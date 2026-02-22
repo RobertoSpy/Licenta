@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --color-buildnavy: #1b2a47;
+  --color-buildorange: #ff6b35;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
