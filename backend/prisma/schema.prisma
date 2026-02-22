@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  password     String
+  name         String?
+  refreshToken String?   // Salvează tokenul de refresh curent pentru securitate (opțional, dar recomandat pt validare la delogare)
+  projects     Project[]
+  createdAt    DateTime  @default(now())
+}
+
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  title       String   
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  
+  // Date Teren
+  plotWidth   Float?   
+  plotLength  Float?   
+  
+  // Devizul 
+  bomItems    ProjectBOM[] 
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 3. Catalogul de Materiale 
+model Material {
+  id          Int      @id @default(autoincrement())
+  name        String   
+  category    String   
+  unit        String   
+  price       Float    
+  storeUrl    String?  
+  
+  bomItems    ProjectBOM[] 
+}
+
+// 4. Devizul 
+model ProjectBOM {
+  id          Int      @id @default(autoincrement())
+  
+  projectId   Int
+  project     Project  @relation(fields: [projectId], references: [id])
+  
+  materialId  Int
+  material    Material @relation(fields: [materialId], references: [id])
+  
+  quantity    Float    
+  totalPrice  Float   
+}
