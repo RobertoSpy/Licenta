@@ -1,8 +1,12 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './pages/auth/Login';
 import { Register } from './pages/auth/Register';
-import { Dashboard } from './pages/Dashboard';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { DashboardLayout } from './components/layout/DashboardLayout';
+import { MyProjects } from './pages/dashboard/MyProjects';
+import { MarketAnalysis } from './pages/dashboard/MarketAnalysis';
+import { Materials } from './pages/dashboard/Materials';
+import { Experts } from './pages/dashboard/Experts';
 import { useAuth } from './context/AuthContext';
 
 function App() {
@@ -25,10 +29,15 @@ function App() {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <DashboardLayout />
           </ProtectedRoute>
         }
-      />
+      >
+        <Route index element={<MyProjects />} />
+        <Route path="market" element={<MarketAnalysis />} />
+        <Route path="materials" element={<Materials />} />
+        <Route path="experts" element={<Experts />} />
+      </Route>
 
       {/* Orice altă rută ne-existentă (Fallback) */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

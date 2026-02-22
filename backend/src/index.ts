@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/authRoutes';
+import projectRoutes from './routes/projectRoutes';
 
 dotenv.config();
 
@@ -20,8 +21,10 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+
 // Punct de intrare rute de Autentificare
 app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'Hello from Backend! Conexiunea funcționează!' });
