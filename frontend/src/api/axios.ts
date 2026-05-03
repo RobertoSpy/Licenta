@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Instanța de bază pentru cereri publice
 export const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -11,7 +11,7 @@ export const api = axios.create({
 
 // Instanța protejată (necesită token)
 export const apiPrivate = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },

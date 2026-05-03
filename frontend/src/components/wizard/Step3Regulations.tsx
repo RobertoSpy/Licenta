@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Ruler, AlertTriangle, Brain, Info, Loader2 } from 'lucide-react';
+import { getAccessToken } from '../../api/axios';
 import type { ProjectFormData } from './ProjectWizard';
 
 interface Props {
@@ -61,8 +62,8 @@ export const Step3Regulations = ({ data, updateData }: Props) => {
   const startAiStreaming = async () => {
     setIsAiLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/ai/chat', {
+      const token = getAccessToken();
+      const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

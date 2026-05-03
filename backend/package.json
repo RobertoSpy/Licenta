@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "predev": "npx prisma@^5.19.0 generate && npx prisma db push",
+    "predev": "npx prisma generate && npx prisma migrate deploy",
     "dev": "nodemon -L src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "seed:normatives": "ts-node -T src/scripts/seedNormatives.ts"
@@ -19,7 +19,7 @@
     "@google/genai": "^1.49.0",
     "@prisma/client": "^5.22.0",
     "@types/pdf-parse": "^1.1.5",
-    "axios": "^1.15.0",
+    "axios": "1.15.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

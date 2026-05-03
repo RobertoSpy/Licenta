@@ -90,6 +90,9 @@ CREATE INDEX "Project_userId_idx" ON "Project"("userId");
 -- CreateIndex
 CREATE INDEX "NormativeChunk_source_idx" ON "NormativeChunk"("source");
 
+-- Create index for pgvector similarity search
+CREATE INDEX IF NOT EXISTS "NormativeChunk_embedding_idx" ON "NormativeChunk" USING ivfflat ("embedding" vector_cosine_ops) WITH (lists = 100);
+
 -- AddForeignKey
 ALTER TABLE "Project" ADD CONSTRAINT "Project_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -98,3 +101,4 @@ ALTER TABLE "ProjectBOM" ADD CONSTRAINT "ProjectBOM_projectId_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "ProjectBOM" ADD CONSTRAINT "ProjectBOM_materialId_fkey" FOREIGN KEY ("materialId") REFERENCES "Material"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
