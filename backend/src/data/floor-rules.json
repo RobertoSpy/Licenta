@@ -1,0 +1,8 @@
+{
+  "0.10g": { "Pietros": 5, "Argilos": 4, "Nisipos": 3, "default": 3 },
+  "0.15g": { "Pietros": 4, "Argilos": 4, "Nisipos": 3, "default": 3 },
+  "0.20g": { "Pietros": 4, "Argilos": 3, "Nisipos": 2, "default": 2 },
+  "0.25g": { "Pietros": 3, "Argilos": 2, "Nisipos": 2, "default": 2 },
+  "0.30g": { "Pietros": 3, "Argilos": 2, "Nisipos": 1, "default": 2 },
+  "0.35g": { "Pietros": 2, "Argilos": 1, "Nisipos": 1, "default": 1 }
+}

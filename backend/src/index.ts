@@ -1,45 +1,76 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
+import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+
+import { globalLimiter } from './middleware/rateLimiter';
 import authRoutes from './routes/authRoutes';
 import projectRoutes from './routes/projectRoutes';
+import terrainRoutes from './routes/terrainRoutes';
+import aiRoutes from './routes/aiRoutes';
+import materialRoutes from './routes/materialRoutes';
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT;
-const prisma = new PrismaClient();
+const port = process.env.PORT || 3000;
 
-// Configurare CORS pentru a permite trimiterea cookie-urilor de Refresh
+// ─────────────────────────────────────────────
+// 1. SECURITATE: Helmet setează HTTP security headers
+//    (X-Frame-Options, Content-Security-Policy, etc.)
+// ─────────────────────────────────────────────
+app.use(helmet());
+
+// ─────────────────────────────────────────────
+// 2. CORS: Respinge origine necunoscute ÎNAINTE
+//    de parsare body — cost minim per request respins
+// ─────────────────────────────────────────────
 app.use(cors({
-  origin: 'http://localhost:5173', // Frontend URL
-  credentials: true
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true, // necesar pentru cookie-uri (Refresh Token)
 }));
 
+// ─────────────────────────────────────────────
+// 3. PARSERE: JSON body + cookies
+//    Ordinea contează: parsăm după CORS, înainte de rate limiter
+// ─────────────────────────────────────────────
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// ─────────────────────────────────────────────
+// 4. RATE LIMITING GLOBAL: Gardian ieftin înainte de business logic
+//    Protecție DDoS / brute-force la nivel de server
+// ─────────────────────────────────────────────
+app.use(globalLimiter);
 
-// Punct de intrare rute de Autentificare
+// ─────────────────────────────────────────────
+// 5. HEALTH CHECK: Fără autentificare, fără rate limiting strict
+// ─────────────────────────────────────────────
+app.get('/health', (_, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ─────────────────────────────────────────────
+// 6. RUTE
+// ─────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/terrain', terrainRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/materials', materialRoutes);
 
-app.get('/', (req: Request, res: Response) => {
-  res.json({ message: 'Hello from Backend! Conexiunea funcționează!' });
+// ─────────────────────────────────────────────
+// 7. FALLBACK: Rută necunoscută
+// ─────────────────────────────────────────────
+app.use((_, res) => {
+  res.status(404).json({ message: 'Ruta nu există.' });
 });
 
-app.get('/api/materials', async (req: Request, res: Response) => {
-  try {
-    const materials = await prisma.material.findMany();
-    res.json(materials);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ error: "Eroare la preluarea materialelor" });
-  }
-});
-
+// ─────────────────────────────────────────────
+// 8. PORNIRE SERVER
+// ─────────────────────────────────────────────
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`[Server] Running on port ${port}`);
 });

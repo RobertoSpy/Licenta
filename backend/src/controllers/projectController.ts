@@ -1,8 +1,6 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/authMiddleware';
-
-const prisma = new PrismaClient();
+import { projectService } from '../services/projectService';
 
 // Creare Proiect nou
 export const createProject = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -13,22 +11,8 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const { title, plotWidth, plotLength } = req.body;
-
-    if (!title) {
-      res.status(400).json({ message: 'Titlul este obligatoriu' });
-      return;
-    }
-
-    const project = await prisma.project.create({
-      data: {
-        title,
-        plotWidth,
-        plotLength,
-        userId
-      }
-    });
-
+    const title = req.body?.title || `Proiect nou - ${new Date().toLocaleDateString()}`;
+    const project = await projectService.createProject(userId, title);
     res.status(201).json(project);
   } catch (error) {
     console.error('Eroare creare proiect:', error);
@@ -45,14 +29,7 @@ export const getUserProjects = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    const projects = await prisma.project.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        bomItems: true
-      }
-    });
-
+    const projects = await projectService.getUserProjects(userId);
     res.json(projects);
   } catch (error) {
     console.error('Eroare preluare proiecte:', error);
@@ -75,30 +52,65 @@ export const getProjectById = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      include: {
-        bomItems: {
-          include: {
-            material: true
-          }
-        }
-      }
-    });
-
-    if (!project) {
-      res.status(404).json({ message: 'Proiectul nu a fost găsit' });
-      return;
-    }
-
-    if (project.userId !== userId) {
-      res.status(403).json({ message: 'Acces interzis' });
-      return;
-    }
-
+    const project = await projectService.getProjectById(projectId, userId);
     res.json(project);
-  } catch (error) {
-    console.error('Eroare preluare proiect:', error);
-    res.status(500).json({ message: 'Eroare la preluarea proiectului' });
+  } catch (error: any) {
+    if (error.message === 'NOT_FOUND') {
+      res.status(404).json({ message: 'Proiectul nu a fost găsit' });
+    } else if (error.message === 'FORBIDDEN') {
+      res.status(403).json({ message: 'Acces interzis' });
+    } else {
+      console.error('Eroare preluare proiect:', error);
+      res.status(500).json({ message: 'Eroare la preluarea proiectului' });
+    }
+  }
+};
+
+export const updateProject = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Neautorizat' });
+      return;
+    }
+
+    const projectId = parseInt(req.params.id as string);
+    if (isNaN(projectId)) {
+      res.status(400).json({ message: 'ID proiect invalid' });
+      return;
+    }
+
+    const updatedProject = await projectService.updateProject(projectId, userId, req.body);
+    res.status(200).json(updatedProject);
+  } catch (error: any) {
+    if (error.message === 'NOT_FOUND') {
+      res.status(404).json({ message: 'Proiectul nu a fost găsit' });
+    } else if (error.message === 'FORBIDDEN') {
+      res.status(403).json({ message: 'Acces interzis' });
+    } else {
+      console.error('Eroare la actualizare proiect:', error);
+      res.status(500).json({ message: 'Eroare la actualizarea proiectului' });
+    }
+  }
+};
+
+// Stergere proiect
+export const deleteProject = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) { res.status(401).json({ message: 'Neautorizat' }); return; }
+
+    const projectId = parseInt(req.params.id as string);
+    if (isNaN(projectId)) { res.status(400).json({ message: 'ID invalid' }); return; }
+
+    await projectService.deleteProject(projectId, userId);
+    res.status(200).json({ message: 'Proiect șters cu succes' });
+  } catch (error: any) {
+    if (error.message === 'FORBIDDEN_OR_NOT_FOUND') {
+      res.status(403).json({ message: 'Acces interzis sau proiect inexistent' });
+    } else {
+      console.error('Eroare ștergere proiect:', error);
+      res.status(500).json({ message: 'Eroare la ștergerea proiectului' });
+    }
   }
 };

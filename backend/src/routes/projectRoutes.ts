@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createProject, getUserProjects, getProjectById } from '../controllers/projectController';
+import { createProject, getUserProjects, getProjectById, updateProject, deleteProject } from '../controllers/projectController';
 import { protect } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -11,6 +11,9 @@ router.route('/')
   .get(getUserProjects);
 
 router.route('/:id')
-  .get(getProjectById);
+  .get(getProjectById)
+  .patch(updateProject)
+  .delete(deleteProject);
 
 export default router;
+

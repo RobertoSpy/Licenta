@@ -7,6 +7,7 @@ import { MyProjects } from './pages/dashboard/MyProjects';
 import { MarketAnalysis } from './pages/dashboard/MarketAnalysis';
 import { Materials } from './pages/dashboard/Materials';
 import { Experts } from './pages/dashboard/Experts';
+import { ProjectDetail } from './pages/dashboard/ProjectDetail';
 import { useAuth } from './context/AuthContext';
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
         <Route path="market" element={<MarketAnalysis />} />
         <Route path="materials" element={<Materials />} />
         <Route path="experts" element={<Experts />} />
+        <Route path="projects/:id" element={<ProjectDetail />} />
       </Route>
 
       {/* Orice altă rută ne-existentă (Fallback) */}

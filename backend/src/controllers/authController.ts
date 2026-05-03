@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { userRepository } from '../repositories/userRepository';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -30,7 +28,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await userRepository.findByEmail(email);
     if (existingUser) {
       res.status(409).json({ message: 'Un cont cu acest email există deja' });
       return;
@@ -38,12 +36,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name
-      },
+    const newUser = await userRepository.create({
+      email,
+      password: hashedPassword,
+      name
     });
 
     res.status(201).json({
@@ -68,7 +64,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await userRepository.findByEmail(email);
     if (!user) {
       res.status(401).json({ message: 'Credențiale invalide' });
       return;
@@ -93,11 +89,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       { expiresIn: '7d' }
     );
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken }
-    });
-
+    await userRepository.updateRefreshToken(user.id, refreshToken);
 
     res.cookie('jwt', refreshToken, {
       httpOnly: true,
@@ -116,6 +108,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ message: 'Eroare internă a serverului' });
   }
 };
+
 // REHIDRATARE
 export const refresh = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -128,9 +121,7 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
 
     const refreshToken = cookies.jwt;
 
-    const user = await prisma.user.findFirst({
-      where: { refreshToken }
-    });
+    const user = await userRepository.findByRefreshToken(refreshToken);
 
     if (!user) {
       res.status(403).json({ message: 'Acces interzis - Token invalid pe server' });
@@ -172,12 +163,7 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
 
     const refreshToken = cookies.jwt;
 
-
-    await prisma.user.updateMany({
-      where: { refreshToken },
-      data: { refreshToken: null }
-    });
-
+    await userRepository.clearRefreshToken(refreshToken);
 
     res.clearCookie('jwt', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
     res.sendStatus(204);

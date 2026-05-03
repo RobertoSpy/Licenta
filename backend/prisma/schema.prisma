@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 model User {
@@ -17,22 +19,52 @@ model User {
   createdAt    DateTime  @default(now())
 }
 
-
 model Project {
-  id          Int      @id @default(autoincrement())
-  title       String   
-  userId      Int
-  user        User     @relation(fields: [userId], references: [id])
-  
-  // Date Teren
-  plotWidth   Float?   
-  plotLength  Float?   
-  
-  // Devizul 
-  bomItems    ProjectBOM[] 
+  id     Int    @id @default(autoincrement())
+  title  String
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // === SCREEN 1: Identificare Teren ===
+  lat               Float?
+  lng               Float?
+  // polygonGeoJSON stochează Json — suprafața se calculează în backend cu turf.js
+  // și se salvează în plotAreaSqm. Nu se recalculează la citire.
+  polygonGeoJSON    Json?
+  county            String?
+  locality          String?
+  seismicZone       String?   // "0.10g" | "0.15g" | "0.20g" | "0.25g" | "0.30g" | "0.35g"
+  frostDepthCm      Int?
+  plotAreaSqm       Float?    // calculat cu turf.js la salvare, stocat aici
+
+  // === SCREEN 2: Caracteristici Teren ===
+  soilType          String?   // "Argilos" | "Nisipos" | "Pietros" | "Stâncos" | "Necunoscut"
+  slopePercent      Float?
+  streetOrientation String?   // "N" | "NE" | "E" | "SE" | "S" | "SV" | "V" | "NV"
+  soilNotes         String?
+
+  // === SCREEN 3: Reglementări (generate de AI, salvate pentru referință) ===
+  maxAllowedFloors     Int?
+  minFoundationDepthCm Int?
+  zoningRestrictions   String?
+
+  // === SCREEN 4: Tipul Casei ===
+  houseStyle       String?   // "Modern" | "Industrial" | "Clasic" | "Mediteranean"
+  hasBasement      Boolean   @default(false)
+  hasGroundFloor   Boolean   @default(true)
+  upperFloorsCount Int       @default(0)
+  hasMansard       Boolean   @default(false)
+  totalFloors      Int?      // calculat: basement(0/1) + parter(1) + etaje + mansardă(0/1)
+
+  // Starea Wizard-ului — DB este sursa de adevăr
+  wizardStep   Int     @default(1)
+  isCompleted  Boolean @default(false)
+
+  bomItems  ProjectBOM[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId])
 }
 
 // 3. Catalogul de Materiale 
@@ -52,11 +84,22 @@ model ProjectBOM {
   id          Int      @id @default(autoincrement())
   
   projectId   Int
-  project     Project  @relation(fields: [projectId], references: [id])
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
   materialId  Int
-  material    Material @relation(fields: [materialId], references: [id])
+  material    Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
   
   quantity    Float    
   totalPrice  Float   
+}
+
+// === PENTRU RAG ===
+model NormativeChunk {
+  id        Int    @id @default(autoincrement())
+  source    String // "NP112-2014" | "P100-2013" | "CR6-2013" etc.
+  chapter   String // "Cap.3 - Identificarea vizuală a solului"
+  content   String // 800-1000 cuvinte per chunk
+  embedding Unsupported("vector(768)")?
+
+  @@index([source])
 }

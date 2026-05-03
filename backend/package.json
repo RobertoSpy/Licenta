@@ -6,7 +6,8 @@
   "scripts": {
     "predev": "npx prisma@^5.19.0 generate && npx prisma db push",
     "dev": "nodemon -L src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "seed:normatives": "ts-node -T src/scripts/seedNormatives.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -15,19 +16,27 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/genai": "^1.49.0",
     "@prisma/client": "^5.22.0",
+    "@types/pdf-parse": "^1.1.5",
+    "axios": "^1.15.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
-    "jsonwebtoken": "^9.0.3"
+    "express-rate-limit": "^8.4.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "pdf-parse": "^1.1.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/helmet": "^0.0.48",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.19.11",
     "nodemon": "^3.1.0",
