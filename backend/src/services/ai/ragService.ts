@@ -1,6 +1,6 @@
 import { normativeChunkRepository } from '../../repositories/normativeChunkRepository';
 import { embeddingService } from './embeddingService';
-
+//ragService vectorizeaza intrebarea si striga la nom=rmativeChunksrepo
 export const ragService = {
   /**
    * Caută cele mai relevante X paragrafe din baza de cunoștințe (NormativeChunk)

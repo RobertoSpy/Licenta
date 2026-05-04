@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/axios';
 import { Button } from '../../components/ui/Button';
@@ -13,7 +13,9 @@ export const Login = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  const successMessage = (location.state as { message?: string })?.message || '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +73,11 @@ export const Login = () => {
           <p className="text-slate-500 mt-2 mb-8">Introdu credențiale tale pentru a accesa panoul tău de proiecte.</p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {successMessage && (
+              <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-700 text-sm rounded-r-md">
+                {successMessage}
+              </div>
+            )}
             {error && (
               <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded-r-md">
                 {error}
@@ -102,9 +109,9 @@ export const Login = () => {
                 <input type="checkbox" className="rounded border-slate-300 text-buildorange focus:ring-buildorange" />
                 <span className="ml-2 text-sm text-slate-600">Ține-mă minte</span>
               </label>
-              <a href="#" className="text-sm font-medium text-buildorange hover:text-orange-600">
+              <Link to="/forgot-password" className="text-sm font-medium text-buildorange hover:text-orange-600">
                 Ai uitat parola?
-              </a>
+              </Link>
             </div>
 
             <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>

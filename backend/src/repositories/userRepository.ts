@@ -23,5 +23,35 @@ export const userRepository = {
       where: { refreshToken },
       data: { refreshToken: null }
     });
-  }
+  },
+  async saveResetToken(userId: number, hashedToken: string, expires: Date): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: expires,
+      },
+    });
+  },
+
+  async findByResetToken(hashedToken: string): Promise<import('@prisma/client').User | null> {
+    return prisma.user.findFirst({
+      where: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { gt: new Date() }, // token-ul nu a expirat
+      },
+    });
+  },
+
+  async clearResetToken(userId: number, newHashedPassword: string): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: newHashedPassword,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+  },
 };
+

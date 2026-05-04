@@ -28,7 +28,7 @@ export const projectRepository = {
     return prisma.project.create({ data: data as any });
   },
   async update(id: number, data: Partial<Project>): Promise<Project> {
-    return prisma.project.update({ where: { id }, data });
+    return prisma.project.update({ where: { id }, data: data as any });
   },
   async delete(id: number): Promise<void> {
     await prisma.project.delete({ where: { id } });

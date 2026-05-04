@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { userRepository } from '../repositories/userRepository';
+import { sendPasswordResetEmail } from '../services/emailService';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -172,4 +174,66 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     console.error('Eroare la logout:', error);
     res.status(500).json({ message: 'Eroare internă a serverului' });
   }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  // Același răspuns indiferent — nu dezvălui dacă emailul există în DB
+  const genericResponse = {
+    message: 'Dacă adresa există, vei primi un cod de verificare în câteva minute.'
+  };
+
+  try {
+    const user = await userRepository.findByEmail(email);
+    if (!user) return res.status(200).json(genericResponse);
+
+    // Generăm un cod OTP de 6 cifre
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = crypto
+      .createHash('sha256')
+      .update(otp)
+      .digest('hex');
+
+    await userRepository.saveResetToken(
+      user.id,
+      hashedOtp,
+      new Date(Date.now() + 15 * 60 * 1000) // 15 minute
+    );
+
+    await sendPasswordResetEmail(email, otp);
+
+    return res.status(200).json(genericResponse);
+  } catch (err) {
+    console.error('forgotPassword error:', err);
+    return res.status(200).json(genericResponse); // tot același răspuns
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({ message: 'Email, cod OTP și parola nouă sunt obligatorii.' });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({ message: 'Parola trebuie să aibă minim 8 caractere.' });
+  }
+
+  const hashedOtp = crypto
+    .createHash('sha256')
+    .update(otp)
+    .digest('hex');
+
+  const user = await userRepository.findByResetToken(hashedOtp);
+
+  if (!user || user.email !== email) {
+    return res.status(400).json({ message: 'Cod invalid sau expirat.' });
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  await userRepository.clearResetToken(user.id, hashedPassword);
+
+  return res.status(200).json({ message: 'Parola a fost resetată cu succes.' });
 };
