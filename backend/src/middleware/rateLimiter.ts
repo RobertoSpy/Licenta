@@ -39,6 +39,7 @@ export const authEmailLimiter = rateLimit({
   max: 10, // 10 încercări per email — prag strict anti brute-force
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false, trustProxy: false, ip: false }, // Dezactivăm avertismentul IPv6 pentru fallback
   keyGenerator: (req: Request): string => {
     // Normalizare email: lowercase + trim → evită bypass prin variații de case
     const email = req.body?.email;
@@ -71,7 +72,7 @@ export const authIpLimiter = rateLimit({
   max: 50, // 50 request-uri per IP — tolerant pentru WiFi comun
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: Request): string => `ip:${req.ip}`,
+  // keyGenerator-ul default folosește `req.ip` safe, inclusiv pentru IPv6, deci nu e nevoie de unul custom.
   message: {
     status: 429,
     message: 'Prea multe cereri de la această rețea. Încearcă din nou în 15 minute.',

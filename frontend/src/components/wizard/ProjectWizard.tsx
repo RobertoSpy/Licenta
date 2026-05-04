@@ -7,7 +7,7 @@ import { Step1Location } from './Step1Location';
 import { Step2Terrain } from './Step2Terrain';
 import { Step3Regulations } from './Step3Regulations';
 import { Step4HouseType } from './Step4HouseType';
-import { api } from '../../api/axios';
+import { apiPrivate } from '../../api/axios';
 import { useProjectGuard } from '../../hooks/useProjectGuard';
 
 export interface ProjectFormData {
@@ -84,7 +84,7 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
   const handleNext = async () => {
     if (currentStep >= 1 && currentStep <= 3) {
       try {
-        await api.patch(`/api/projects/${projectId}`, {
+        await apiPrivate.patch(`/projects/${projectId}`, {
           ...formData, // Trimite toate datele strânse
           wizardStep: currentStep + 1 // Sincronizam cu pasul URMATOR
         });
@@ -106,7 +106,7 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
     if (!projectId) return;
     setIsSaving(true);
     try {
-      await api.patch(`/api/projects/${projectId}`, {
+      await apiPrivate.patch(`/projects/${projectId}`, {
         ...formData,
         wizardStep: 4,
         isCompleted: true,

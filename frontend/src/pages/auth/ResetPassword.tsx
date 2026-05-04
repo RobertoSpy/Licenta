@@ -1,4 +1,5 @@
-import { useState, useRef, KeyboardEvent, ClipboardEvent } from 'react';
+import { useState, useRef } from 'react';
+import type { KeyboardEvent, ClipboardEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../api/axios';
 import { Button } from '../../components/ui/Button';

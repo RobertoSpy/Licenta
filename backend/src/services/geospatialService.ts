@@ -11,17 +11,17 @@ export const geospatialService = {
   async reverseGeocode(lat: number, lng: number): Promise<{ county: string, locality: string } | null> {
     try {
       const response = await axios.get(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ro`,
         { headers: { 'User-Agent': 'BuildWise/1.0' } }
       );
-      
+
       const addr = response.data.address;
       // Depending on nominatim format, county might be under .county or .state if not mapped perfectly.
       // Usually it's returned as "Județul Cluj" -> we can normalize it
-      let county = addr.county || addr.state || addr.region || '';
+      let county = addr.county || addr.state || addr.region || addr.city || addr.municipality || addr.town || '';
       county = county.replace(/Județul /g, '').replace(' County', '').trim();
 
-      const locality = addr.city || addr.town || addr.village || addr.municipality || '';
+      const locality = addr.village || addr.town || addr.city || addr.municipality || '';
 
       return { county, locality };
     } catch (error) {

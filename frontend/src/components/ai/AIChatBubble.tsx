@@ -22,18 +22,28 @@ interface Message {
 
 interface AIChatBubbleProps {
   contextData?: Record<string, unknown>; // Date pe care le oferim AI-ului ca referință (ex: date teren)
+  welcomeMessage?: string; // Mesaj predefinit afișat la deschidere, fără apel backend
   suggestedAction?: {
     label: string;
     onApply: () => void;
   };
 }
 
-export const AIChatBubble: React.FC<AIChatBubbleProps> = ({ contextData, suggestedAction }) => {
+export const AIChatBubble: React.FC<AIChatBubbleProps> = ({ contextData, welcomeMessage, suggestedAction }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const welcomeInjected = useRef(false);
+
+  // Injectează mesajul de bun venit la prima montare (fără apel backend)
+  useEffect(() => {
+    if (welcomeMessage && !welcomeInjected.current) {
+      welcomeInjected.current = true;
+      setMessages([{ role: 'ai', content: welcomeMessage }]);
+    }
+  }, [welcomeMessage]);
 
   // Auto scroll la ultimul mesaj
   useEffect(() => {
@@ -181,7 +191,7 @@ export const AIChatBubble: React.FC<AIChatBubbleProps> = ({ contextData, suggest
 
             {/* Chat History */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
-              {messages.length === 0 && (
+              {messages.length === 0 && !welcomeMessage && (
                 <div className="text-center text-gray-400 text-sm mt-10 px-4">
                   <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <BrainIcon />

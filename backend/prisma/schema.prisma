@@ -14,7 +14,7 @@ model User {
   email        String    @unique
   password     String
   name         String?
-  refreshToken String?   // Salvează tokenul de refresh curent pentru securitate (opțional, dar recomandat pt validare la delogare)
+  refreshToken String?   // SalveazÄƒ tokenul de refresh curent pentru securitate (opÈ›ional, dar recomandat pt validare la delogare)
   passwordResetToken   String?
   passwordResetExpires DateTime?
   projects     Project[]
@@ -30,8 +30,8 @@ model Project {
   // === SCREEN 1: Identificare Teren ===
   lat               Float?
   lng               Float?
-  // polygonGeoJSON stochează Json — suprafața se calculează în backend cu turf.js
-  // și se salvează în plotAreaSqm. Nu se recalculează la citire.
+  // polygonGeoJSON stocheazÄƒ Json â€” suprafaÈ›a se calculeazÄƒ Ã®n backend cu turf.js
+  // È™i se salveazÄƒ Ã®n plotAreaSqm. Nu se recalculeazÄƒ la citire.
   polygonGeoJSON    Json?
   county            String?
   locality          String?
@@ -40,12 +40,12 @@ model Project {
   plotAreaSqm       Float?    // calculat cu turf.js la salvare, stocat aici
 
   // === SCREEN 2: Caracteristici Teren ===
-  soilType          String?   // "Argilos" | "Nisipos" | "Pietros" | "Stâncos" | "Necunoscut"
+  soilType          String?   // "Argilos" | "Nisipos" | "Pietros" | "StÃ¢ncos" | "Necunoscut"
   slopePercent      Float?
   streetOrientation String?   // "N" | "NE" | "E" | "SE" | "S" | "SV" | "V" | "NV"
   soilNotes         String?
 
-  // === SCREEN 3: Reglementări (generate de AI, salvate pentru referință) ===
+  // === SCREEN 3: ReglementÄƒri (generate de AI, salvate pentru referinÈ›Äƒ) ===
   maxAllowedFloors     Int?
   minFoundationDepthCm Int?
   zoningRestrictions   String?
@@ -56,9 +56,9 @@ model Project {
   hasGroundFloor   Boolean   @default(true)
   upperFloorsCount Int       @default(0)
   hasMansard       Boolean   @default(false)
-  totalFloors      Int?      // calculat: basement(0/1) + parter(1) + etaje + mansardă(0/1)
+  totalFloors      Int?      // calculat: basement(0/1) + parter(1) + etaje + mansardÄƒ(0/1)
 
-  // Starea Wizard-ului — DB este sursa de adevăr
+  // Starea Wizard-ului â€” DB este sursa de adevÄƒr
   wizardStep   Int     @default(1)
   isCompleted  Boolean @default(false)
 
@@ -99,9 +99,12 @@ model ProjectBOM {
 model NormativeChunk {
   id        Int    @id @default(autoincrement())
   source    String // "NP112-2014" | "P100-2013" | "CR6-2013" etc.
-  chapter   String // "Cap.3 - Identificarea vizuală a solului"
+  chapter   String // "Cap.3 - Identificarea vizualÄƒ a solului"
   content   String // 800-1000 cuvinte per chunk
+  agent     String @default("general")
   embedding Unsupported("vector(768)")?
 
   @@index([source])
+  @@index([agent])
 }
+

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '../api/axios';
+import { apiPrivate } from '../api/axios';
 import type { ProjectFormData } from '../components/wizard/ProjectWizard';
 
 export const useProjectGuard = () => {
@@ -15,7 +15,7 @@ export const useProjectGuard = () => {
         
         if (savedId) {
           const id = parseInt(savedId);
-          const { data: project } = await api.get(`/api/projects/${id}`);
+          const { data: project } = await apiPrivate.get(`/projects/${id}`);
           
           if (project) {
             setProjectId(project.id);
@@ -49,7 +49,7 @@ export const useProjectGuard = () => {
         }
         
         // Dacă nu avem ID salvat, creăm un proiect nou
-        const { data: newProject } = await api.post('/api/projects');
+        const { data: newProject } = await apiPrivate.post('/projects');
         setProjectId(newProject.id);
         localStorage.setItem('activeProjectId', newProject.id.toString());
 

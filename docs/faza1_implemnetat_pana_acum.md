@@ -20,11 +20,15 @@ Acest document descrie stadiul actual al proiectului la finalizarea primei faze 
   - **Reverse Geocoding**: Traducerea coordonatelor hărții din Leaflet (lat/lng) în județ, cu ajutorul API-ului public Nominatim.
   - **Match Automat**: Preluare automată a zonei seismice și a limitei de adâncime la îngheț pe județ, direct din dicționare JSON.
 
-### 1.3. Asistent Inteligent „Zidario”
-A fost implementată o soluție de top din zona AI, arhitectura hibridă **CAG + RAG**:
-- **CAG (Cache-Augmented Generation)**: Tabelele grele (zone seismice pe județ, adâncimi de îngheț, limite de suprafețe sau cerințe etaje din norme de construcții) sunt încărcate optimizat într-un singur string Singleton la boot-ul backend-ului și furnizate asistentului AI ca set strict de reguli inviolabile.
-- **RAG (Retrieval-Augmented Generation)**: Legislația densă este citită dinamic folosind **pgvector** pe baza întrebării vectorizate a utilizatorului. Am adăugat indexul `ivfflat` direct prin fișier de migrare manual Prisma pentru performanță pe o scalare viitoare a mii de PDF-uri.
-- **Chat cu Streaming (SSE)**: Conexiunea AI este menținută prin Server-Sent Events, livrând progresiv un feedback direct către interfața React. Asistentul acum dispune și de **Conversation History**, astfel „Zidario” își amintește de la un mesaj la altul contextul despre ce vorbea cu utilizatorul.
+### 1.3. Asistent Inteligent „Zidario” & Arhitectură Multi-Agent RAG
+A fost implementată o soluție de top din zona AI, o arhitectură hibridă avansată **CAG + Multi-Agent RAG**:
+- **CAG (Cache-Augmented Generation)**: Tabelele grele (zone seismice pe județ, adâncimi de îngheț, limite de suprafețe sau cerințe etaje) sunt încărcate optimizat într-un singur string la boot-ul backend-ului și furnizate asistentului AI ca set strict de reguli.
+- **Multi-Agent RAG (Retrieval-Augmented Generation)**: Legislația densă este citită dinamic folosind **pgvector**, dar cu izolare completă de context. Am creat agenți specializați (Geotehnic, Seismic, Legal), fiecare interogând doar un subset specific de normative prin intermediul unui câmp `agent` din baza de date vectorizată. Astfel eliminăm complet halucinațiile AI-ului (nu va încurca reguli de izolație cu reguli de structură).
+- **Proactive UX (Zero-Call AI)**: În pașii wizard-ului, asistentul injectează automat mesaje educaționale predefinite la montarea componentei. Utilizatorul este ghidat vizual cum să calculeze panta sau să recunoască tipul de sol, bazat pe norme (P100-1, NP 112), fără a declanșa apeluri costisitoare către backend/Gemini.
+- **Chat cu Streaming (SSE)**: Conexiunea AI este menținută prin Server-Sent Events, livrând progresiv feedback. Asistentul dispune de **Conversation History**, astfel „Zidario” își amintește contextul de la un mesaj la altul.
+
+### 1.4. Interfață Utilizator & Dashboard
+- **Ecran ProjectDetail Elegant**: Proiectele salvate beneficiază de un ecran sumar care afișează toate deciziile de configurare (teren, seismicitate, fundație, arhitectură). Include un banner animat premium pentru funcționalitățile Fazei 2 aflate în dezvoltare (Editor Plan 2D Interactiv).
 
 ---
 
@@ -45,7 +49,10 @@ graph TD
     subgraph Layer 2: Business Logic pur
         Controllers --> Services[Strat 3: Services<br/>/services/*.ts]
         Services --> Geospatial(geospatialService)
-        Services --> RAG(ragService)
+        Services --> Orchestrator(agentOrchestrator)
+        Orchestrator --> AgentG(ragAgentGeotehnic)
+        Orchestrator --> AgentS(ragAgentSeismic)
+        Orchestrator --> AgentL(ragAgentLegal)
         Services --> Proj(projectService)
     end
 
@@ -55,9 +62,11 @@ graph TD
 
     Repos --> Prisma[(Prisma ORM<br/>PostgreSQL)]
     
-    RAG --> Embedding[Google GenAI<br/>Vectorizare]
+    AgentG --> Embedding[Google GenAI<br/>Vectorizare]
+    AgentS --> Embedding
+    AgentL --> Embedding
     Geospatial --> API[Nominatim OSM API]
-    RAG --> CAG[normativeCache.ts<br/>In-Memory JSON]
+    Orchestrator --> CAG[normativeCache.ts<br/>In-Memory JSON]
 ```
 
 ### Cum interacționează între ele:
@@ -89,11 +98,12 @@ Vom modela traseul clar în care Utilizatorul X interacționează cu Wizard-ul �
 
 ### 📍 Pas 3: Interogarea Tehnică (Zidario AI Assistant)
 - User-ul deschide asistentul Zidario și întreabă: *"Cu terenul meu din Cluj, pot construi ceva structură de zidărie dacă adaug și etaj și mansardă?"*.
-- Apelul pleacă pe ruta `/api/ai/chat`. Pe lângă întrebare, front-end-ul atașează log-ul de chaturi din ultima oră (Conversation History) și proprietățile terenului.
-- Controller-ul deschide din start capătul de stream HTTP Server-Sent Events (SSE) (începe trimiterea header-elor cu `text/event-stream`). Apoi lasă procesarea pe seama lui `agentOrchestrator.ts`.
-- Orchestratorul declanșează fluxurile în paralel:
-  1. Cere String-ul cu limitările statice de etaje și îngheț de la **CAG** (`normativeCache.ts`).
-  2. Rulează funcția din **RAG** (`ragService.ts`), trimițând întrebarea pe modelul Google GenAI, devenind vector format din 768 de dimensiuni numerice.
-- Baza de date este interogată de `normativeChunkRepository.ts` folosind distanța de masă cosine (`<=>`) care întoarce la nanosecundă cele mai aplicabile 3 articole și legi despre înălțimea clădirilor de zidărie.
+- Apelul pleacă pe ruta `/api/ai/chat`. Pe lângă întrebare, front-end-ul atașează log-ul de chaturi din ultima oră și proprietățile terenului.
+- Controller-ul deschide capătul de stream HTTP Server-Sent Events (SSE) (începe trimiterea header-elor cu `text/event-stream`). Apoi lasă procesarea pe seama lui `agentOrchestrator.ts`.
+- Orchestratorul execută **rutarea inteligentă**: 
+  1. Evaluează cuvintele cheie din întrebare (ex: "structură", "etaj") și detectează că intenția este de natură *Seismică/Structurală*.
+  2. Apelează exclusiv `ragAgentSeismic`, care extrage doar din documentul P100-1 (Cod seismic) evitând bruiaje de la documente de sol sau legi de urbanism.
+  3. Încarcă limitările statice de etaje și îngheț din **CAG** (`normativeCache.ts`).
+- Baza de date este interogată de `normativeChunkRepository.ts` filtrând strict după `WHERE agent = 'seismic'`, folosind distanța de masă cosine (`<=>`) pentru a aduce cele mai relevante 3 pasaje din codul de proiectare.
 - Prompt-ul gigant (dar invizibil utilizatorului) cuprinzând Regulile Statice, Normativele Potrivite, Istoricul Chat-ului, Variabilele curente (Județul Cluj, etc) și Întrebarea este dat lui **Gemini 2.5 Pro**.
 - Pe măsură ce AI-ul Google gândește răspunsul, chunk-urile de câteva silabe vin succesiv înapoi. În bucla `for await...` din backend, fiecare părticică este trimisă cu comandă SSE nativă `res.write()` către Browser-ul User-ului, care o afișează progresiv pe ecran.

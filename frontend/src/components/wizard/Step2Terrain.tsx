@@ -37,6 +37,29 @@ const calculateAreaFromMeters = (points: { x: string, y: string }[]) => {
 
 const springConfig = { type: "spring" as const, stiffness: 300, damping: 20 };
 
+// Mesaj educativ predefinit — nu afișăm valorile introduse, EDUCĂM utilizatorul
+const TERRAIN_WELCOME_MESSAGE = `👋 Bun venit la analiza terenului! Înainte să completezi câmpurile, hai să înțelegem ce înseamnă fiecare:
+
+📐 **PANTA TERENULUI**
+Cum se calculează: (diferență de nivel ÷ distanță orizontală) × 100
+Exemplu: dacă terenul coboară **1 metru** pe o lungime de **10 metri** → panta este **10%**.
+Cum o măsori: cu o aplicație pe telefon (Clinometer), cu un furtun de nivel, sau cu un topograf autorizat.
+⚠️ Conform **P100-1/2013**: pantele peste **30%** necesită studiu geotehnic obligatoriu.
+
+🌍 **TIPUL DE SOL — Cum îl recunoști vizual**
+• **Argilos** — lipicios umed, se crapă uscat, nu absoarbe apa rapid. Cel mai răspândit în România.
+• **Nisipos** — granulos, curge printre degete, absoarbe apa instant.
+• **Pietros** — pietre și bolovani, drenaj bun, portanță mare.
+• **Stâncos** — rocă solidă la suprafață. Cel mai sigur, dar costisitor de excavat.
+📋 Conform **NP 112-2014**: tipul de sol determină adâncimea minimă a fundației.
+
+🧭 **ORIENTAREA FAȚĂ DE STRADĂ**
+Direcția cardinală spre care privește fațada principală.
+• **Sud / Sud-Est** — lumină naturală maximă, consum energetic redus iarna.
+• **Nord** — camerele din față vor fi mai reci și mai puțin luminate.
+
+Pune-mi orice întrebare! 🏗️`;
+
 export const Step2Terrain = ({ data, updateData }: Props) => {
   const areaSqMeters = useMemo(() => calculateAreaFromMeters(data.plotCoordinates), [data.plotCoordinates]);
 
@@ -181,7 +204,7 @@ export const Step2Terrain = ({ data, updateData }: Props) => {
             )}
           </MapContainer>
           
-          {/* Card Detalii Geo - Blur Backdrop */}
+          {/* Card Detalii Geo */}
           <div className="absolute top-6 left-6 z-10 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl p-4 shadow-2xl">
              <div className="flex items-center gap-3">
                 <div className="p-2 bg-buildorange rounded-xl shadow-lg">
@@ -196,17 +219,15 @@ export const Step2Terrain = ({ data, updateData }: Props) => {
         </div>
       </motion.div>
 
-      {/* AI Assistant Embedded for technical support */}
+      {/* AI Assistant cu mesaj educativ predefinit */}
       <AIChatBubble 
-        contextData={data} 
+        contextData={data as unknown as Record<string, unknown>}
+        welcomeMessage={TERRAIN_WELCOME_MESSAGE}
         suggestedAction={{
            label: "Analizează tipul de sol",
-           onApply: () => {
-             // Aceasta este doar o actiune vizuala pentru demo
-           }
+           onApply: () => {}
         }}
       />
     </div>
   );
 };
-

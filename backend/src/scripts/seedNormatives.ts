@@ -10,6 +10,19 @@ import { embeddingService } from '../services/ai/embeddingService';
 
 const prisma = new PrismaClient();
 
+/**
+ * Mapping de agent per fisier PDF.
+ * Doar aceste 5 documente sunt indexate pentru Faza 1.
+ * Adauga mai multe fisiere aici cand incepi Faza 2+.
+ */
+const AGENT_MAP: Record<string, string> = {
+  'III_26_NP_112_2014.pdf':  'geotehnic',  // NP112 - Fundatii si sol
+  'NP_074-2022_.pdf':        'geotehnic',  // NP074 - Studii geotehnice
+  'I_22_P100_1_2013.pdf':    'seismic',   // P100-1 - Cod seismic
+  'Lege 50 1991(r2).pdf':    'legal',     // Legea 50 - Autorizatii
+  'Lege 350 2001.pdf':       'legal',     // Legea 350 - Urbanism
+};
+
 // Oprim la 15 calls / request sau punem sleep pentru a nu depasi cota gratuita Gemini API
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -66,15 +79,16 @@ async function processPdf(filePath: string) {
         const content = chunks[i];
 
         try {
-            // Trimitem fragmnetul la Google Gemini (Generază lista matematică)
+            // Trimitem fragmentul la Google Gemini (Genereaza lista matematica)
             const vector = await embeddingService.embed(content);
             const vectorStr = `[${vector.join(',')}]`;
+            const agentName = AGENT_MAP[fileName] || 'general';
 
-            // Prisma nu expune direct insert pe câmpul de vector, deci operăm prin SQL brut:
+            // Prisma nu expune direct insert pe campul de vector, deci operam prin SQL brut:
             await prisma.$executeRawUnsafe(
-               `INSERT INTO "NormativeChunk" ("source", "chapter", "content", "embedding") 
-                VALUES ($1, $2, $3, $4::vector)`,
-               fileName, snippetTitle, content, vectorStr
+               `INSERT INTO "NormativeChunk" ("source", "chapter", "content", "agent", "embedding") 
+                VALUES ($1, $2, $3, $4, $5::vector)`,
+               fileName, snippetTitle, content, agentName, vectorStr
             );
             embeddedCount++;
 
@@ -107,9 +121,17 @@ async function main() {
         return;
     }
 
-    const files = fs.readdirSync(docsDir).filter(f => f.endsWith('.pdf'));
+    const allFiles = fs.readdirSync(docsDir).filter(f => f.endsWith('.pdf'));
     
-    if(files.length === 0){
+    // Filtram doar documentele din AGENT_MAP (cele 5 prioritare pentru Faza 1)
+    const files = allFiles.filter(f => AGENT_MAP[f]);
+    const skipped = allFiles.filter(f => !AGENT_MAP[f]);
+
+    if (skipped.length > 0) {
+      console.log(`Sarite (nu sunt in AGENT_MAP): ${skipped.join(', ')}`);
+    }
+    
+    if (files.length === 0) {
         console.log(`Nu s-au găsit documente PDF în folderul ${docsDir}`);
         return;
     }

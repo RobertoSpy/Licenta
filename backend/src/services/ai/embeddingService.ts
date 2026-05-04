@@ -1,10 +1,12 @@
-import dotenv from 'dotenv';
-import path from 'path';
-dotenv.config({ path: path.resolve(__dirname, '../../../../.env') }); // Root .env
 import { GoogleGenAI } from '@google/genai';
-//converteste textul in vectori numerici pentru a putea fi cautat dupa inteles
-// Instantiem clientul; cauta automat variabila GEMINI_API_KEY din env
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }); 
+// converteste textul in vectori numerici pentru a putea fi cautat dupa inteles
+
+// Funcție pentru inițializare lazy a clientului
+let aiInstance: GoogleGenAI | null = null;
+const getAi = () => {
+  if (!aiInstance) aiInstance = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return aiInstance;
+};
 
 export const embeddingService = {
   /**
@@ -17,8 +19,8 @@ export const embeddingService = {
     }
 
     try {
-      const response = await ai.models.embedContent({
-        model: 'text-embedding-004',
+      const response = await getAi().models.embedContent({
+        model: 'gemini-embedding-2',
         contents: text,
       });
       
