@@ -99,12 +99,14 @@ model ProjectBOM {
 model NormativeChunk {
   id        Int    @id @default(autoincrement())
   source    String // "NP112-2014" | "P100-2013" | "CR6-2013" etc.
-  chapter   String // "Cap.3 - Identificarea vizualÄƒ a solului"
+  chapter   String // "Cap.3 - Identificarea vizuala a solului"
   content   String // 800-1000 cuvinte per chunk
-  agent     String @default("general")
+  agent     String @default("general")  // "geotehnic" | "seismic" | "legal" | "structural" | "materiale" | "deviz"
+  status    String @default("in_vigoare") // "in_vigoare" | "in_revizuire" | "abrogat"
   embedding Unsupported("vector(768)")?
 
   @@index([source])
   @@index([agent])
+  @@index([status])
 }
 

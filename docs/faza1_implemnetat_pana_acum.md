@@ -16,25 +16,35 @@ Acest document descrie stadiul actual al proiectului la finalizarea primei faze 
 
 ### 1.2. Setare Teren și Proiecte (Wizard 4 Pași)
 - **Persistență și Structură DB (Prisma)**: O bază de date stabilă (PostgreSQL) complet scalabilă care captează detalii specifice construcției: județ, tip de sol, zonare seismică, prezență subsol, mansardă.
-- **Serviciu Geospatial Inteligent (`geospatialService`)**: 
-  - **Reverse Geocoding**: Traducerea coordonatelor hărții din Leaflet (lat/lng) în județ, cu ajutorul API-ului public Nominatim.
-  - **Match Automat**: Preluare automată a zonei seismice și a limitei de adâncime la îngheț pe județ, direct din dicționare JSON.
+- **useProjectGuard (Resume/Sync)**: Hook custom care monitorizează `activeProjectId` în `localStorage`. Permite utilizatorului să închidă browser-ul și să revină exact la pasul și datele salvate anterior, sincronizând automat starea din DB cu formularul React.
+- **Dual-Flow Location Selection (Step 1)**:
+  - **Flux A (Stereo 70)**: Introducere coordonate X/Y din planul PAD cu conversie automată în GPS (via `proj4`) și vizualizare poligon pe hartă.
+  - **Flux B (Manual/Search)**: Căutare inteligentă prin **Nominatim API**. Permite selectarea localității fără coordonate GPS precise, centrând harta automat.
+- **Serviciu Geospatial & AI Extraction**: 
+  - **Reverse Geocoding**: Traducerea locației în județ și localitate.
+  - **Match Automat (AI Extracted)**: Preluare automată a zonei seismice (ag) și a limitei de adâncime la îngheț (NP 112-2014) pe baza locației, afișate cu **Skeleton Loaders** premium în timpul procesării.
 
 ### 1.3. Asistent Inteligent „Zidario” & Arhitectură Multi-Agent RAG
 A fost implementată o soluție de top din zona AI, o arhitectură hibridă avansată **CAG + Multi-Agent RAG**:
 - **CAG (Cache-Augmented Generation)**: Tabelele grele (zone seismice pe județ, adâncimi de îngheț, limite de suprafețe sau cerințe etaje) sunt încărcate optimizat într-un singur string la boot-ul backend-ului și furnizate asistentului AI ca set strict de reguli.
-- **Multi-Agent RAG (Retrieval-Augmented Generation)**: Legislația densă este citită dinamic folosind **pgvector**, dar cu izolare completă de context. Am creat agenți specializați (Geotehnic, Seismic, Legal), fiecare interogând doar un subset specific de normative prin intermediul unui câmp `agent` din baza de date vectorizată. Astfel eliminăm complet halucinațiile AI-ului (nu va încurca reguli de izolație cu reguli de structură).
-- **Proactive UX (Zero-Call AI)**: În pașii wizard-ului, asistentul injectează automat mesaje educaționale predefinite la montarea componentei. Utilizatorul este ghidat vizual cum să calculeze panta sau să recunoască tipul de sol, bazat pe norme (P100-1, NP 112), fără a declanșa apeluri costisitoare către backend/Gemini.
-- **Chat cu Streaming (SSE)**: Conexiunea AI este menținută prin Server-Sent Events, livrând progresiv feedback. Asistentul dispune de **Conversation History**, astfel „Zidario” își amintește contextul de la un mesaj la altul.
+- **Multi-Agent RAG (Retrieval-Augmented Generation)**: Legislația densă este citită dinamic folosind **pgvector** cu index de tip **ivfflat** (optimizat pentru viteză la interogări de similaritate cosinus).
+- **Izolare prin Agenți**: Am creat agenți specializați (Geotehnic, Seismic, Legal), fiecare interogând doar un subset specific de normative prin intermediul unui câmp `agent` din baza de date vectorizată.
+- **Proactive UX (Zero-Call AI)**: În pașii wizard-ului, asistentul injectează automat mesaje educaționale predefinite la montarea componentei. 
+- **Chat cu Streaming (SSE)**: Conexiunea AI este menținută prin Server-Sent Events, livrând progresiv feedback cu suport pentru **Conversation History**.
 
-### 1.4. Interfață Utilizator & Dashboard
-- **Ecran ProjectDetail Elegant**: Proiectele salvate beneficiază de un ecran sumar care afișează toate deciziile de configurare (teren, seismicitate, fundație, arhitectură). Include un banner animat premium pentru funcționalitățile Fazei 2 aflate în dezvoltare (Editor Plan 2D Interactiv).
+### 1.4. Interfață Utilizator & Dashboard (UX Premium)
+- **MyProjects (Management)**: Listă de proiecte sub formă de carduri interactive cu:
+  - **Stagger Animations**: Cardurile apar succesiv cu efect vizual modern (Framer Motion).
+  - **Badge Status**: Indicatori vizuali pentru progres (In Progress / Completed).
+  - **Skeleton Loading**: Placeholder-e animate premium pentru o percepție de viteză crescută.
+- **ProjectDetail (Sumar Elegant)**: Ecran dedicat (`/dashboard/projects/:id`) care centralizează toate datele tehnice extrase. Include vizualizare hartă satelit a terenului și un banner informativ pentru Faza 2 (Editor 2D).
+- **Arhitectură Routing**: Structură ierarhică sub `/dashboard`, protejată de rute securizate.
 
 ---
 
 ## 2. Arhitectura Curentă a Backend-ului
 
-Aplicația backend aplică principiile stricte de **Layered Architecture** și **Separation of Concerns**. Fișierele au roluri unice și specifice, izolând Baza de Date de Stratul de HTTP/Web, iar logica de calcule se face intermediar.
+Aplicația backend aplică principiile stricte de **Layered Architecture** și **Separation of Concerns**.
 
 ```mermaid
 graph TD
@@ -69,41 +79,26 @@ graph TD
     Orchestrator --> CAG[normativeCache.ts<br/>In-Memory JSON]
 ```
 
-### Cum interacționează între ele:
-1. **`Routes`**: Primesc endpoint-ul. Tot aici se aplică gărzile (Ex: `protect` pentru a verifica autentificarea). Le pasează mai departe. Nu conțin logică.
-2. **`Controllers`**: Extrag parametri din `req.body` sau `req.params`. Apelează un singur `Service`. Când Serviciul dă return cu un răspuns sau cu eroare, controller-ul formulează JSON-ul `res.status(200)` sau `res.status(403)`.
-3. **`Services`**: Verifică logica de afaceri. Calculează câte etaje are o clădire după datele introduse. Trimit cereri de extragere la *Repository*.
-4. **`Repositories`**: Aici se folosește Prisma. Se fac `findUnique`, `create`, `updateMany` sau queriuri brute SQL de similaritate vectorială pentru AI. Repositoriile doar returnează date din baza de date direct.
+### Roluri Componente:
+1. **`Routes`**: Definește endpoint-urile și aplică gărzile de securitate.
+2. **`Controllers`**: Gestionează request/response HTTP. Nu conțin logică complexă.
+3. **`Services`**: Nucleul aplicației. Aici se află logica de business (calcule, orchestrare AI, procesare geospațială).
+4. **`Repositories`**: Singurul loc unde se accesează Baza de Date via Prisma sau SQL Raw pentru vectori.
 
 ---
 
 ## 3. Flux Complet (Exemplu User Flow)
 
-Vom modela traseul clar în care Utilizatorul X interacționează cu Wizard-ul și consultă AI-ul.
-
-### 📍 Pas 1: Autentificarea
-- User-ul completează Formularul de Login.
-- Request-ul `POST /api/auth/login` ajunge la server.
-- Express verifică limitele prin **Dual Rate Limiter** (`authEmailLimiter` apoi `authIpLimiter`).
-- `authController.ts` validează intrarea, pasează la `userRepository.ts` care apelează Baza de Date cu funcția `findByEmail()`.
-- Se verifică Hash-ul bcrypt, iar `authController` creează doi tokeni JWT. Cel scurt (`15m`) ajunge în răspuns. Cel lung (`7zile`) ajunge salvat automat în cookie.
+### 📍 Pas 1: Autentificarea & Dashboard
+- User-ul se loghează și este redirecționat către `/dashboard`.
+- Cardurile de proiecte se încarcă cu animație stagger. Dacă nu are proiecte, se creează automat unul nou prin `useProjectGuard`.
 
 ### 📍 Pas 2: Pasul de Teren (Wizard)
-- Odată autentificat, User-ul pe un ecran alege locația terenului dând click pe Hartă.
-- React-ul face trigger pe coordonate și cheamă ruta `/api/terrain/analyze-location`.
-- `terrainController` extrage latitudinea și longitudinea, invocând `geospatialService.ts`.
-- Serviciul apelează interfața Nominatim. Se extrage cuvântul cheie *„Cluj”*.
-- Din json-urile din backend mapate (`seismic-zones.json` și `frost-depth.json`), sistemul își dă seama că la Cluj, forța `ag` seismică este `0.10g` iar adâncimea critică de îngheț este de `90 cm`.
-- Frontend-ul primește și afișează aceste date. User-ul dă "Next" -> Acestea sunt trimise pe `PATCH /api/projects/:id`. Logica de salvare trece prin `projectService` unde se filtrează input-ul (se whitelist-ează parametrii, respingând câmpurile injectate malițios de către atacatori). Apoi, `projectRepository` face direct update pe tabel.
+- Utilizatorul alege **Fluxul B** și caută "București".
+- Backend-ul (`geospatialService`) identifică zona seismică (0.30g) și adâncimea de îngheț (90cm) folosind seturile de date statice.
+- Datele sunt salvate asincron pe măsură ce utilizatorul avansează în pași.
 
-### 📍 Pas 3: Interogarea Tehnică (Zidario AI Assistant)
-- User-ul deschide asistentul Zidario și întreabă: *"Cu terenul meu din Cluj, pot construi ceva structură de zidărie dacă adaug și etaj și mansardă?"*.
-- Apelul pleacă pe ruta `/api/ai/chat`. Pe lângă întrebare, front-end-ul atașează log-ul de chaturi din ultima oră și proprietățile terenului.
-- Controller-ul deschide capătul de stream HTTP Server-Sent Events (SSE) (începe trimiterea header-elor cu `text/event-stream`). Apoi lasă procesarea pe seama lui `agentOrchestrator.ts`.
-- Orchestratorul execută **rutarea inteligentă**: 
-  1. Evaluează cuvintele cheie din întrebare (ex: "structură", "etaj") și detectează că intenția este de natură *Seismică/Structurală*.
-  2. Apelează exclusiv `ragAgentSeismic`, care extrage doar din documentul P100-1 (Cod seismic) evitând bruiaje de la documente de sol sau legi de urbanism.
-  3. Încarcă limitările statice de etaje și îngheț din **CAG** (`normativeCache.ts`).
-- Baza de date este interogată de `normativeChunkRepository.ts` filtrând strict după `WHERE agent = 'seismic'`, folosind distanța de masă cosine (`<=>`) pentru a aduce cele mai relevante 3 pasaje din codul de proiectare.
-- Prompt-ul gigant (dar invizibil utilizatorului) cuprinzând Regulile Statice, Normativele Potrivite, Istoricul Chat-ului, Variabilele curente (Județul Cluj, etc) și Întrebarea este dat lui **Gemini 2.5 Pro**.
-- Pe măsură ce AI-ul Google gândește răspunsul, chunk-urile de câteva silabe vin succesiv înapoi. În bucla `for await...` din backend, fiecare părticică este trimisă cu comandă SSE nativă `res.write()` către Browser-ul User-ului, care o afișează progresiv pe ecran.
+### 📍 Pas 3: Interogarea Zidario AI
+- User-ul întreabă despre adâncimea fundației.
+- `agentOrchestrator` detectează intenția geotehnică și interoghează baza de date vectorizată (`pgvector` cu index `ivfflat`).
+- Se returnează un stream de date (SSE) care combină datele proiectului (București) cu normativele tehnice (NP 112).

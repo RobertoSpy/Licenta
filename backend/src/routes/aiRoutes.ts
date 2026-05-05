@@ -4,7 +4,10 @@ import { protect } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// Endpoint de chat RAG+CAG protejat ce returnează text progresiv (SSE)
+// POST /api/ai/chat — Chat RAG+CAG cu streaming SSE (protejat)
 router.post('/chat', protect, aiController.chatStream);
+
+// POST /api/ai/summarize — Rezumare conversație (protejat, non-streaming)
+router.post('/summarize', protect, aiController.summarizeConversation);
 
 export default router;
