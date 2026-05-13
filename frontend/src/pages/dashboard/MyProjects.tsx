@@ -62,6 +62,11 @@ export const MyProjects = () => {
       .finally(() => setIsLoading(false));
   }, [showWizard]);
 
+  const startNewProject = () => {
+    localStorage.removeItem('activeProjectId');
+    setShowWizard(true);
+  };
+
   if (showWizard) {
     return (
       <div className="flex items-center justify-center min-h-[85vh]">
@@ -77,7 +82,7 @@ export const MyProjects = () => {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Proiectele Mele</h1>
           <p className="text-slate-500 mt-1">Gestionează-ți construcțiile și vizionează devizele.</p>
         </div>
-        <Button className="gap-2 shadow-lg shadow-buildorange/20" onClick={() => setShowWizard(true)}>
+        <Button className="gap-2 shadow-lg shadow-buildorange/20" onClick={startNewProject}>
           <Plus className="w-5 h-5" /> Proiect Nou
         </Button>
       </div>
@@ -100,7 +105,7 @@ export const MyProjects = () => {
           <p className="text-slate-500 max-w-md mx-auto mb-6 text-sm leading-relaxed">
             Începe prin a crea un proiect nou. Modelează-ți casa în 2D și află costurile exacte cu materialele din piață.
           </p>
-          <Button className="gap-2" onClick={() => setShowWizard(true)}>
+          <Button className="gap-2" onClick={startNewProject}>
             <Plus className="w-5 h-5" /> Creează primul proiect
           </Button>
         </motion.div>
@@ -130,11 +135,11 @@ export const MyProjects = () => {
                   </div>
                   <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
                     proj.isCompleted
-                      ? 'bg-emerald-100 text-emerald-700'
+                      ? 'bg-blue-100 text-blue-700'
                       : 'bg-amber-100 text-amber-700'
                   }`}>
                     {proj.isCompleted
-                      ? <><CheckCircle2 className="w-3 h-3" /> Completat</>
+                      ? <><CheckCircle2 className="w-3 h-3" /> Faza 1 / 4</>  
                       : <><Clock className="w-3 h-3" /> Pas {proj.wizardStep}/4</>
                     }
                   </div>

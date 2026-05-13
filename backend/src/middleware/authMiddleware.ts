@@ -6,10 +6,10 @@ export interface AuthRequest extends Request {
     id: number;
   };
 }
-
+//next este o functie care trimite cerea  mai departe la urmatorul pas din cod daca este totul bine
 export const protect = (req: AuthRequest, res: Response, next: NextFunction): void => {
   let token;
-
+//verifica daca headerul are autorization si daca incepe cu bearer tokenul
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];

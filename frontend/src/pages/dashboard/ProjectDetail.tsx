@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { apiPrivate } from '../../api/axios';
@@ -82,13 +82,13 @@ export const ProjectDetail = () => {
   }, [id, navigate]);
 
   const handleDelete = async () => {
-    if (!confirm('EÈ™ti sigur cÄƒ vrei sÄƒ È™tergi acest proiect? AcÈ›iunea este ireversibilÄƒ.')) return;
+    if (!confirm('Ești sigur că vrei să ștergi acest proiect? Acțiunea este ireversibilă.')) return;
     setIsDeleting(true);
     try {
       await apiPrivate.delete(`/projects/${id}`);
       navigate('/dashboard');
     } catch {
-      alert('Eroarea la È™tergere. ÃŽncearcÄƒ din nou.');
+      alert('Eroarea la ștergere. Încearcă din nou.');
       setIsDeleting(false);
     }
   };
@@ -111,7 +111,7 @@ export const ProjectDetail = () => {
 
   if (!project) return null;
 
-  const stepLabels = ['Date de BazÄƒ', 'Parametrii Teren', 'ReglementÄƒri', 'Viziune CasÄƒ'];
+  const stepLabels = ['Date de Bază', 'Parametrii Teren', 'Reglementări', 'Viziune Casă'];
 
   return (
     <motion.div
@@ -138,7 +138,7 @@ export const ProjectDetail = () => {
                   : 'bg-amber-100 text-amber-700'
               }`}>
                 {project.isCompleted ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                {project.isCompleted ? 'Completat' : `ÃŽn Progres (Pasul ${project.wizardStep}/4)`}
+                {project.isCompleted ? 'Completat' : `În Progres (Pasul ${project.wizardStep}/4)`}
               </div>
               <span className="text-sm text-slate-400">Creat {new Date(project.createdAt).toLocaleDateString('ro-RO')}</span>
             </div>
@@ -147,7 +147,7 @@ export const ProjectDetail = () => {
         <div className="flex items-center gap-3">
           {!project.isCompleted && (
             <Button onClick={handleContinueWizard} className="gap-2">
-              <Edit2 className="w-4 h-4" /> ContinuÄƒ Configurarea
+              <Edit2 className="w-4 h-4" /> Continuă Configurarea
             </Button>
           )}
           <Button
@@ -157,7 +157,7 @@ export const ProjectDetail = () => {
             className="gap-2 text-red-500 border-red-200 hover:bg-red-50"
           >
             <Trash2 className="w-4 h-4" />
-            {isDeleting ? 'Se È™terge...' : 'È˜terge'}
+            {isDeleting ? 'Se șterge...' : 'Șterge'}
           </Button>
         </div>
       </motion.div>
@@ -192,67 +192,67 @@ export const ProjectDetail = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Card: LocaÈ›ie & Teren */}
+        {/* Card: Locație & Teren */}
         <motion.div variants={cardVariants} className="bg-white border border-slate-100 rounded-3xl p-8 space-y-6 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-50 rounded-2xl">
               <MapPin className="w-5 h-5 text-blue-600" />
             </div>
-            <h2 className="font-black text-slate-900">LocaÈ›ie & Teren</h2>
+            <h2 className="font-black text-slate-900">Locație & Teren</h2>
           </div>
           <div className="grid grid-cols-2 gap-y-5">
-            <DataPoint label="JudeÈ›" value={project.county} />
+            <DataPoint label="Județ" value={project.county} />
             <DataPoint label="Localitate" value={project.locality} />
-            <DataPoint label="SuprafaÈ›Äƒ" value={project.plotAreaSqm ? `${project.plotAreaSqm.toFixed(0)} mÂ²` : undefined} />
+            <DataPoint label="Suprafață" value={project.plotAreaSqm ? `${project.plotAreaSqm.toFixed(0)} m²` : undefined} />
             <DataPoint label="Tip Sol" value={project.soilType} />
-            <DataPoint label="PantÄƒ" value={project.slopePercent !== undefined ? `${project.slopePercent}%` : undefined} />
-            <DataPoint label="Orientare StradÄƒ" value={project.streetOrientation} />
+            <DataPoint label="Pantă" value={project.slopePercent !== undefined ? `${project.slopePercent}%` : undefined} />
+            <DataPoint label="Orientare Stradă" value={project.streetOrientation} />
           </div>
         </motion.div>
 
-        {/* Card: ReglementÄƒri Tehnice */}
+        {/* Card: Reglementări Tehnice */}
         <motion.div variants={cardVariants} className="bg-slate-900 text-white rounded-3xl p-8 space-y-6 relative overflow-hidden">
           <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-amber-400/10 blur-3xl rounded-full" />
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/10 rounded-2xl">
               <ShieldCheck className="w-5 h-5 text-amber-400" />
             </div>
-            <h2 className="font-black text-white">ReglementÄƒri Tehnice</h2>
+            <h2 className="font-black text-white">Reglementări Tehnice</h2>
           </div>
           <div className="grid grid-cols-2 gap-y-5">
-            <DataPointDark label="ZonÄƒ SeismicÄƒ" value={project.seismicZone} accent="amber" />
-            <DataPointDark label="AdÃ¢nc. ÃŽngheÈ›" value={project.frostDepthCm ? `${project.frostDepthCm} cm` : undefined} accent="blue" />
+            <DataPointDark label="Zonă Seismică" value={project.seismicZone} accent="amber" />
+            <DataPointDark label="Adânc. Îngheț" value={project.frostDepthCm ? `${project.frostDepthCm} cm` : undefined} accent="blue" />
             <DataPointDark label="Max Etaje" value={project.maxAllowedFloors ? `P + ${project.maxAllowedFloors - 1}` : undefined} accent="amber" />
             <DataPointDark label="Min. Fundare" value={project.minFoundationDepthCm ? `-${project.minFoundationDepthCm} cm` : undefined} accent="blue" />
           </div>
         </motion.div>
 
-        {/* Card: ConfiguraÈ›ie CasÄƒ */}
+        {/* Card: Configurație Casă */}
         <motion.div variants={cardVariants} className="bg-white border border-slate-100 rounded-3xl p-8 space-y-6 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-amber-50 rounded-2xl">
               <Home className="w-5 h-5 text-amber-600" />
             </div>
-            <h2 className="font-black text-slate-900">ConfiguraÈ›ie CasÄƒ</h2>
+            <h2 className="font-black text-slate-900">Configurație Casă</h2>
           </div>
           {project.houseStyle ? (
             <div className="grid grid-cols-2 gap-y-5">
               <DataPoint label="Stil Arhitectural" value={project.houseStyle} />
               <DataPoint label="Total Niveluri" value={project.totalFloors ? `${project.totalFloors} niveluri` : undefined} />
-              <DataPoint label="Subsol" value={project.hasBasement ? 'âœ“ Da' : 'âœ— Nu'} />
-              <DataPoint label="MansardÄƒ" value={project.hasMansard ? 'âœ“ Da' : 'âœ— Nu'} />
+              <DataPoint label="Subsol" value={project.hasBasement ? '✓ Da' : '✗ Nu'} />
+              <DataPoint label="Mansardă" value={project.hasMansard ? '✓ Da' : '✗ Nu'} />
               <DataPoint label="Etaje Supraterane" value={project.upperFloorsCount !== undefined ? `${project.upperFloorsCount}` : undefined} />
             </div>
           ) : (
             <div className="flex items-center gap-3 text-slate-400 bg-slate-50 rounded-2xl p-4">
               <AlertTriangle className="w-5 h-5 shrink-0" />
-              <p className="text-sm font-medium">ConfiguraÈ›ia casei nu a fost completatÄƒ Ã®ncÄƒ.</p>
+              <p className="text-sm font-medium">Configurația casei nu a fost completată încă.</p>
             </div>
           )}
         </motion.div>
       </div>
 
-      {/* Banner Plan 2D â€” Faza 2 */}
+      {/* Banner Plan 2D — Faza 2 */}
       {project.isCompleted && (
         <motion.div
           variants={cardVariants}
@@ -277,14 +277,14 @@ export const ProjectDetail = () => {
                   transition={{ duration: 1.5, repeat: Infinity }}
                   className="w-1.5 h-1.5 rounded-full bg-buildorange inline-block"
                 />
-                ÃŽurmÄƒtorul pas â€” Faza 2
+                Următorul pas — Faza 2
               </div>
               <h3 className="text-2xl font-black mb-2">Editor Plan 2D Interactiv</h3>
               <p className="text-slate-400 text-sm max-w-lg leading-relaxed">
-                Vei putea desena planul parterului, dimensiona camerele, valida faÈ›Äƒ de <strong className="text-white">Legea 114/1996</strong> ÅŸi exporta un PDF de prezentare. Salvare automatÄƒ la 30 secunde.
+                Vei putea desena planul parterului, dimensiona camerele, valida față de <strong className="text-white">Legea 114/1996</strong> și exporta un PDF de prezentare. Salvare automată la 30 secunde.
               </p>
               <div className="flex flex-wrap gap-2 mt-4 justify-center md:justify-start">
-                {['Canvas Konva.js', 'SuprafeÈ›e live', 'Validare AI', 'Export PDF'].map(tag => (
+                {['Canvas Konva.js', 'Suprafețe live', 'Validare AI', 'Export PDF'].map(tag => (
                   <span key={tag} className="px-3 py-1 bg-white/10 border border-white/10 rounded-full text-xs font-medium text-slate-300">
                     {tag}
                   </span>
@@ -293,15 +293,19 @@ export const ProjectDetail = () => {
             </div>
 
             <div className="shrink-0">
-              <div className="px-6 py-3 bg-white/10 border border-white/20 rounded-2xl text-sm font-semibold text-slate-300 cursor-default select-none">
-                ðŸš§ ÃŽn Dezvoltare
-              </div>
+              <button
+                onClick={() => navigate(`/dashboard/projects/${project.id}/editor`)}
+                className="flex items-center gap-2 px-6 py-3 bg-buildorange text-white rounded-2xl text-sm font-black hover:bg-orange-600 transition-all shadow-lg shadow-buildorange/30 hover:shadow-buildorange/50 hover:scale-105"
+              >
+                <span>Deschide Editorul 2D</span>
+                <span className="text-lg">✏️</span>
+              </button>
             </div>
           </div>
         </motion.div>
       )}
 
-      {/* Asistentul AI Zidario â€” montat cu contextul complet al proiectului curent */}
+      {/* Asistentul AI Zidario — montat cu contextul complet al proiectului curent */}
       <AIChatBubble
         contextData={{
           county: project.county,

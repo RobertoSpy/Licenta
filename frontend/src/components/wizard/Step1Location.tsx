@@ -187,13 +187,28 @@ export const Step1Location = ({ data, updateData }: Props) => {
             </h3>
             <div className="flex bg-slate-100 rounded-lg p-1">
               <button
-                onClick={() => setInputMode('stereo70')}
+                onClick={() => {
+                  setInputMode('stereo70');
+                  setSearchQuery('');
+                  updateData({ lat: null, lng: null });
+                }}
                 className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${inputMode === 'stereo70' ? 'bg-white text-buildorange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 Stereo 70
               </button>
               <button
-                onClick={() => setInputMode('manual')}
+                onClick={() => {
+                  setInputMode('manual');
+                  updateData({
+                    plotCoordinates: [
+                      { x: '', y: '' },
+                      { x: '', y: '' },
+                      { x: '', y: '' },
+                      { x: '', y: '' },
+                    ],
+                    polygonLatLngs: []
+                  });
+                }}
                 className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${inputMode === 'manual' ? 'bg-white text-buildorange shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 Căutare (Manual)
@@ -305,12 +320,27 @@ export const Step1Location = ({ data, updateData }: Props) => {
 
                 {/* Confirmare selecție */}
                 {data.lat && !isSearchingLocation && inputMode === 'manual' && (
-                  <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 mt-2">
-                    <MapPin className="w-4 h-4 text-green-600 shrink-0"/>
-                    <p className="text-sm text-green-700">
-                      <strong>{data.locality || searchQuery}</strong>
-                      {data.county && `, județul ${data.county}`}
-                    </p>
+                  <div className="flex flex-col gap-2 mt-2">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-2 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-green-600 shrink-0"/>
+                      <p className="text-sm text-green-700 truncate">
+                        <strong>{data.locality || searchQuery}</strong>
+                        {data.county && `, jud. ${data.county}`}
+                      </p>
+                    </div>
+
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        Arie Teren (m²)
+                      </label>
+                      <input
+                        type="number"
+                        className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-sm font-bold outline-none focus:ring-1 focus:ring-buildorange"
+                        placeholder="Ex: 500"
+                        value={data.plotAreaSqm || ''}
+                        onChange={(e) => updateData({ plotAreaSqm: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
                   </div>
                 )}
               </div>

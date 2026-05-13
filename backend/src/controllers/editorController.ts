@@ -1,0 +1,219 @@
+import { Request, Response } from 'express';
+import { editorService } from '../services/editorService';
+import { agentOrchestrator } from '../services/ai/agentOrchestrator';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+// ============================================================
+// Ownership guard inline — verifică că snapshot-ul aparține
+// proiectului utilizatorului autentificat
+// ============================================================
+async function verifySnapshotOwnership(snapshotId: number, userId: number): Promise<boolean> {
+  const snapshot = await prisma.planSnapshot.findUnique({
+    where: { id: snapshotId },
+    include: { project: { select: { userId: true } } },
+  });
+  return snapshot?.project.userId === userId;
+}
+
+/**
+ * POST /api/editor/snapshots
+ * Body: { projectId, planJSON, label? }
+ * Creare snapshot nou (auto-save sau manual Ctrl+S).
+ */
+export const createSnapshot = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { projectId, planJSON, label } = req.body;
+
+    if (!projectId || !planJSON) {
+      res.status(400).json({ message: 'projectId și planJSON sunt obligatorii.' });
+      return;
+    }
+
+    // Ownership: verifică că proiectul aparține userului
+    const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
+    if (!project) {
+      res.status(403).json({ message: 'Acces interzis.' });
+      return;
+    }
+
+    const snapshot = await editorService.saveSnapshot(projectId, planJSON, label);
+    res.status(201).json(snapshot);
+  } catch (err) {
+    console.error('[editorController] createSnapshot:', err);
+    res.status(500).json({ message: 'Eroare la salvarea planului.' });
+  }
+};
+
+/**
+ * GET /api/editor/snapshots/:projectId
+ * Lista ultimele 20 snapshot-uri (metadate, fără planJSON).
+ */
+export const listSnapshots = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const projectId = parseInt(req.params.projectId as string);
+
+    const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
+    if (!project) {
+      res.status(403).json({ message: 'Acces interzis.' });
+      return;
+    }
+
+    const snapshots = await editorService.listSnapshots(projectId);
+    res.json(snapshots);
+  } catch (err) {
+    console.error('[editorController] listSnapshots:', err);
+    res.status(500).json({ message: 'Eroare la încărcarea istoricului.' });
+  }
+};
+
+/**
+ * GET /api/editor/snapshots/single/:id
+ * Conținut complet al unui snapshot (pentru restore).
+ */
+export const getSnapshot = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const snapshotId = parseInt(req.params.id as string);
+
+    if (!(await verifySnapshotOwnership(snapshotId, userId))) {
+      res.status(403).json({ message: 'Acces interzis.' });
+      return;
+    }
+
+    const snapshot = await editorService.getSnapshot(snapshotId);
+    if (!snapshot) {
+      res.status(404).json({ message: 'Snapshot negăsit.' });
+      return;
+    }
+    res.json(snapshot);
+  } catch (err) {
+    console.error('[editorController] getSnapshot:', err);
+    res.status(500).json({ message: 'Eroare la încărcarea planului.' });
+  }
+};
+
+/**
+ * GET /api/editor/latest/:projectId
+ * Cel mai recent snapshot — pentru inițializare editor.
+ */
+export const getLatestSnapshot = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const projectId = parseInt(req.params.projectId as string);
+
+    const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
+    if (!project) {
+      res.status(403).json({ message: 'Acces interzis.' });
+      return;
+    }
+
+    const snapshot = await editorService.getLatestSnapshot(projectId);
+    res.json(snapshot ?? null);
+  } catch (err) {
+    console.error('[editorController] getLatestSnapshot:', err);
+    res.status(500).json({ message: 'Eroare.' });
+  }
+};
+
+/**
+ * PATCH /api/editor/snapshots/:id/publish
+ * Marchează snapshot ca versiune oficială → input Faza 3.
+ */
+export const publishSnapshot = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const snapshotId = parseInt(req.params.id as string);
+    const { projectId } = req.body;
+
+    if (!projectId) {
+      res.status(400).json({ message: 'projectId este obligatoriu.' });
+      return;
+    }
+
+    if (!(await verifySnapshotOwnership(snapshotId, userId))) {
+      res.status(403).json({ message: 'Acces interzis.' });
+      return;
+    }
+
+    const published = await editorService.publishSnapshot(snapshotId, projectId);
+    res.json(published);
+  } catch (err) {
+    console.error('[editorController] publishSnapshot:', err);
+    res.status(500).json({ message: 'Eroare la publicarea planului.' });
+  }
+};
+
+/**
+ * DELETE /api/editor/snapshots/:id
+ * Ștergere snapshot cu verificare ownership.
+ */
+export const deleteSnapshot = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const snapshotId = parseInt(req.params.id as string);
+
+    if (!(await verifySnapshotOwnership(snapshotId, userId))) {
+      res.status(403).json({ message: 'Acces interzis.' });
+      return;
+    }
+
+    await editorService.deleteSnapshot(snapshotId);
+    res.json({ message: 'Snapshot șters.' });
+  } catch (err) {
+    console.error('[editorController] deleteSnapshot:', err);
+    res.status(500).json({ message: 'Eroare la ștergerea snapshot-ului.' });
+  }
+};
+
+/**
+ * POST /api/editor/explain-conformity
+ * Body: { violations: [{ label, usableSqm, minRequired }] }
+ * Response: SSE stream cu explicație AI (RAG Legea 114/1996).
+ */
+export const explainConformity = async (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  try {
+    const { violations } = req.body;
+
+    if (!violations || !Array.isArray(violations) || violations.length === 0) {
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
+    const violationsText = violations
+      .map((v: any) => `- ${v.label}: ${v.usableSqm}mp (minim legal: ${v.minRequired}mp)`)
+      .join('\n');
+
+    const question = `Explică de ce Legea 114/1996 impune suprafețele minime pentru aceste camere:\n${violationsText}\nFii concis, citează articolele exacte.`;
+
+    const stream = await agentOrchestrator.getAiStreamForChat(
+      question,
+      'Context: validare conformitate plan 2D conform Legea 114/1996.',
+      [],
+      'editor'
+    );
+
+    for await (const chunk of stream) {
+      if (chunk.text) {
+        res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+      }
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    console.error('[editorController] explainConformity:', err);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ Serviciul AI nu este disponibil momentan.' })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+};

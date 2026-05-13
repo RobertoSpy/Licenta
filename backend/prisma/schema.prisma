@@ -62,7 +62,15 @@ model Project {
   wizardStep   Int     @default(1)
   isCompleted  Boolean @default(false)
 
-  bomItems  ProjectBOM[]
+  bomItems      ProjectBOM[]
+  chatSummaries ChatSummary[]
+  planSnapshots PlanSnapshot[]
+
+  // Faza 2 — plan 2D
+  publishedSnapshotId Int?     // FK la snapshotul publicat (versiunea oficială)
+  totalFloorAreaSqm   Float?   // calculat la publish din plan
+  planStatus          String?  // "draft" | "published" | "approved"
+
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
@@ -110,3 +118,36 @@ model NormativeChunk {
   @@index([status])
 }
 
+// === ISTORICUL CHAT-ULUI (Rezumate persistente per proiect/faza/ecran) ===
+model ChatSummary {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  phase     String   // "faza1" | "faza2" | "faza3"
+  screen    String?  // "screen1" | "screen2" | "screen3" | "screen4" | "editor" | "bom" | null = rezumat global
+  summary   String   // Textul rezumatului acumulat (max ~500 cuvinte)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Un singur rezumat activ per (proiect, faza, ecran)
+  @@unique([projectId, phase, screen])
+  @@index([projectId])
+}
+
+// === FAZA 2: Snapshoturi plan 2D ===
+model PlanSnapshot {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  planJSON    Json     // Starea complet\u0103 Konva: { elements: [...], scale, viewport }
+  version     Int      @default(1)  // auto-increment per proiect
+  label       String?  // \"Versiune manual\u0103\"
+  isPublished Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}

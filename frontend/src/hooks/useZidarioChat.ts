@@ -1,6 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
-import { getAccessToken } from '../api/axios';
-import { apiPrivate } from '../api/axios';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { aiApi } from '../api/aiApi';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -10,16 +9,27 @@ export interface ChatMessage {
 /** Numărul maxim de mesaje înainte de a declanșa rezumarea automată */
 const MAX_HISTORY = 10;
 
-/**
- * Prompt-ul de sistem pentru rezumare.
- * Gemini va produce un rezumat compact care păstrează deciziile tehnice cheie.
- */
-const SUMMARY_SYSTEM_PROMPT = `
-Rezumă conversația de mai jos în maxim 200 de cuvinte.
-Păstrează obligatoriu: tipul solului ales, coordonatele/județul, configurația casei,
-deciziile tehnice luate și întrebările fără răspuns clar.
-Returnează DOAR rezumatul, fără introducere sau formulă de încheiere.
-`;
+// ── Dependențele între screen-uri ─────────────────────────────────────────────
+// Definesc ce context anterior este relevant pentru fiecare ecran.
+// La mount, hook-ul va încărca rezumatele screen-urilor dependente din DB
+// și le va injecta ca context AI pentru sesiunea curentă.
+const SCREEN_DEPENDENCIES: Record<string, string[]> = {
+  screen1: [],
+  screen2: ['screen1'],
+  screen3: ['screen1', 'screen2'],
+  screen4: ['screen1', 'screen2', 'screen3'],
+  editor:  ['screen1', 'screen2', 'screen3', 'screen4'],
+  bom:     ['screen3', 'screen4', 'editor'],
+};
+
+const SCREEN_PHASE: Record<string, string> = {
+  screen1: 'faza1',
+  screen2: 'faza1',
+  screen3: 'faza1',
+  screen4: 'faza1',
+  editor:  'faza2',
+  bom:     'faza3',
+};
 
 /**
  * useZidarioChat — Hook complet pentru chat-ul cu Zidario AI.
@@ -27,175 +37,172 @@ Returnează DOAR rezumatul, fără introducere sau formulă de încheiere.
  * Features:
  * - Streaming SSE (răspunsuri progresive)
  * - Rezumare automată la MAX_HISTORY mesaje (fără pierdere de context)
- * - Rezumate acumulative (rezumat la 10 → inclus în rezumatul la 20)
- * - Trimitere screenContext la backend pentru rutare SCREEN_AGENTS
+ * - Persistență rezumate în DB (supraviețuiesc refresh-ului paginii)
+ * - Context cross-screen: rezumatele ecranelor anterioare sunt injectate la mount
  * - Guard de domeniu (refuz automat pe întrebări non-construcții)
  *
- * @param screen - Ecranul activ ('screen1' | 'screen2' | 'screen3' | 'screen4' | 'editor' | 'bom')
- * @param projectContext - Date despre proiectul curent trimise ca context la AI
+ * @param screen       - Ecranul activ ('screen1' | 'screen2' | ... | 'editor' | 'bom')
+ * @param projectId    - ID-ul proiectului curent (obligatoriu pentru persistență)
+ * @param projectContext - Date despre proiect trimise ca context la AI
  */
 export function useZidarioChat(
   screen: string,
+  projectId: number,
   projectContext: Record<string, unknown>
 ) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
 
   /**
-   * summaryRef — Rezumatul acumulat al conversației.
-   * Nu se stochează în state (nu cauzează re-render).
-   * Format: string simplu, maxim 200 cuvinte per iterație, concatenate.
+   * summaryRef — Rezumatul acumulat al conversației (din DB + sesiune curentă).
+   * Nu e în state ca să nu cauzeze re-render inutil.
    */
   const summaryRef = useRef<string | null>(null);
+  const phase = SCREEN_PHASE[screen] ?? 'faza1';
 
-  /**
-   * Construiește istoricul trimis la backend.
-   * Dacă există rezumat, îl injectează ca prim mesaj 'assistant'
-   * pentru a oferi context AI-ului fără a trimite tot istoricul brut.
-   */
+  // ── Încărcare context la mount ─────────────────────────────────────────────
+  // La fiecare schimbare de ecran sau proiect:
+  //   1. Citim rezumatul ecranului curent (dacă userul s-a mai întors)
+  //   2. Citim rezumatele ecranelor dependente (context din pași anteriori)
+  useEffect(() => {
+    if (!projectId) return;
+
+    summaryRef.current = null; // resetăm la schimbare de ecran
+
+    const loadSummaries = async () => {
+      const deps = SCREEN_DEPENDENCIES[screen] ?? [];
+
+      // Apeluri paralele: rezumatul curent + rezumatele dependente
+      const [currentResult, depResults] = await Promise.all([
+        aiApi.getSummary(projectId, phase, screen),
+        aiApi.getSummaries(projectId, deps),
+      ]);
+
+      const dependencyContext = depResults
+        .map((s) => `[${s.screen}]: ${s.summary}`)
+        .join('\n');
+
+      const parts = [dependencyContext, currentResult?.summary].filter(Boolean);
+      summaryRef.current = parts.length > 0 ? parts.join('\n\n') : null;
+    };
+
+    loadSummaries().catch((err) =>
+      console.warn('[useZidarioChat] Eroare la încărcarea rezumatelor:', err)
+    );
+  }, [projectId, screen, phase]);
+
+  // ── Constructorul de istoric ──────────────────────────────────────────────
   const buildHistory = useCallback((): ChatMessage[] => {
     const history: ChatMessage[] = [];
     if (summaryRef.current) {
       history.push({
         role: 'assistant',
-        content: `[Rezumat conversație anterioară]: ${summaryRef.current}`
+        content: `[Context proiect din conversații anterioare]: ${summaryRef.current}`,
       });
     }
     return [...history, ...messages];
   }, [messages]);
 
-  /**
-   * Rezumă automat conversația când ajunge la MAX_HISTORY mesaje.
-   * Returnează lista de mesaje redusă (păstrează ultimele 2 pentru context imediat).
-   * Dacă rezumarea eșuează, taie la jumătate — mai bine decât eroare.
-   */
-  const summarizeIfNeeded = useCallback(async (
-    currentMessages: ChatMessage[]
-  ): Promise<ChatMessage[]> => {
-    if (currentMessages.length < MAX_HISTORY) return currentMessages;
+  // ── Rezumare automată + persistență ──────────────────────────────────────
+  const summarizeIfNeeded = useCallback(
+    async (currentMessages: ChatMessage[]): Promise<ChatMessage[]> => {
+      if (currentMessages.length < MAX_HISTORY) return currentMessages;
 
-    const conversationText = currentMessages
-      .map(m => `${m.role === 'user' ? 'User' : 'Zidario'}: ${m.content}`)
-      .join('\n');
+      const conversationText = currentMessages
+        .map((m) => `${m.role === 'user' ? 'User' : 'Zidario'}: ${m.content}`)
+        .join('\n');
 
-    try {
-      const response = await apiPrivate.post('/ai/summarize', {
-        systemPrompt: SUMMARY_SYSTEM_PROMPT,
-        text: conversationText
-      });
-      const newSummary: string = response.data.summary;
+      try {
+        const newSummary = await aiApi.summarize(conversationText);
 
-      // Acumulăm rezumatele recursiv — nu pierdem niciodată context
-      summaryRef.current = summaryRef.current
-        ? `${summaryRef.current}\n\n${newSummary}`
-        : newSummary;
+        // Acumulăm rezumatele recursiv — contextul nu se pierde niciodată
+        const accumulated = summaryRef.current
+          ? `${summaryRef.current}\n\n${newSummary}`
+          : newSummary;
 
-      // Păstrăm doar ultimele 2 mesaje post-rezumare (context imediat)
-      return currentMessages.slice(-2);
-    } catch (err) {
-      console.warn('[useZidarioChat] Rezumare eșuată, tăiem la -5:', err);
-      return currentMessages.slice(-5);
-    }
-  }, []);
+        // Salvăm în DB — rezumatul supraviețuiește refresh-ului
+        await aiApi.saveSummary({
+          projectId,
+          phase,
+          screen,
+          summary: accumulated,
+        });
 
-  /**
-   * sendMessage — Trimite un mesaj utilizatorului și primește răspunsul în streaming.
-   */
-  const sendMessage = useCallback(async (userText: string) => {
-    if (!userText.trim() || isStreaming) return;
+        summaryRef.current = accumulated;
 
-    const userMessage: ChatMessage = { role: 'user', content: userText };
-
-    // Adăugăm mesajul user și verificăm dacă trebuie rezumat
-    let updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-    setIsStreaming(true);
-
-    updatedMessages = await summarizeIfNeeded(updatedMessages);
-    setMessages(updatedMessages);
-
-    // Placeholder gol pentru mesajul AI — se completează progresiv
-    setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
-    try {
-      const token = getAccessToken();
-
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          message: userText,
-          contextString: JSON.stringify(projectContext),
-          conversationHistory: buildHistory().map(m => ({
-            role: m.role === 'user' ? 'user' : 'model',
-            text: m.content
-          })),
-          screenContext: screen  // SCREEN_AGENTS routing
-        })
-      });
-
-      if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-      if (!response.body) throw new Error('No response body');
-
-      // SSE Reader
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.replace('data: ', '').trim();
-            if (dataStr === '[DONE]') break;
-
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.text) {
-                setMessages(prev => {
-                  const updated = [...prev];
-                  const lastIdx = updated.length - 1;
-                  if (updated[lastIdx]?.role === 'assistant') {
-                    updated[lastIdx] = {
-                      ...updated[lastIdx],
-                      content: updated[lastIdx].content + data.text
-                    };
-                  }
-                  return updated;
-                });
-              }
-            } catch {
-              // Ignorăm chunk-uri SSE incomplete
-            }
-          }
-        }
+        // Păstrăm ultimele 2 mesaje pentru context imediat
+        return currentMessages.slice(-2);
+      } catch (err) {
+        console.warn('[useZidarioChat] Rezumare eșuată, tăiem la -5:', err);
+        return currentMessages.slice(-5);
       }
-    } catch (e) {
-      console.error('[useZidarioChat] Eroare SSE:', e);
-      setMessages(prev => {
-        const arr = [...prev];
-        const lastIdx = arr.length - 1;
-        if (arr[lastIdx]?.role === 'assistant') {
-          arr[lastIdx] = {
-            ...arr[lastIdx],
-            content: '⚠️ O eroare a apărut la conectarea la asistent. Încearcă din nou.'
-          };
-        }
-        return arr;
-      });
-    } finally {
-      setIsStreaming(false);
-    }
-  }, [messages, isStreaming, screen, projectContext, buildHistory, summarizeIfNeeded]);
+    },
+    [projectId, phase, screen]
+  );
 
-  /** Resetează complet chat-ul și rezumatul acumulat */
+  // ── sendMessage ───────────────────────────────────────────────────────────
+  const sendMessage = useCallback(
+    async (userText: string) => {
+      if (!userText.trim() || isStreaming) return;
+
+      const userMessage: ChatMessage = { role: 'user', content: userText };
+      let updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
+      setIsStreaming(true);
+
+      // Rezumăm dacă am atins limita
+      updatedMessages = await summarizeIfNeeded(updatedMessages);
+      setMessages(updatedMessages);
+
+      // Placeholder gol pentru răspunsul AI — se completează progresiv
+      setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
+
+      try {
+        await aiApi.streamChat(
+          {
+            message: userText,
+            history: buildHistory(),
+            screen,
+            projectContext,
+            historySummary: summaryRef.current,
+          },
+          (chunk: string) => {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const lastIdx = updated.length - 1;
+              if (updated[lastIdx]?.role === 'assistant') {
+                updated[lastIdx] = {
+                  ...updated[lastIdx],
+                  content: updated[lastIdx].content + chunk,
+                };
+              }
+              return updated;
+            });
+          }
+        );
+      } catch (e) {
+        console.error('[useZidarioChat] Eroare SSE:', e);
+        setMessages((prev) => {
+          const arr = [...prev];
+          const lastIdx = arr.length - 1;
+          if (arr[lastIdx]?.role === 'assistant') {
+            arr[lastIdx] = {
+              ...arr[lastIdx],
+              content:
+                '⚠️ O eroare a apărut la conectarea la asistent. Încearcă din nou.',
+            };
+          }
+          return arr;
+        });
+      } finally {
+        setIsStreaming(false);
+      }
+    },
+    [messages, isStreaming, screen, projectContext, buildHistory, summarizeIfNeeded]
+  );
+
+  // ── resetChat ─────────────────────────────────────────────────────────────
+  /** Resetează chat-ul local (nu șterge rezumatele din DB) */
   const resetChat = useCallback(() => {
     setMessages([]);
     summaryRef.current = null;

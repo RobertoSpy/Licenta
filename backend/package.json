@@ -18,6 +18,7 @@
   "dependencies": {
     "@google/genai": "^1.49.0",
     "@prisma/client": "^5.22.0",
+    "@turf/turf": "^7.3.5",
     "@types/pdf-parse": "^1.1.5",
     "axios": "1.15.0",
     "bcrypt": "^6.0.0",
@@ -40,6 +41,7 @@
     "@types/helmet": "^0.0.48",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.19.11",
+    "@types/turf": "^3.5.32",
     "nodemon": "^3.1.0",
     "prisma": "^5.22.0",
     "ts-node": "^10.9.2",

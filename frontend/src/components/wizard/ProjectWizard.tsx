@@ -19,6 +19,7 @@ export interface ProjectFormData {
   soilType: string;
   slopePercent: number;
   streetOrientation: string;
+  plotAreaSqm?: number;
   county?: string;
   locality?: string;
   seismicZone?: string;
@@ -30,6 +31,8 @@ export interface ProjectFormData {
   hasGroundFloor: boolean;
   upperFloorsCount: number;
   hasMansard: boolean;
+  soilNotes?: string;
+  zoningRestrictions?: string;
 }
 
 const initialData: ProjectFormData = {
@@ -51,6 +54,9 @@ const initialData: ProjectFormData = {
   hasGroundFloor: true,
   upperFloorsCount: 0,
   hasMansard: false,
+  soilNotes: '',
+  zoningRestrictions: '',
+  plotAreaSqm: 0,
 };
 
 const steps = [

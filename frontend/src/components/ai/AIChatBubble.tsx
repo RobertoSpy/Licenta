@@ -27,10 +27,11 @@ interface AIChatBubbleProps {
     label: string;
     onApply: () => void;
   };
+  defaultOpen?: boolean;
 }
 
-export const AIChatBubble: React.FC<AIChatBubbleProps> = ({ contextData, welcomeMessage, suggestedAction }) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const AIChatBubble: React.FC<AIChatBubbleProps> = ({ contextData, welcomeMessage, suggestedAction, defaultOpen }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen || false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -45,10 +46,12 @@ export const AIChatBubble: React.FC<AIChatBubbleProps> = ({ contextData, welcome
     }
   }, [welcomeMessage]);
 
-  // Auto scroll la ultimul mesaj
+  // Auto scroll la ultimul mesaj DOAR dacă utilizatorul a întrebat ceva sau AI-ul scrie activ
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (messages.length > 1 || isStreaming) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isStreaming]);
 
   const sendMessage = async () => {
     if (!input.trim() || isStreaming) return;

@@ -58,10 +58,22 @@ Direcția cardinală spre care privește fațada principală.
 • **Sud / Sud-Est** — lumină naturală maximă, consum energetic redus iarna.
 • **Nord** — camerele din față vor fi mai reci și mai puțin luminate.
 
+📝 **NOTE ADIȚIONALE TEREN (Opțional)**
+Aici poți nota particularități esențiale observate pe teren care mă vor ajuta să evaluez riscurile și costurile de fundare:
+• Există apă la suprafață (pânză freatică ridicată)?
+• Terenul este mlăștinos sau de umplutură?
+• Există risc de alunecare de teren în zonă?
+
 Pune-mi orice întrebare! 🏗️`;
 
 export const Step2Terrain = ({ data, updateData }: Props) => {
-  const areaSqMeters = useMemo(() => calculateAreaFromMeters(data.plotCoordinates), [data.plotCoordinates]);
+  const calculatedArea = useMemo(() => calculateAreaFromMeters(data.plotCoordinates), [data.plotCoordinates]);
+
+  useEffect(() => {
+    if (calculatedArea > 0 && data.plotAreaSqm !== calculatedArea) {
+      updateData({ plotAreaSqm: calculatedArea });
+    }
+  }, [calculatedArea, data.plotAreaSqm, updateData]);
 
   const orientations = [
     { id: 'N', name: 'Nord' }, { id: 'NE', name: 'Nord-Est' }, 
@@ -86,7 +98,7 @@ export const Step2Terrain = ({ data, updateData }: Props) => {
             </div>
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Suprafață Identificată</p>
-              <p className="text-2xl font-black text-slate-900">{areaSqMeters.toFixed(2)} m²</p>
+              <p className="text-2xl font-black text-slate-900">{data.plotAreaSqm ? Number(data.plotAreaSqm).toFixed(2) : '0.00'} m²</p>
             </div>
           </div>
         </motion.div>
@@ -161,6 +173,22 @@ export const Step2Terrain = ({ data, updateData }: Props) => {
           </motion.div>
         </div>
 
+        {/* Note Sol */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ ...springConfig, delay: 0.4 }}
+          className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm"
+        >
+          <label className="text-xs font-black text-slate-500 uppercase tracking-wider block mb-3">Note adiționale teren (Opțional)</label>
+          <textarea
+            className="w-full border-2 border-slate-100 bg-slate-50 hover:bg-white rounded-2xl p-4 outline-none focus:border-buildorange transition-all font-medium text-slate-700 resize-none h-24"
+            placeholder="Ex: Pânza freatică la suprafață, teren mlăștinos, umplutură etc."
+            value={data.soilNotes || ''}
+            onChange={(e) => updateData({ soilNotes: e.target.value })}
+          />
+        </motion.div>
+
         <div className="bg-slate-900/5 p-4 rounded-2xl flex gap-3">
           <Info className="w-5 h-5 text-slate-400 shrink-0" />
           <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
@@ -219,14 +247,10 @@ export const Step2Terrain = ({ data, updateData }: Props) => {
         </div>
       </motion.div>
 
-      {/* AI Assistant cu mesaj educativ predefinit */}
       <AIChatBubble 
         contextData={data as unknown as Record<string, unknown>}
         welcomeMessage={TERRAIN_WELCOME_MESSAGE}
-        suggestedAction={{
-           label: "Analizează tipul de sol",
-           onApply: () => {}
-        }}
+        defaultOpen={true}
       />
     </div>
   );

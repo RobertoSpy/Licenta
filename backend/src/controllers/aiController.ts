@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { agentOrchestrator } from '../services/ai/agentOrchestrator';
+import { chatSummaryRepository } from '../repositories/chatSummaryRepository';
 import { GoogleGenAI } from '@google/genai';
 
 // Lazy init — același pattern ca în orchestrator
@@ -17,7 +18,7 @@ export const aiController = {
    */
   async chatStream(req: Request, res: Response): Promise<void> {
     try {
-      const { message, contextString, conversationHistory, screenContext } = req.body;
+      const { message, contextString, conversationHistory, screenContext, historySummary } = req.body;
 
       if (!message) {
         res.status(400).json({ error: 'Mesajul este obligatoriu.' });
@@ -35,7 +36,8 @@ export const aiController = {
         message,
         contextString || 'Fără context special generat din formularul anterior.',
         conversationHistory || [],
-        screenContext  // transmis la SCREEN_AGENTS router
+        screenContext,
+        historySummary ?? null
       );
 
       // Stream progresiv către client
@@ -90,6 +92,59 @@ export const aiController = {
     } catch (e: any) {
       console.error('[aiController.summarizeConversation] Eroare:', e);
       res.status(500).json({ error: 'Serviciul de rezumare nu este disponibil.' });
+    }
+  },
+
+  /**
+   * GET /api/ai/summary/:projectId?phase=...&screen=...
+   * Returnează rezumatul existent pentru un ecran specificat.
+   * Folosit de useZidarioChat la mount pentru a restaura contextul.
+   */
+  async getSummary(req: Request, res: Response): Promise<void> {
+    try {
+      // Ownership verificat de tenantGuard — req.project este disponibil
+      const projectId = parseInt(req.params.projectId as string);
+      const phase = req.query.phase as string;
+      const screen = req.query.screen as string | undefined;
+
+      if (!phase) {
+        res.status(400).json({ error: 'phase este obligatoriu.' });
+        return;
+      }
+
+      const summary = await chatSummaryRepository.getOne(projectId, phase, screen ?? null);
+      res.json({ summary: summary?.summary ?? null });
+    } catch (e: any) {
+      console.error('[aiController.getSummary] Eroare:', e);
+      res.status(500).json({ error: 'Eroare la citirea rezumatului.' });
+    }
+  },
+
+  /**
+   * POST /api/ai/summary
+   * Salvează (upsert) rezumatul pentru un ecran specificat.
+   * Apelat automat de useZidarioChat la fiecare 10 mesaje.
+   */
+  async saveSummary(req: Request, res: Response): Promise<void> {
+    try {
+      // Ownership verificat de tenantGuard — req.project este disponibil
+      const { projectId, phase, screen, summary } = req.body;
+
+      if (!phase || !summary) {
+        res.status(400).json({ error: 'phase și summary sunt obligatorii.' });
+        return;
+      }
+
+      const result = await chatSummaryRepository.upsert(
+        projectId,
+        phase,
+        screen ?? null,
+        summary
+      );
+      res.json({ success: true, id: result.id });
+    } catch (e: any) {
+      console.error('[aiController.saveSummary] Eroare:', e);
+      res.status(500).json({ error: 'Eroare la salvarea rezumatului.' });
     }
   }
 };

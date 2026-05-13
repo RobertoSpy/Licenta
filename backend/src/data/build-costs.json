@@ -1,0 +1,17 @@
+{
+  "_source": "P91-INCERC",
+  "_note": "Costuri orientative rezidențial România, 2023, lei/mc. Fără TVA, fără utilități.",
+  "structuri": {
+    "BetonArmat":   { "min": 800,  "max": 1100 },
+    "ZidăriePurtantă": { "min": 650,  "max": 900  },
+    "Lemn":         { "min": 700,  "max": 950  }
+  },
+  "finisaje": {
+    "Standard": { "min": 300, "max": 500 },
+    "Premium":  { "min": 600, "max": 900 }
+  },
+  "suplimente": {
+    "Subsol":   { "factor": 1.30, "descriere": "+30% față de prețul structurii" },
+    "Mansardă": { "factor": 1.20, "descriere": "+20% față de prețul etajului curent" }
+  }
+}

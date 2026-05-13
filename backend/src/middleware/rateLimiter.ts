@@ -4,9 +4,7 @@ import { Request } from 'express';
 /**
  * Global rate limiter — se aplică pe toate rutele.
  * Scopul: protecție DDoS / brute-force înainte de orice business logic.
- *
- * Valorile sunt conservatoare pentru development; în producție le poți
- * reduce sau extrage din env vars.
+ 
  */
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minute
@@ -39,7 +37,7 @@ export const authEmailLimiter = rateLimit({
   max: 10, // 10 încercări per email — prag strict anti brute-force
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false, trustProxy: false, ip: false }, // Dezactivăm avertismentul IPv6 pentru fallback
+  validate: false, // Dezactivează toate validările stricte din v8 (inclusiv IPv6)
   keyGenerator: (req: Request): string => {
     // Normalizare email: lowercase + trim → evită bypass prin variații de case
     const email = req.body?.email;
@@ -47,7 +45,7 @@ export const authEmailLimiter = rateLimit({
       return `email:${email.toLowerCase().trim()}`;
     }
     // Fallback pe IP dacă emailul lipsește (request malformat / endpoint /refresh)
-    return `ip:${req.ip}`;
+    return `ip:${req.ip?.replace(/:([^:]*)$/, '') || 'unknown'}`;
   },
   message: {
     status: 429,

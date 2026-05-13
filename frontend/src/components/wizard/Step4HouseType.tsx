@@ -166,8 +166,8 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
                 <span className="text-xs font-bold text-slate-400">Limită locală: P + {maxFloors - 1}</span>
               </div>
               
-              <div className="flex gap-4">
-                {[0, 1, 2].map((count) => {
+              <div className="grid grid-cols-3 gap-3">
+                {[0, 1, 2, 3, 4].map((count) => {
                   const total = 1 + count;
                   const isBlocked = total > maxFloors;
                   const isActive = data.upperFloorsCount === count;
@@ -177,7 +177,7 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
                       key={count}
                       disabled={isBlocked}
                       onClick={() => setUpperFloors(count)}
-                      className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all relative ${
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all relative ${
                         isActive 
                         ? 'border-amber-500 bg-amber-50 text-amber-900' 
                         : isBlocked 
@@ -185,11 +185,11 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
                         : 'border-slate-100 hover:border-slate-200 text-slate-600'
                       }`}
                     >
-                      <span className="text-xl font-black">{count === 0 ? 'P' : `P+${count}`}</span>
-                      <span className="text-[10px] font-bold uppercase tracking-widest">{count === 0 ? 'Doar parter' : `${count} Etaj${count > 1 ? 'e' : ''}`}</span>
+                      <span className="text-lg font-black">{count === 0 ? 'P' : `P+${count}`}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-center">{count === 0 ? 'Doar parter' : `${count} Etaj${count > 1 ? 'e' : ''}`}</span>
                       {isBlocked && (
-                        <div className="absolute -top-1 -right-1">
-                           <AlertCircle className="w-4 h-4 text-slate-400 fill-white" />
+                        <div className="absolute -top-1.5 -right-1.5">
+                           <AlertCircle className="w-4 h-4 text-slate-400 fill-white bg-white rounded-full" />
                         </div>
                       )}
                     </button>

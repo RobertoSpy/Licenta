@@ -10,6 +10,7 @@ import projectRoutes from './routes/projectRoutes';
 import terrainRoutes from './routes/terrainRoutes';
 import aiRoutes from './routes/aiRoutes';
 import materialRoutes from './routes/materialRoutes';
+import editorRoutes from './routes/editorRoutes';
 
 dotenv.config();
 
@@ -60,6 +61,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/terrain', terrainRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/materials', materialRoutes);
+app.use('/api/editor', editorRoutes);
 
 // ─────────────────────────────────────────────
 // 7. FALLBACK: Rută necunoscută

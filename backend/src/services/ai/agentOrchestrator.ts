@@ -144,7 +144,8 @@ export const agentOrchestrator = {
     userQuestion: string,
     contextString: string,
     conversationHistory: { role: string; text: string }[] = [],
-    screenContext?: string
+    screenContext?: string,
+    historySummary?: string | null   // rezumat pre-încărcat din DB de frontend
   ) {
     // 0. DOMAIN GUARD — verificăm dacă întrebarea e legată de construcții
     //    Dacă nu, returnăm un "fake stream" cu mesaj de refuz (zero cost Gemini)
@@ -212,8 +213,24 @@ export const agentOrchestrator = {
 Rolul tău este să oferi suport tehnic direct, fără ocolviri, pe un ton prietenos dar extrem de precis.
 Domenii active pentru această întrebare: **${agentLabel}**
 ${statusDisclaimer}
+${
+  historySummary
+    ? `=== CONTEXT PROIECT (din conversații anterioare) ===\n${historySummary}\n`
+    : ''
+}
 CONTEXT CURENT UTILIZATOR (informații preluate automat):
 ${contextString}
+
+LIMITĂ TEHNICĂ CALCULATĂ DETERMINIST (nu o modifica, nu o recalcula):
+- Citește "Maximum tehnic etaje", "Județ", "Localitate" din secțiunea CONTEXT CURENT UTILIZATOR.
+- Această valoare vine din CR6-2013 + P100-1/2013, nu din AI.
+
+OBLIGATORIU când discuți despre numărul de etaje permis:
+1. Prezintă limita tehnică națională din context.
+2. Avertizează că Primăria locală poate impune restricții mai stricte prin PUG (Plan Urbanistic General).
+3. Recomandă obținerea Certificatului de Urbanism de la Primărie — termen 30 zile, taxă 5-30 RON, temei Legea 50/1991.
+4. Menționează că PUG-ul diferă de la primărie la primărie.
+5. Subliniază că estimările ZIDARIO nu înlocuiesc documentația legală oficială.
 
 NORMATIVE STATICE (CAG — referință fixă, date numerice exacte):
 ${staticNormatives}

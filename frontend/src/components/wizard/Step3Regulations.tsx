@@ -43,6 +43,7 @@ const itemVariants = {
 export const Step3Regulations = ({ data, updateData }: Props) => {
   const [isPredicting, setIsPredicting] = useState(true);
   const [aiExplanation, setAiExplanation] = useState("");
+  const aiExplanationRef = useRef("");
   const [isAiLoading, setIsAiLoading] = useState(false);
   const streamStarted = useRef(false);
 
@@ -69,10 +70,32 @@ export const Step3Regulations = ({ data, updateData }: Props) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          message: `Explică-mi pe scurt reglementările pentru un teren în ${data.county || 'România'}. Zona seismică este ${data.seismicZone || '0.20g'} și adâncimea de îngheț este ${data.frostDepthCm || '90'}cm. Menționează de ce sunt importante aceste valori pentru fundație.`,
-          contextString: JSON.stringify(data)
-        })
+body: JSON.stringify({
+  message: `Explică reglementările tehnice pentru terenul meu 
+    din ${data.locality || data.county || 'România'}, 
+    județul ${data.county}. 
+    Zona seismică este ${data.seismicZone} conform P100-1/2013 
+    și adâncimea de îngheț este ${data.frostDepthCm}cm 
+    conform NP112-2014. 
+    Explică de ce sunt importante aceste valori pentru fundație 
+    și câte etaje pot construi tehnic.
+    Menționează obligatoriu că limita tehnică națională este 
+    P+${data.maxAllowedFloors} dar că trebuie să obțin 
+    Certificatul de Urbanism de la Primăria ${data.locality} 
+    pentru a afla restricțiile locale exacte prin PUG, 
+    deoarece acestea pot fi mai stricte decât limita națională.`,
+  contextString: `
+    Județ: ${data.county}
+    Localitate: ${data.locality}
+    Suprafață teren: ${data.plotAreaSqm || 0} m²
+    Zonă seismică: ${data.seismicZone}
+    Adâncime îngheț: ${data.frostDepthCm}cm
+    Tip sol: ${data.soilType}
+    Note adiționale teren: ${data.soilNotes || 'Fără note'}
+    Maximum tehnic etaje (CR6+P100): P+${data.maxAllowedFloors}
+    Adâncime minimă fundație (NP112): ${data.minFoundationDepthCm}cm
+  `.trim()
+})
       });
 
       if (!response.body) return;
@@ -90,11 +113,16 @@ export const Step3Regulations = ({ data, updateData }: Props) => {
             if (dataStr === '[DONE]') break;
             try {
               const parsed = JSON.parse(dataStr);
-              setAiExplanation(prev => prev + parsed.text);
+              setAiExplanation(prev => {
+                const newText = prev + parsed.text;
+                aiExplanationRef.current = newText;
+                return newText;
+              });
             } catch (e) {}
           }
         }
       }
+      updateData({ zoningRestrictions: aiExplanationRef.current });
     } catch (err) {
       setAiExplanation("Eroare la generarea explicației AI. Te rugăm să verifici conexiunea.");
     } finally {
@@ -103,7 +131,7 @@ export const Step3Regulations = ({ data, updateData }: Props) => {
   };
 
   // Determinarea limitei administrative de etaje (logica determinista)
-  const maxFloors = data.seismicZone === '0.35g' || data.seismicZone === '0.30g' ? 2 : 4;
+const maxFloors = data.maxAllowedFloors ?? 4;
   
   useEffect(() => {
     if (maxFloors !== data.maxAllowedFloors) {
@@ -185,6 +213,33 @@ export const Step3Regulations = ({ data, updateData }: Props) => {
           <p className="text-sm text-slate-400 mt-2">Maxim {maxFloors} niveluri supraterane permise.</p>
         </motion.div>
       </div>
+
+      {/* Banner avertizare CU — după grid-ul cu 3 carduri */}
+<motion.div
+  variants={itemVariants}
+  className="bg-amber-50 border border-amber-200 rounded-2xl p-5"
+>
+  <div className="flex items-start gap-3">
+    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+    <div>
+      <p className="font-semibold text-amber-800 text-sm">
+        Limita afișată este tehnică națională
+      </p>
+      <p className="text-amber-700 text-sm mt-1">
+        Normativele naționale permit maximum{' '}
+        <strong>P+{data.maxAllowedFloors}</strong> pentru zona ta. 
+        Primăria <strong>{data.locality}</strong>, județul{' '}
+        <strong>{data.county}</strong> poate impune restricții 
+        mai stricte prin PUG (Plan Urbanistic General).
+      </p>
+      <p className="text-amber-600 text-xs mt-2">
+        Obține <strong>Certificatul de Urbanism</strong> înainte 
+        de a demara proiectarea — termen legal 30 zile, 
+        taxă 5-30 RON, temei Legea 50/1991.
+      </p>
+    </div>
+  </div>
+</motion.div>
 
       {/* AI Explanation Box with backdrop blur effects requested */}
       <motion.div 

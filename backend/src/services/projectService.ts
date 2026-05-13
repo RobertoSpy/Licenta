@@ -1,4 +1,5 @@
 import { projectRepository } from '../repositories/projectRepository';
+import * as turf from '@turf/turf';
 
 export const projectService = {
   calculateTotalFloors(existing: any, input: any) {
@@ -10,38 +11,29 @@ export const projectService = {
   },
 
   async createProject(userId: number, title: string) {
-    return projectRepository.create({
-      title,
-      userId
-    });
+    return projectRepository.create({ title, userId });
   },
 
   async getUserProjects(userId: number) {
     return projectRepository.findManyByUserId(userId);
   },
 
-  async getProjectById(projectId: number, userId: number) {
-    const project = await projectRepository.findById(projectId);
-    if (!project) {
-      throw new Error('NOT_FOUND');
-    }
-    if (project.userId !== userId) {
-      throw new Error('FORBIDDEN');
-    }
-    return project;
-  },
 
-  async updateProject(projectId: number, userId: number, inputData: any) {
+  /**
+   * Actualizează proiectul după ID.
+   * Ownership-ul este deja verificat de tenantGuard înainte de apelul acestei metode.
+   */
+  async updateProject(projectId: number, inputData: any) {
     const existing = await projectRepository.findById(projectId);
-    if (!existing) {
-      throw new Error('NOT_FOUND');
-    }
-    if (existing.userId !== userId) {
-      throw new Error('FORBIDDEN');
-    }
+    if (!existing) throw new Error('NOT_FOUND');
 
     let totalFloors: number | undefined;
-    if (inputData.hasBasement !== undefined || inputData.hasGroundFloor !== undefined || inputData.upperFloorsCount !== undefined || inputData.hasMansard !== undefined) {
+    if (
+      inputData.hasBasement !== undefined ||
+      inputData.hasGroundFloor !== undefined ||
+      inputData.upperFloorsCount !== undefined ||
+      inputData.hasMansard !== undefined
+    ) {
       totalFloors = this.calculateTotalFloors(existing, inputData);
     }
 
@@ -49,10 +41,10 @@ export const projectService = {
 
     const data: Record<string, unknown> = {};
     const allowedKeys = [
-      'title', 'wizardStep', 'lat', 'lng', 'polygonGeoJSON', 'county', 'locality', 
-      'seismicZone', 'frostDepthCm', 'plotAreaSqm', 'soilType', 'slopePercent', 
-      'streetOrientation', 'soilNotes', 'maxAllowedFloors', 'minFoundationDepthCm', 
-      'zoningRestrictions', 'houseStyle', 'hasBasement', 'hasGroundFloor', 
+      'title', 'wizardStep', 'lat', 'lng', 'polygonGeoJSON', 'county', 'locality',
+      'seismicZone', 'frostDepthCm', 'plotAreaSqm', 'soilType', 'slopePercent',
+      'streetOrientation', 'soilNotes', 'maxAllowedFloors', 'minFoundationDepthCm',
+      'zoningRestrictions', 'houseStyle', 'hasBasement', 'hasGroundFloor',
       'upperFloorsCount', 'hasMansard'
     ];
 
@@ -65,14 +57,28 @@ export const projectService = {
     if (totalFloors !== undefined) data.totalFloors = totalFloors;
     if (isCompleted !== undefined) data.isCompleted = isCompleted;
 
+    if (inputData.polygonLatLngs && Array.isArray(inputData.polygonLatLngs) && inputData.polygonLatLngs.length >= 3) {
+      try {
+        const coords = inputData.polygonLatLngs.map((p: any) => [p[1], p[0]]); // GeoJSON wants [lng, lat]
+        if (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1]) {
+          coords.push([...coords[0]]); // Close the linear ring
+        }
+        const poly = turf.polygon([coords]);
+        data.polygonGeoJSON = poly.geometry;
+        data.plotAreaSqm = turf.area(poly);
+      } catch (e) {
+        console.error('Eroare generare poligon/arie:', e);
+      }
+    }
+
     return projectRepository.update(projectId, data);
   },
 
-  async deleteProject(projectId: number, userId: number) {
-    const existing = await projectRepository.findById(projectId);
-    if (!existing || existing.userId !== userId) {
-      throw new Error('FORBIDDEN_OR_NOT_FOUND');
-    }
+  /**
+   * Șterge proiectul după ID.
+   * Ownership-ul este deja verificat de tenantGuard înainte de apelul acestei metode.
+   */
+  async deleteProject(projectId: number) {
     await projectRepository.delete(projectId);
   }
 };
