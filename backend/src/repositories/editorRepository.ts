@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export const editorRepository = {
   /**
@@ -43,6 +41,17 @@ export const editorRepository = {
    */
   async getSnapshot(id: number) {
     return prisma.planSnapshot.findUnique({ where: { id } });
+  },
+
+  /**
+   * Verifică dacă un snapshot aparține userului curent (via proiect).
+   */
+  async verifySnapshotOwnership(snapshotId: number, userId: number): Promise<boolean> {
+    const snapshot = await prisma.planSnapshot.findUnique({
+      where: { id: snapshotId },
+      include: { project: { select: { userId: true } } },
+    });
+    return snapshot?.project.userId === userId;
   },
 
   /**

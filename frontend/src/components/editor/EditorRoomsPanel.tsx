@@ -1,10 +1,10 @@
 import React from 'react';
-import { RoomInfo } from '../../hooks/useRoomCalculator';
+import { type ConformityRoom } from '../../hooks/useConformityCheck';
 import { useEditorState } from '../../hooks/useEditorState';
 import { CheckCircle2, AlertTriangle, XCircle, Layers } from 'lucide-react';
 
 interface Props {
-  rooms: RoomInfo[];
+  rooms: ConformityRoom[];
 }
 
 const statusConfig = {

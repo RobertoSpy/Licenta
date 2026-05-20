@@ -111,7 +111,7 @@ model NormativeChunk {
   content   String // 800-1000 cuvinte per chunk
   agent     String @default("general")  // "geotehnic" | "seismic" | "legal" | "structural" | "materiale" | "deviz"
   status    String @default("in_vigoare") // "in_vigoare" | "in_revizuire" | "abrogat"
-  embedding Unsupported("vector(768)")?
+  embedding Unsupported("vector(3072)")?
 
   @@index([source])
   @@index([agent])

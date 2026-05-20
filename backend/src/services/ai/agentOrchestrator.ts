@@ -1,12 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
 import { normativeCache } from './normativeCache';
-import { ragAgentGeotehnic } from './ragAgentGeotehnic';
-import { ragAgentSeismic } from './ragAgentSeismic';
-import { ragAgentLegal } from './ragAgentLegal';
-import { ragAgentStructural } from './ragAgentStructural';
-import { ragAgentMateriale } from './ragAgentMateriale';
-import { ragAgentDeviz } from './ragAgentDeviz';
-import { ragService } from './ragService'; // fallback general
+import { AgentType, AGENT_SOURCES } from '../../data/normative-registry';
+import { searchHybrid, ragService } from './ragService';
+import { bomService } from '../bomService';
 
 // Funcție pentru inițializare lazy a clientului
 let aiInstance: GoogleGenAI | null = null;
@@ -29,7 +25,7 @@ const CONSTRUCTION_KEYWORDS = [
   'grindă', 'lemn', 'acoperire', 'mansarda', 'mansardă', 'subsol', 'parter',
   'proiect', 'calcul', 'rezistenta', 'rezistență', 'sapatura', 'săpătură',
   'pamant', 'pământ', 'pietris', 'pietriș', 'argilos', 'nisipos', 'stâncos',
-  'cutremur', 'seismicitate', 'zona', 'judet', 'județ'
+  'cutremur', 'seismicitate', 'zona', 'judet', 'județ',
 ];
 
 /**
@@ -42,87 +38,157 @@ function isConstructionRelated(message: string): boolean {
 }
 
 // ============================================================
-// SCREEN AGENTS MAP — care agenți sunt activi per ecran/context
-// Această mapare definește sursa de cunoaștere pentru fiecare
-// pas al aplicației. Adaugă screen-uri noi odată cu Faza 2/3.
+// SCREEN AGENTS MAP — fallback per ecran când keyword routing nu prinde
 // ============================================================
-export const SCREEN_AGENTS: Record<string, string[]> = {
-  // Faza 1 — Wizard
-  screen1: ['geotehnic', 'seismic'],            // locație → sol + seismicitate
-  screen2: ['geotehnic'],                        // tip sol, pantă, orientare
-  screen3: ['seismic', 'structural', 'legal'],   // reglementări construcție
-  screen4: ['legal'],                             // tip casă, suprafețe minime
-
-  // Faza 2 — Editor 2D
-  editor: ['legal', 'structural'],               // validare plan vs Legea 114 + CR6
-
-  // Faza 3 — Deviz
-  bom: ['structural', 'materiale', 'deviz'],     // cantități, materiale, prețuri
-  timeline: ['legal', 'structural'],             // etape construcție, verificări
+export const SCREEN_AGENTS: Record<string, AgentType[]> = {
+  screen1: ['geotehnic', 'seismic'],
+  screen2: ['geotehnic'],
+  screen3: ['seismic', 'structural', 'legal'],
+  screen4: ['legal'],
+  editor:  ['legal', 'structural'],
+  bom:     ['structural', 'materiale', 'deviz'],
+  timeline:['legal', 'structural'],
 };
 
-// Tipuri de agenți disponibili în sistem
-type AgentType = 'geotehnic' | 'seismic' | 'legal' | 'structural' | 'materiale' | 'deviz' | 'general';
-
-/**
- * Detectează agentul potrivit pe baza keyword-urilor din întrebare.
- * Rutare simplă bazată pe intenție — fără apel AI suplimentar.
- * Returnează un array de agenți relevanți (poate fi mai mult de unul).
- */
-function detectAgents(question: string): AgentType[] {
+// ============================================================
+// DETECT REQUIRED AGENTS — routing pe baza keyword-urilor
+// Returnează array de agenți unici.
+// Ordinea regulilor contează: mai specific înainte de mai general.
+// ============================================================
+export function detectRequiredAgents(
+  question: string,
+  screen: string
+): AgentType[] {
   const q = question.toLowerCase();
-  const agents: AgentType[] = [];
+  const agents = new Set<AgentType>();
 
-  // Geotehnic: sol, fundații, teren
-  if (/sol|fundati|teren|argilos|nisipos|pietros|stancos|geotehnic|capacitate portanta|tasare|infiltrat|umiditate/.test(q)) {
-    agents.push('geotehnic');
+  // GEOTEHNIC — sol, fundație, îngheț, adâncime, apă freatică
+  if (/sol|teren|fundati|fundare|inghet|îngheț|adancime|adâncime|argilos|nisipos|pietros|stancos|stâncos|apa freatica|apă freatică|infiltrar|geotehni|capacitate portant|tasar/.test(q)) {
+    agents.add('geotehnic');
   }
 
-  // Seismic: cutremure, accelerație, structură seismică
-  if (/seismic|cutremur|zona|accelerati|ag\b|spectru|risc seismic/.test(q)) {
-    agents.push('seismic');
+  // SEISMIC — cutremur, zonă seismică, etaje, parametri seismici
+  if (/seismic|cutremur|etaj|inaltime cladire|înălțime clădire|zona|ag\b|tc\b|accelerati|spectru seismic|risc seismic/.test(q)) {
+    agents.add('seismic');
   }
 
-  // Structural: zidărie, beton, structura casei, zăpadă, vânt
-  if (/zidarie|beton|stalp|grinda|planseu|structura|etaj|mansarda|incarcare|zapada|vant|cadre|armat/.test(q)) {
-    agents.push('structural');
+  // STRUCTURAL — materiale structurale, armare, zidărie, ancoraj acoperiș
+  if (/zidarie|zidărie|beton|armar|perete structural|zia\b|zna\b|zc\b|dch\b|dcm\b|grosime perete|rezistent|cleme|fixare|ancor|sutiune|suțiune|smulgere|stalp|stâlp|grinda|grindă|planseu|planșeu/.test(q)) {
+    agents.add('structural');
   }
 
-  // Legal: autorizații, PUG, POT, CUT
-  if (/autorizati|lege|pug|puz|pot\b|cut\b|urbanism|aviz|regulament|permis|constructie legala|retrocedar/.test(q)) {
-    agents.push('legal');
+  // ARCHITECTURAL — formă plan, regularitate, categorie teren, expunere vânt
+  if (/plan|regularitate|simetrie|categorie.*teren|rugozitate|expunere|vant|vânt|tip.*acoperis|acoperiș|forma.*casa|formă.*casă/.test(q)) {
+    agents.add('architectural');
   }
 
-  // Deviz: costuri, prețuri, estimare
-  if (/cost|pret|deviz|buget|estimare|mc|metru cub|cheltuieli|materiale/.test(q)) {
-    agents.push('deviz');
-    agents.push('materiale');
+  // LEGAL — suprafețe minime, Legea 114, autorizații, PUG
+  if (/suprafata|suprafață|metru patrat|metru pătrat|\bmp\b|camera|cameră|living|dormitor|baie|bucatarie|bucătărie|minim legal|legea 114|autorizati|pug\b|puz\b|urbanism/.test(q)) {
+    agents.add('legal');
   }
 
-  // Dacă nu s-a detectat nimic specific, returnăm 'general'
-  return agents.length > 0 ? agents : ['general'];
+  // DEVIZ/MATERIALE — costuri, prețuri, estimare (Faza 3, încă active în SCREEN_AGENTS)
+  if (/cost|pret|preț|deviz|buget|estimare|mc\b|metru cub|cheltuieli/.test(q)) {
+    agents.add('deviz');
+    agents.add('materiale');
+  }
+
+  // FALLBACK 1: folosim screen-ul activ dacă keyword routing nu a prins nimic
+  if (agents.size === 0 && screen && SCREEN_AGENTS[screen]) {
+    SCREEN_AGENTS[screen].forEach(a => agents.add(a));
+    console.log(`[detectRequiredAgents] Fallback pe screen "${screen}": [${[...agents].join(', ')}]`);
+  }
+
+  // FALLBACK 2: seismic ca default absolut
+  if (agents.size === 0) {
+    agents.add('seismic');
+  }
+
+  return [...agents];
 }
 
-/**
- * Execută căutarea RAG pentru un agent specificat și returnează contextul.
- */
-async function fetchRagContext(agent: AgentType, question: string, limit: number = 3): Promise<string> {
-  switch (agent) {
-    case 'geotehnic':   return ragAgentGeotehnic.search(question, limit);
-    case 'seismic':     return ragAgentSeismic.search(question, limit);
-    case 'legal':       return ragAgentLegal.search(question, limit);
-    case 'structural':  return ragAgentStructural.search(question, limit);
-    case 'materiale':   return ragAgentMateriale.search(question, limit);
-    case 'deviz':       return ragAgentDeviz.search(question, limit);
-    case 'general':     return ragService.searchRelevantChunks(question, 3);
-    default:            return '';
+// ============================================================
+// BUILD RAG CONTEXT — asamblează contextul RAG complet pentru prompt
+// Apelează toți agenții detectați în paralel (Promise.all)
+// ============================================================
+export async function buildRAGContext(
+  question: string,
+  screen: string,
+  project: {
+    county?: string | null;
+    locality?: string | null;
+    seismicZone?: string | null;
+    frostDepthCm?: number | null;
+    soilType?: string | null;
+    windPressureKpa?: number | null;
+    terrainCategory?: string | null;
   }
+): Promise<string> {
+  const agents = detectRequiredAgents(question, screen);
+  const limitPerAgent = agents.length === 1 ? 5 : 3;
+
+  console.log(`[buildRAGContext] Agenți activi: [${agents.join(', ')}] pentru screen="${screen}"`);
+
+  // Interogăm toți agenții în paralel
+  const contextParts = await Promise.all(
+    agents.map(async agent => {
+      // materiale și deviz nu au chunks în DB încă (Faza 3) — skip silențios
+      if (AGENT_SOURCES[agent].length === 0) return null;
+
+      const chunks = await searchHybrid(question, agent, limitPerAgent);
+      if (chunks.length === 0) return null;
+
+      const chunksText = chunks
+        .map(c => `§ ${c.source} — ${c.chapter}:\n${c.content}`)
+        .join('\n\n');
+
+      return `[AGENT ${agent.toUpperCase()}]\n${chunksText}`;
+    })
+  );
+
+  // Date deterministe din proiect — injectate direct în prompt, nu din RAG
+  // AI-ul NU recalculează aceste valori — le citește și le explică
+  const foundationSpec = bomService.getFoundationSpec(project.frostDepthCm, project.soilType);
+
+  const projectLines = [
+    '[DATE PROIECT — DETERMINISTE]',
+    project.county          ? `Județ: ${project.county}` : null,
+    project.locality        ? `Localitate: ${project.locality}` : null,
+    project.seismicZone     ? `Zonă seismică: ${project.seismicZone} (P100-1-2013, Anexa A)` : null,
+    project.frostDepthCm    ? `Adâncime îngheț: ${project.frostDepthCm} cm (NP112-2014, Anexa B)` : null,
+    project.soilType        ? `Tip sol: ${project.soilType}` : null,
+    project.windPressureKpa ? `Presiune vânt qb: ${project.windPressureKpa} kPa (CR1-1-4-2012, Anexa A)` : null,
+    project.terrainCategory ? `Categorie teren rugozitate: ${project.terrainCategory}` : null,
+    // Clasa betonului — determinată de bomService, nu de AI
+    project.frostDepthCm    ? bomService.formatForPrompt(foundationSpec) : null,
+  ].filter(Boolean).join('\n');
+
+  return [
+    projectLines,
+    ...contextParts.filter(Boolean),
+  ].join('\n\n---\n\n');
 }
 
-/**
- * Generează un disclaimer automat pentru normativele în revizuire.
- * Apelat înainte de a compune prompt-ul final.
- */
+// ============================================================
+// AGENT LABEL — string lizibil pentru afișare în prompt
+// ============================================================
+function agentLabel(agents: AgentType[]): string {
+  const labels: Record<AgentType, string> = {
+    geotehnic:     'Geotehnică & Fundații',
+    seismic:       'Seismicitate & Structură',
+    structural:    'Structuri & Materiale',
+    architectural: 'Arhitectură & Reglementări',
+    legal:         'Legislație & Urbanism',
+    materiale:     'Cataloage Materiale',
+    deviz:         'Deviz & Estimare Costuri',
+    general:       'General',
+  };
+  return agents.map(a => labels[a]).join(', ');
+}
+
+// ============================================================
+// STATUS DISCLAIMER — pentru normative în revizuire
+// ============================================================
 function getStatusDisclaimer(agents: AgentType[]): string {
   if (agents.includes('seismic')) {
     return '\n⚠️ **Notă normativ:** P100-1/2013 este versiunea în vigoare. P100-1/2025 este în stadiu de redactare și nu a intrat în vigoare.\n';
@@ -130,27 +196,39 @@ function getStatusDisclaimer(agents: AgentType[]): string {
   return '';
 }
 
+// ============================================================
+// MAIN ORCHESTRATOR
+// ============================================================
 export const agentOrchestrator = {
   /**
    * Orchestrează interogarea Multi-Agent RAG + CAG și returnează un stream SSE.
-   * Fiecare întrebare este rutată la unul sau mai mulți agenți specializați.
    *
-   * @param userQuestion - Întrebarea utilizatorului
-   * @param contextString - Date despre proiectul curent (județ, tip sol, etc.)
+   * @param userQuestion     - Întrebarea utilizatorului
+   * @param contextString    - Date despre proiectul curent (județ, tip sol, etc.)
    * @param conversationHistory - Ultimele mesaje din chat
-   * @param screenContext - Contextul de ecran activ (ex: 'screen1', 'editor', 'bom')
+   * @param screenContext    - Contextul de ecran activ (ex: 'screen1', 'editor', 'bom')
+   * @param historySummary   - Rezumat pre-încărcat din DB de frontend
+   * @param projectData      - Date deterministe din proiect (seismicZone, frostDepth etc.)
    */
   async getAiStreamForChat(
     userQuestion: string,
     contextString: string,
     conversationHistory: { role: string; text: string }[] = [],
     screenContext?: string,
-    historySummary?: string | null   // rezumat pre-încărcat din DB de frontend
+    historySummary?: string | null,
+    projectData?: {
+      county?: string | null;
+      locality?: string | null;
+      seismicZone?: string | null;
+      frostDepthCm?: number | null;
+      soilType?: string | null;
+      windPressureKpa?: number | null;
+      terrainCategory?: string | null;
+    }
   ) {
-    // 0. DOMAIN GUARD — verificăm dacă întrebarea e legată de construcții
-    //    Dacă nu, returnăm un "fake stream" cu mesaj de refuz (zero cost Gemini)
+    // 0. DOMAIN GUARD
     if (!isConstructionRelated(userQuestion)) {
-      console.log(`[agentOrchestrator] Off-topic detectat: "${userQuestion.slice(0, 60)}...". Refuz fără apel Gemini.`);
+      console.log(`[agentOrchestrator] Off-topic: "${userQuestion.slice(0, 60)}..."`);
       async function* refusalStream() {
         yield { text: 'Zidario este specializat exclusiv în construcții rezidențiale din România. ' };
         yield { text: 'Pentru această întrebare te rog să folosești un asistent general. ' };
@@ -162,56 +240,38 @@ export const agentOrchestrator = {
     // 1. CAG — date statice mereu disponibile
     const staticNormatives = await normativeCache.load();
 
-    // 2. Detectăm agenții relevanți din întrebare
-    //    Dacă avem un screen context activ, îl prioritizăm pentru agenți
-    let activeAgents: AgentType[];
-    if (screenContext && SCREEN_AGENTS[screenContext]) {
-      activeAgents = SCREEN_AGENTS[screenContext] as AgentType[];
-      console.log(`[agentOrchestrator] Rutare după screen: "${screenContext}" → agenți: [${activeAgents.join(', ')}]`);
-    } else {
-      activeAgents = detectAgents(userQuestion);
-      console.log(`[agentOrchestrator] Rutare după keyword: agenți detectați: [${activeAgents.join(', ')}] pentru: "${userQuestion.slice(0, 60)}..."`);
-    }
+    // 2. Detectăm agenții necesari (keyword routing + screen fallback)
+    const screen = screenContext ?? 'screen1';
+    const activeAgents = detectRequiredAgents(userQuestion, screen);
+    console.log(`[agentOrchestrator] Agenți detectați: [${activeAgents.join(', ')}]`);
 
-    // 3. RAG — căutăm în paralel în toți agenții activi
-    //    Dacă sunt mai mulți agenți, fiecare aduce max 2 chunks (nu 3) pentru a nu umfla prompt-ul
-    const limitPerAgent = activeAgents.length === 1 ? 3 : 2;
-
-    const ragResults = await Promise.all(
-      activeAgents.map(agent => fetchRagContext(agent, userQuestion, limitPerAgent))
+    // 3. RAG — hybrid search pentru toți agenții în paralel
+    const ragContext = await buildRAGContext(
+      userQuestion,
+      screen,
+      projectData ?? {}
     );
-    const ragContext = ragResults.filter(Boolean).join('\n\n') || 'Baza de cunoaștere RAG nu a fost indexată încă.';
 
-    // 4. Disclaimer pentru normative în revizuire
+    // 4. Disclaimer normative în revizuire
     const statusDisclaimer = getStatusDisclaimer(activeAgents);
 
     // 5. Istoricul conversației (ultimele 10 mesaje)
     let historyStr = '';
     if (conversationHistory && conversationHistory.length > 0) {
-      historyStr = 'ISTORIC CONVERSAȚIE:\n' +
+      historyStr =
+        'ISTORIC CONVERSAȚIE:\n' +
         conversationHistory
           .slice(-10)
           .map(msg => `[${msg.role === 'user' ? 'Utilizator' : 'Zidario'}]: ${msg.text}`)
-          .join('\n') + '\n\n';
+          .join('\n') +
+        '\n\n';
     }
 
-    // 6. Label lizibil pentru domeniu
-    const agentLabel = activeAgents
-      .map(a => ({
-        geotehnic: 'Geotehnică & Fundații',
-        seismic: 'Seismicitate & Structură',
-        legal: 'Legislație & Urbanism',
-        structural: 'Structuri & Materiale',
-        materiale: 'Cataloage Materiale',
-        deviz: 'Deviz & Estimare Costuri',
-        general: 'General',
-      }[a]))
-      .join(', ');
-
-    // 7. Compunem prompt-ul final
+    // 6. Prompt final
+    const label = agentLabel(activeAgents);
     const prompt = `Ești Zidario, un asistent tehnic AI expert în proiectarea și construcția caselor din România.
 Rolul tău este să oferi suport tehnic direct, fără ocolviri, pe un ton prietenos dar extrem de precis.
-Domenii active pentru această întrebare: **${agentLabel}**
+Domenii active pentru această întrebare: **${label}**
 ${statusDisclaimer}
 ${
   historySummary
@@ -227,7 +287,7 @@ LIMITĂ TEHNICĂ CALCULATĂ DETERMINIST (nu o modifica, nu o recalcula):
 
 OBLIGATORIU când discuți despre numărul de etaje permis:
 1. Prezintă limita tehnică națională din context.
-2. Avertizează că Primăria locală poate impune restricții mai stricte prin PUG (Plan Urbanistic General).
+2. Avertizează că Primăria locală poate impune restricții mai stricte prin PUG.
 3. Recomandă obținerea Certificatului de Urbanism de la Primărie — termen 30 zile, taxă 5-30 RON, temei Legea 50/1991.
 4. Menționează că PUG-ul diferă de la primărie la primărie.
 5. Subliniază că estimările ZIDARIO nu înlocuiesc documentația legală oficială.
@@ -235,7 +295,7 @@ OBLIGATORIU când discuți despre numărul de etaje permis:
 NORMATIVE STATICE (CAG — referință fixă, date numerice exacte):
 ${staticNormatives}
 
-REGLEMENTĂRI RELEVANTE DIN NORMATIVE (RAG — ${agentLabel}):
+REGLEMENTĂRI RELEVANTE DIN NORMATIVE (RAG — Hybrid Search: ${label}):
 ${ragContext}
 
 ${historyStr}ÎNTREBARE UTILIZATOR:
@@ -244,17 +304,16 @@ ${historyStr}ÎNTREBARE UTILIZATOR:
 Răspunde profesionist, citează sursele exacte (ex: Conform NP 112-2014, Art. 5.2...) dacă este nevoie.
 Folosește limbaj simplu de om normal, nu jargon tehnic inutil. Paragrafe scurte. Markdown: doar bold și liste.`;
 
-    // 8. Stream
+    // 7. Stream Gemini
     try {
       const responseStream = await getAi().models.generateContentStream({
         model: 'gemini-2.5-flash',
-        contents: prompt
+        contents: prompt,
       });
-
       return responseStream;
     } catch (e: any) {
       console.error('[agentOrchestrator] Eroare Gemini:', e.message);
       throw new Error('Serviciul de asistență tehnică nu este disponibil.');
     }
-  }
+  },
 };

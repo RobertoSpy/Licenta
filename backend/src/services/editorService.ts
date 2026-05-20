@@ -26,6 +26,13 @@ export const editorService = {
   },
 
   /**
+   * Ownership check pentru snapshot (via proiect).
+   */
+  async verifySnapshotOwnership(snapshotId: number, userId: number): Promise<boolean> {
+    return editorRepository.verifySnapshotOwnership(snapshotId, userId);
+  },
+
+  /**
    * Cel mai recent snapshot al proiectului — pentru inițializarea editorului.
    */
   async getLatestSnapshot(projectId: number) {

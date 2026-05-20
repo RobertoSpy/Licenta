@@ -3,14 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useEditorState } from '../../hooks/useEditorState';
 import { useRoomCalculator } from '../../hooks/useRoomCalculator';
 import { useEditorAutoSave } from '../../hooks/useEditorAutoSave';
+import { useConformityCheck } from '../../hooks/useConformityCheck';
 import { EditorCanvas } from '../../components/editor/EditorCanvas';
 import { EditorToolbar } from '../../components/editor/EditorToolbar';
 import { EditorRoomsPanel } from '../../components/editor/EditorRoomsPanel';
 import { EditorPropertiesPanel } from '../../components/editor/EditorPropertiesPanel';
 import { EditorConformityAlert } from '../../components/editor/EditorConformityAlert';
+import { EditorRuler } from '../../components/editor/EditorRuler';
+import { EditorVersionHistory } from '../../components/editor/EditorVersionHistory';
+import { EditorChatSidebar } from '../../components/editor/EditorChatSidebar';
+import { GenerateLayoutModal } from '../../components/editor/GenerateLayoutModal';
 import { apiPrivate } from '../../api/axios';
+import { editorApi } from '../../api/editorApi';
 import { ArrowLeft } from 'lucide-react';
 import Konva from 'konva';
+import { v4 as uuidv4 } from 'uuid';
+import { metersToPx, pxToMeters } from '../../hooks/useEditorState';
 
 // Dialog simplu pentru label cameră (inline, fără librărie externă)
 interface RoomLabelDialogProps {
@@ -88,13 +96,31 @@ export const ProjectEditor: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [projectTitle, setProjectTitle] = useState('Proiect');
+  const [projectData, setProjectData] = useState<any>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
 
   // Stare dialog label
   const [labelDialog, setLabelDialog] = useState<{ id: string; x: number; y: number } | null>(null);
 
-  const { elements, loadFromJSON, updateElement, markClean, undo, redo, deleteSelected, setTool, setZoom } = useEditorState();
+  const { elements, loadFromJSON, updateElement, markClean, undo, redo, deleteSelected, setTool, setZoom, canvasScale, canvasOffset } = useEditorState();
   const rooms = useRoomCalculator(elements);
-  const violations = rooms.filter((r) => r.conformityStatus === 'error');
+  const doors = elements
+    .filter((el) => el.type === 'door')
+    .map((el) => ({
+      id: el.id,
+      widthM: pxToMeters(el.width),
+    }));
+
+  // Hook dedicat pentru validare conformitate (cu debounce 2s, conform plan_faza2.md)
+  const {
+    rooms: roomsWithStatus,
+    violations,
+    warnings,
+    violationIssues,
+    warningIssues,
+    isPending: isConformityPending,
+  } = useConformityCheck(rooms, doors);
 
   // Auto-save
   useEditorAutoSave(projectId);
@@ -146,6 +172,7 @@ export const ProjectEditor: React.FC = () => {
           apiPrivate.get(`/projects/${projectId}`),
           apiPrivate.get(`/editor/latest/${projectId}`).catch(() => ({ data: null })),
         ]);
+        setProjectData(project);
         setProjectTitle(project.title ?? 'Proiect');
         if (snapshot?.planJSON?.elements) {
           loadFromJSON(snapshot.planJSON.elements);
@@ -178,7 +205,7 @@ export const ProjectEditor: React.FC = () => {
     }
   }, [elements, isSaving, projectId, markClean]);
 
-  // Export PNG
+  // Export PNG — Konva nativ (zero backend)
   const handleExportPNG = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -188,6 +215,56 @@ export const ProjectEditor: React.FC = () => {
     link.download = `plan-parter-${projectTitle}.png`;
     link.click();
   }, [projectTitle]);
+
+  // Export PDF — trimitem PNG base64 la backend → Puppeteer generează PDF
+  const handleExportPDF = useCallback(async () => {
+    const stage = stageRef.current;
+    const pngBase64 = stage
+      ? stage.toDataURL({ pixelRatio: 2 }).replace('data:image/png;base64,', '')
+      : null;
+
+    try {
+      const response = await apiPrivate.post(
+        `/export/plan-pdf/${projectId}`,
+        { planPngBase64: pngBase64 },
+        { responseType: 'blob' }
+      );
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `plan-parter-${projectTitle}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[ProjectEditor] Eroare export PDF:', err);
+      alert('Export PDF eșuat. Asigurați-vă că ați publicat o versiune a planului.');
+    }
+  }, [projectId, projectTitle]);
+
+  // Generare layout (Cerere utilizator Faza 2)
+  const handleOpenGenerateModal = useCallback(() => {
+    setIsGenerateModalOpen(true);
+  }, []);
+
+  const handleGenerateLayout = useCallback(async (area: number, style: string, bedrooms: number) => {
+    if (!projectData) return;
+    
+    try {
+      const newElements = await editorApi.generateLayout({
+        projectId,
+        totalFloorAreaSqm: area,
+        style,
+        bedrooms
+      });
+      
+      loadFromJSON(newElements);
+      setZoom(0.8);
+      markClean(); // Resetează istoricul
+    } catch (err) {
+      console.error('[ProjectEditor] Eroare generare layout:', err);
+      throw err;
+    }
+  }, [projectData, projectId, loadFromJSON, setZoom, markClean]);
 
   // Dialog label cameră
   const handleRoomLabelRequest = (id: string, x: number, y: number) => {
@@ -232,39 +309,88 @@ export const ProjectEditor: React.FC = () => {
       <EditorToolbar
         onSave={handleManualSave}
         onExportPNG={handleExportPNG}
+        onExportPDF={handleExportPDF}
+        onGenerateLayout={handleOpenGenerateModal}
+        isChatOpen={isChatOpen}
+        onToggleChat={() => setIsChatOpen(!isChatOpen)}
         isSaving={isSaving}
         lastSaved={lastSaved}
+        versionHistory={
+          <EditorVersionHistory
+            projectId={projectId}
+            onRestore={(snapshotId) => {
+              console.log('[ProjectEditor] Restaurat snapshot:', snapshotId);
+              setLastSaved(new Date());
+            }}
+          />
+        }
       />
 
       {/* Main layout: Panel stânga | Canvas | Panel dreapta */}
       <div className="flex flex-1 overflow-hidden">
         {/* Panel Camere (stânga) */}
-        <EditorRoomsPanel rooms={rooms} />
+        <EditorRoomsPanel rooms={roomsWithStatus} />
 
-        {/* Canvas zona */}
+        {/* Canvas zona — padding de 24px (RULER_SIZE) pentru rigla metrică */}
         <div ref={containerRef} className="flex-1 relative overflow-hidden bg-slate-50">
-          <EditorCanvas
+          {/* Riglă metrică (sus + stânga) */}
+          <EditorRuler
             width={containerSize.width}
             height={containerSize.height}
-            stageRef={stageRef}
-            onRoomLabelRequest={handleRoomLabelRequest}
+            scale={canvasScale}
+            offset={canvasOffset}
+            onFitScreen={() => setZoom(1)}
           />
 
+          {/* Canvas Konva — offset de 24px pentru a nu se suprapune cu rigla */}
+          <div style={{ position: 'absolute', top: 24, left: 24, right: 0, bottom: 0 }}>
+            <EditorCanvas
+              width={Math.max(0, containerSize.width - 24)}
+              height={Math.max(0, containerSize.height - 24)}
+              stageRef={stageRef}
+              onRoomLabelRequest={handleRoomLabelRequest}
+            />
+          </div>
+
           {/* Conformity alert — flotant deasupra canvas */}
-          <div className="absolute bottom-0 left-0 right-0 pointer-events-none">
+          <div className="absolute bottom-0 left-6 right-0 pointer-events-none">
             <div className="pointer-events-auto">
-              <EditorConformityAlert violations={violations} />
+              <EditorConformityAlert
+                violations={violations}
+                violationIssues={violationIssues}
+                warningIssues={warningIssues}
+              />
             </div>
           </div>
 
-          {/* Indicator scală */}
-          <div className="absolute bottom-4 right-4 bg-white/80 backdrop-blur-sm border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm pointer-events-none">
-            1 celulă = 1m real
+          {/* Indicator scală + status conformitate */}
+          <div className="absolute bottom-4 right-4 flex items-center gap-2 pointer-events-none">
+            {isConformityPending && violations.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-lg">
+                Verificare...
+              </div>
+            )}
+            {!isConformityPending && warnings.length > 0 && violations.length === 0 && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-lg">
+                ⚠ {warnings.length} cameră aproape de limită
+              </div>
+            )}
+            <div className="bg-white/80 backdrop-blur-sm border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm">
+              1 celulă = 1m real
+            </div>
           </div>
         </div>
 
-        {/* Panel Proprietăți (dreapta) */}
-        <EditorPropertiesPanel onRenameRequest={(id) => setLabelDialog({ id, x: 0, y: 0 })} />
+        {/* Panou Lateral: Copilot AI */}
+        <EditorChatSidebar
+          projectId={projectId}
+          projectData={projectData}
+          isOpen={isChatOpen}
+          onToggle={() => setIsChatOpen(false)}
+        />
+
+        {/* Panel Proprietăți (dreapta) - doar dacă nu e chat-ul deschis */}
+        {!isChatOpen && <EditorPropertiesPanel onRenameRequest={(id) => setLabelDialog({ id, x: 0, y: 0 })} />}
       </div>
 
       {/* Dialog label cameră */}
@@ -275,6 +401,17 @@ export const ProjectEditor: React.FC = () => {
           y={labelDialog.y}
           onConfirm={handleLabelConfirm}
           onCancel={() => setLabelDialog(null)}
+        />
+      )}
+
+      {/* Modal Autogenerare Layout */}
+      {projectData && (
+        <GenerateLayoutModal
+          isOpen={isGenerateModalOpen}
+          onClose={() => setIsGenerateModalOpen(false)}
+          onGenerate={handleGenerateLayout}
+          initialArea={projectData.totalFloorAreaSqm || projectData.plotAreaSqm || 80}
+          initialStyle={projectData.houseStyle || 'Modern'}
         />
       )}
     </div>

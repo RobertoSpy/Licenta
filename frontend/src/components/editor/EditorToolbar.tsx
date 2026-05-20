@@ -1,16 +1,22 @@
 import React from 'react';
-import { useEditorState, ToolType } from '../../hooks/useEditorState';
+import { useEditorState, type ToolType } from '../../hooks/useEditorState';
 import {
   MousePointer2, Square, Minus, DoorOpen, Maximize2,
   Undo2, Redo2, Grid3x3, Magnet, ZoomIn, ZoomOut,
-  Save, Download, AlertTriangle
+  Save, Download, AlertTriangle, Wand2, Brain
 } from 'lucide-react';
 
 interface Props {
   onSave: () => void;
   onExportPNG: () => void;
+  onExportPDF?: () => void;
+  onGenerateLayout?: () => void;
+  isChatOpen?: boolean;
+  onToggleChat?: () => void;
   isSaving: boolean;
   lastSaved: Date | null;
+  /** Slot pentru EditorVersionHistory — injectat din ProjectEditor */
+  versionHistory?: React.ReactNode;
 }
 
 const TOOLS: { id: ToolType; label: string; icon: React.ReactNode; shortcut: string }[] = [
@@ -22,7 +28,7 @@ const TOOLS: { id: ToolType; label: string; icon: React.ReactNode; shortcut: str
   { id: 'staircase', label: 'Scări',      icon: <Grid3x3 className="w-4 h-4" />,       shortcut: 'S' },
 ];
 
-export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, isSaving, lastSaved }) => {
+export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, onExportPDF, onGenerateLayout, isChatOpen, onToggleChat, isSaving, lastSaved, versionHistory }) => {
   const {
     activeTool, setTool, undo, redo, undoStack, redoStack,
     canvasScale, setZoom, isSnapEnabled, toggleSnap, showGrid, toggleGrid,
@@ -126,6 +132,34 @@ export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, isSaving, 
         </button>
       </div>
 
+      <div className="w-px h-7 bg-slate-200" />
+
+      {/* Auto-Generate Button */}
+      {onGenerateLayout && (
+        <button
+          onClick={onGenerateLayout}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-bold transition-all"
+        >
+          <Wand2 className="w-4 h-4" />
+          <span className="hidden lg:block">Generează Basic</span>
+        </button>
+      )}
+
+      {/* Copilot AI Button */}
+      {onToggleChat && (
+        <button
+          onClick={onToggleChat}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            isChatOpen
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+          }`}
+        >
+          <Brain className="w-4 h-4" />
+          <span>Copilot AI</span>
+        </button>
+      )}
+
       <div className="flex-1" />
 
       {/* Last saved indicator */}
@@ -134,6 +168,11 @@ export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, isSaving, 
           💾 Salvat {formatLastSaved()}
         </span>
       )}
+
+      {/* Version History slot */}
+      {versionHistory}
+
+      <div className="w-px h-7 bg-slate-200" />
 
       {/* Save & Export */}
       <button
@@ -158,6 +197,17 @@ export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, isSaving, 
         <Download className="w-4 h-4" />
         <span className="hidden sm:block">PNG</span>
       </button>
+
+      {onExportPDF && (
+        <button
+          onClick={onExportPDF}
+          title="Export PDF Prezentare (2 pagini)"
+          className="flex items-center gap-1.5 bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-600 transition-colors"
+        >
+          <Download className="w-4 h-4" />
+          <span className="hidden sm:block">PDF</span>
+        </button>
+      )}
     </div>
   );
 };

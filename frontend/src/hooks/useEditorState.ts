@@ -48,7 +48,7 @@ interface EditorStore {
   redoStack: EditorSnapshot[];
 
   // Actions
-  addElement: (el: Omit<CanvasElement, 'id'>) => void;
+  addElement: (el: Omit<CanvasElement, 'id'>) => CanvasElement;
   updateElement: (id: string, changes: Partial<CanvasElement>) => void;
   deleteElement: (id: string) => void;
   deleteSelected: () => void;
@@ -96,6 +96,7 @@ export const useEditorState = create<EditorStore>((set, get) => ({
       selectedId: newElement.id,
       isDirty: true,
     }));
+    return newElement;
   },
 
   updateElement: (id, changes) => {

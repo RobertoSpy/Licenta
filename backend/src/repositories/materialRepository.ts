@@ -1,6 +1,5 @@
-import { PrismaClient, Material } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { Material } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 export const materialRepository = {
   async findAll(): Promise<Material[]> {

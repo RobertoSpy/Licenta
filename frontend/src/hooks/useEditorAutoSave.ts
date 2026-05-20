@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { CanvasElement, useEditorState } from './useEditorState';
+import { type CanvasElement, useEditorState } from './useEditorState';
 import { apiPrivate } from '../api/axios';
 
 const AUTO_SAVE_DELAY = 30_000; // 30 secunde

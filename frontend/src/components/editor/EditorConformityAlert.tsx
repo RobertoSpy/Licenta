@@ -1,17 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RoomInfo } from '../../hooks/useRoomCalculator';
-import { getAccessToken } from '../../api/axios';
+import { type ConformityRoom, type ConformityRuleIssue } from '../../hooks/useConformityCheck';
+import { aiApi } from '../../api/aiApi';
 import { AlertTriangle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Props {
-  violations: RoomInfo[];
+  violations: ConformityRoom[];
+  violationIssues: ConformityRuleIssue[];
+  warningIssues: ConformityRuleIssue[];
 }
 
-export const EditorConformityAlert: React.FC<Props> = ({ violations }) => {
+export const EditorConformityAlert: React.FC<Props> = ({
+  violations,
+  violationIssues,
+  warningIssues,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [aiExplanation, setAiExplanation] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+
+  const renderSources = (sources?: ConformityRuleIssue['sources']) => {
+    if (!sources || sources.length === 0) return null;
+    return (
+      <div className="mt-2 space-y-1 text-[10px] text-slate-400">
+        {sources.map((src, idx) => (
+          <div key={`${src.source}-${idx}`}>
+            <span className="font-semibold">{src.source}</span> · {src.chapter}
+            {src.excerpt && (
+              <div className="text-[10px] text-slate-400">{src.excerpt}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (violations.length === 0) {
@@ -29,42 +51,14 @@ export const EditorConformityAlert: React.FC<Props> = ({ violations }) => {
     setIsStreaming(true);
 
     try {
-      const token = getAccessToken();
-      const response = await fetch('/api/editor/explain-conformity', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          violations: violations.map((v) => ({
-            label: v.label,
-            usableSqm: v.usableSqm,
-            minRequired: v.minRequiredSqm,
-          })),
-        }),
-      });
-
-      if (!response.body) return;
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.replace('data: ', '').trim();
-            if (dataStr === '[DONE]') { setIsStreaming(false); break; }
-            try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed.text) setAiExplanation((prev) => prev + parsed.text);
-            } catch { /* ignorăm chunk-uri incomplete */ }
-          }
-        }
-      }
+      await aiApi.streamConformityExplanation(
+        violations.map((v) => ({
+          label: v.label,
+          usableSqm: v.usableSqm,
+          minRequired: v.minRequiredSqm,
+        })),
+        (text) => setAiExplanation((prev) => prev + text)
+      );
     } catch (e) {
       console.error('[ConformityAlert] Eroare SSE:', e);
     } finally {
@@ -72,7 +66,7 @@ export const EditorConformityAlert: React.FC<Props> = ({ violations }) => {
     }
   };
 
-  if (violations.length === 0) return null;
+  if (violations.length === 0 && violationIssues.length === 0 && warningIssues.length === 0) return null;
 
   return (
     <AnimatePresence>
@@ -92,7 +86,7 @@ export const EditorConformityAlert: React.FC<Props> = ({ violations }) => {
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-red-500" />
               <span className="text-sm font-bold text-red-800">
-                {violations.length} {violations.length === 1 ? 'cameră' : 'camere'} sub limita legală (Legea 114/1996)
+                {violationIssues.length || violations.length} încălcări · {warningIssues.length} recomandări
               </span>
             </div>
             {isOpen ? <ChevronDown className="w-4 h-4 text-red-500" /> : <ChevronUp className="w-4 h-4 text-red-500" />}
@@ -102,21 +96,37 @@ export const EditorConformityAlert: React.FC<Props> = ({ violations }) => {
           <div className="p-5 space-y-4">
             {/* Lista violări */}
             <div className="space-y-2">
-              {violations.map((v) => (
-                <div key={v.id} className="flex items-center gap-3 bg-red-50 rounded-xl px-3 py-2">
-                  <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+              {violationIssues.map((issue) => (
+                <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-3 bg-red-50 rounded-xl px-3 py-2">
+                  <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                   <div className="flex-1 text-sm">
-                    <span className="font-bold text-slate-900">{v.label}</span>
-                    <span className="text-red-700">
-                      {' '}— {v.usableSqm} m² util (minim legal: {v.minRequiredSqm} m²)
-                    </span>
-                    <span className="text-xs text-red-500 ml-1">
-                      ← {((v.minRequiredSqm ?? 0) - v.usableSqm).toFixed(1)} m² lipsă
-                    </span>
+                    <span className="font-bold text-slate-900">{issue.message}</span>
+                    <div className="text-red-700">
+                      {issue.currentValue} → {issue.requiredValue} ({issue.deltaValue} lipsă)
+                    </div>
+                    <div className="text-xs text-red-500 mt-1">{issue.suggestion}</div>
+                    {renderSources(issue.sources)}
                   </div>
                 </div>
               ))}
             </div>
+
+            {warningIssues.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">Recomandări</p>
+                {warningIssues.map((issue) => (
+                  <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-3 bg-amber-50 rounded-xl px-3 py-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="flex-1 text-sm text-amber-800">
+                      <div className="font-bold">{issue.message}</div>
+                      <div>{issue.currentValue} → {issue.requiredValue} ({issue.deltaValue} lipsă)</div>
+                      <div className="text-xs text-amber-600 mt-1">{issue.suggestion}</div>
+                      {renderSources(issue.sources)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* AI explicație SSE */}
             {(aiExplanation || isStreaming) && (

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { Stage, Layer, Line, Rect, Text, Group, Transformer } from 'react-konva';
 import Konva from 'konva';
-import { useEditorState, CanvasElement, ToolType, GRID_SIZE_PX, metersToPx } from '../../hooks/useEditorState';
+import { useEditorState, type CanvasElement, type ToolType, GRID_SIZE_PX, metersToPx } from '../../hooks/useEditorState';
 
 interface Props {
   width: number;
@@ -105,8 +105,25 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef, onRoomL
     return lines;
   };
 
-  // ─── Drag handlers cu snap ────────────────────────────────
+  // ─── Drag handlers cu snap & collision ──────────────────
+  const isOverlapping = (x: number, y: number, w: number, h: number, ignoreId: string) => {
+    for (const el of elements) {
+      if (el.id === ignoreId) continue;
+      // toleranță de 1px pentru alăturare perfectă (snap)
+      if (
+        x < el.x + el.width - 1 &&
+        x + w > el.x + 1 &&
+        y < el.y + el.height - 1 &&
+        y + h > el.y + 1
+      ) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const handleDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>, id: string) => {
+    // În Konva e mai curat să folosim dragBoundFunc, dar snap-ul e calculat manual aici
     if (!isSnapEnabled) return;
     const node = e.target;
     let x = node.x();
@@ -115,13 +132,32 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef, onRoomL
     y = snapToGrid(y, gridSize);
     x = snapToElements(x, 'x', elements, id);
     y = snapToElements(y, 'y', elements, id);
-    node.x(x);
-    node.y(y);
+    
+    // Verificăm coliziunea. Dacă overlap, nu aplicăm snap-ul (lăsăm dragBoundFunc să blocheze)
+    if (!isOverlapping(x, y, node.width(), node.height(), id)) {
+       node.x(x);
+       node.y(y);
+    }
   }, [isSnapEnabled, gridSize, elements]);
 
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>, id: string) => {
-    updateElement(id, { x: e.target.x(), y: e.target.y() });
-  }, [updateElement]);
+    const node = e.target;
+    let newX = node.x();
+    let newY = node.y();
+    
+    // Dacă utilizatorul a drop-uit cumva peste un alt element (fără snap),
+    // îi dăm revert la poziția anterioară salvată în state (elements)
+    if (isOverlapping(newX, newY, node.width(), node.height(), id)) {
+       const oldEl = elements.find(el => el.id === id);
+       if (oldEl) {
+         node.x(oldEl.x);
+         node.y(oldEl.y);
+         return; // nu salvăm update
+       }
+    }
+    
+    updateElement(id, { x: newX, y: newY });
+  }, [updateElement, elements]);
 
   const handleTransformEnd = useCallback((e: Konva.KonvaEventObject<Event>, id: string) => {
     const node = e.target;
@@ -129,13 +165,27 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef, onRoomL
     const scaleY = node.scaleY();
     node.scaleX(1);
     node.scaleY(1);
+    
+    let newW = Math.max(metersToPx(1), node.width() * scaleX);
+    let newH = Math.max(metersToPx(1), node.height() * scaleY);
+    
+    // Verificăm dacă resize-ul se suprapune
+    if (isOverlapping(node.x(), node.y(), newW, newH, id)) {
+      // Revert resize
+      const oldEl = elements.find(el => el.id === id);
+      if (oldEl) {
+        newW = oldEl.width;
+        newH = oldEl.height;
+      }
+    }
+    
     updateElement(id, {
       x: node.x(),
       y: node.y(),
-      width: Math.max(metersToPx(1), node.width() * scaleX),
-      height: Math.max(metersToPx(1), node.height() * scaleY),
+      width: newW,
+      height: newH,
     });
-  }, [updateElement]);
+  }, [updateElement, elements]);
 
   // ─── Drawing (Room tool) ──────────────────────────────────
   const getRelativePos = (stage: Konva.Stage) => {
@@ -216,6 +266,12 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef, onRoomL
       return;
     }
 
+    if (isOverlapping(drawingRect.x, drawingRect.y, drawingRect.w, drawingRect.h, 'new')) {
+      setDrawingRect(null);
+      // Putem adăuga un toast aici în viitor, dar acum pur și simplu nu permite desenarea
+      return;
+    }
+
     const newElement = addElement({
       type: 'room',
       x: drawingRect.x,
@@ -230,17 +286,13 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef, onRoomL
     setDrawingRect(null);
 
     // Cerem label-ul camerei prin dialog
+    // setTimeout de 50ms — Konva are nevoie de un tick pentru a randa noul nod
     const stage2 = stageRef.current;
     if (stage2) {
       const stageBox = stage2.container().getBoundingClientRect();
       const cx = (drawingRect.x + drawingRect.w / 2) * canvasScale + canvasOffset.x + stageBox.left;
       const cy = (drawingRect.y + drawingRect.h / 2) * canvasScale + canvasOffset.y + stageBox.top;
-      // Găsim ID-ul elementului nou adăugat
-      setTimeout(() => {
-        const state = useEditorState.getState();
-        const last = state.elements[state.elements.length - 1];
-        if (last) onRoomLabelRequest(last.id, cx, cy);
-      }, 50);
+      setTimeout(() => onRoomLabelRequest(newElement.id, cx, cy), 50);
     }
   };
 

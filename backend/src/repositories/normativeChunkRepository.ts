@@ -1,6 +1,14 @@
-import { PrismaClient } from '@prisma/client';
+import { NormativeChunk } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
+export interface RawChunkResult {
+  id: number;
+  source: string;
+  chapter: string;
+  content: string;
+  agent: string;
+  score: number;
+}
 
 export const normativeChunkRepository = {
   /** Căutare globală (fără filtru agent) — fallback general */
@@ -41,5 +49,64 @@ export const normativeChunkRepository = {
       GROUP BY agent
       ORDER BY count DESC
     `;
+  },
+
+  /** Dense search via pgvector pentru Hybrid Search */
+  async searchDense(vectorStr: string, agent: string, isGeneral: boolean): Promise<RawChunkResult[]> {
+    const denseSql = isGeneral
+      ? `SELECT id, source, chapter, content, agent,
+                (1 - (embedding <=> $1::vector)) AS score
+         FROM "NormativeChunk"
+         WHERE status != 'abrogat'
+         ORDER BY score DESC
+         LIMIT 20`
+      : `SELECT id, source, chapter, content, agent,
+                (1 - (embedding <=> $1::vector)) AS score
+         FROM "NormativeChunk"
+         WHERE agent = $2
+           AND status != 'abrogat'
+         ORDER BY score DESC
+         LIMIT 20`;
+
+    return isGeneral
+      ? prisma.$queryRawUnsafe<RawChunkResult[]>(denseSql, vectorStr)
+      : prisma.$queryRawUnsafe<RawChunkResult[]>(denseSql, vectorStr, agent);
+  },
+
+  /** Sparse search via native Full-Text Search pentru Hybrid Search */
+  async searchSparse(question: string, agent: string, isGeneral: boolean): Promise<RawChunkResult[]> {
+    const sparseSql = isGeneral
+      ? `SELECT id, source, chapter, content, agent,
+                ts_rank(
+                  to_tsvector('simple', content),
+                  plainto_tsquery('simple', $1)
+                ) AS score
+         FROM "NormativeChunk"
+         WHERE status != 'abrogat'
+           AND to_tsvector('simple', content) @@ plainto_tsquery('simple', $1)
+         ORDER BY score DESC
+         LIMIT 20`
+      : `SELECT id, source, chapter, content, agent,
+                ts_rank(
+                  to_tsvector('simple', content),
+                  plainto_tsquery('simple', $1)
+                ) AS score
+         FROM "NormativeChunk"
+         WHERE agent = $2
+           AND status != 'abrogat'
+           AND to_tsvector('simple', content) @@ plainto_tsquery('simple', $1)
+         ORDER BY score DESC
+         LIMIT 20`;
+
+    return isGeneral
+      ? prisma.$queryRawUnsafe<RawChunkResult[]>(sparseSql, question)
+      : prisma.$queryRawUnsafe<RawChunkResult[]>(sparseSql, question, agent);
+  },
+
+  /** Preluarea fragmentelor finale după IDs */
+  async findChunksByIds(ids: number[]): Promise<NormativeChunk[]> {
+    return prisma.normativeChunk.findMany({
+      where: { id: { in: ids } },
+    });
   }
 };

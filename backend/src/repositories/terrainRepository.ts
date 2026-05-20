@@ -1,6 +1,5 @@
-import { PrismaClient, Project } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { Project } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 export const terrainRepository = {
   async updateTerrainData(projectId: number, terrainData: any): Promise<Project> {

@@ -149,6 +149,55 @@ Returnează DOAR rezumatul, fără introducere sau formulă de încheiere.
   async saveSummary(payload: SaveSummaryPayload): Promise<void> {
     await apiPrivate.post('/ai/summary', payload);
   },
+
+  /**
+   * SSE streaming — explică violările de conformitate (Legea 114/1996).
+   * onChunk — callback apelat pentru fiecare fragment de text primit.
+   * Unificat cu streamChat pentru consistență arhitecturală —
+   * toate apelurile SSE trec prin aiApi, nu prin fetch raw.
+   */
+  async streamConformityExplanation(
+    violations: Array<{ label: string; usableSqm: number; minRequired?: number }>,
+    onChunk: (text: string) => void
+  ): Promise<void> {
+    const token = getAccessToken();
+
+    const response = await fetch('/api/editor/explain-conformity', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ violations }),
+    });
+
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+    if (!response.body) throw new Error('No response body');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      const raw = decoder.decode(value);
+      const lines = raw.split('\n\n');
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const dataStr = line.replace('data: ', '').trim();
+        if (dataStr === '[DONE]') return;
+
+        try {
+          const data = JSON.parse(dataStr);
+          if (data.text) onChunk(data.text);
+        } catch {
+          // chunk SSE incomplet — ignorat
+        }
+      }
+    }
+  },
 };
 
 // ── Utilitar local ────────────────────────────────────────────────────────────
