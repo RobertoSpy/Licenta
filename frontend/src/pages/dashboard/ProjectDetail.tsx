@@ -75,8 +75,8 @@ export const ProjectDetail = () => {
 
   useEffect(() => {
     if (!id) return;
-    apiPrivate.get(`/projects/${id}`)
-      .then((res: any) => setProject(res.data))
+    apiPrivate.get<Project>(`/projects/${id}`)
+      .then((res) => setProject(res.data))
       .catch(() => navigate('/dashboard'))
       .finally(() => setIsLoading(false));
   }, [id, navigate]);

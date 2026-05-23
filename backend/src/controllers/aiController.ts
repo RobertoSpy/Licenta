@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { agentOrchestrator } from '../services/ai/agentOrchestrator';
+import { agentOrchestrator, suggestRoomProgram } from '../services/ai/agentOrchestrator';
 import { chatSummaryRepository } from '../repositories/chatSummaryRepository';
+import { projectRepository } from '../repositories/projectRepository';
 import { GoogleGenAI } from '@google/genai';
 
 // Lazy init — același pattern ca în orchestrator
@@ -146,5 +147,59 @@ export const aiController = {
       console.error('[aiController.saveSummary] Eroare:', e);
       res.status(500).json({ error: 'Eroare la salvarea rezumatului.' });
     }
-  }
+  },
+
+  /**
+   * POST /api/ai/suggest-rooms
+   * Generează programul funcțional recomandat de AI pentru un proiect.
+   * Body: { projectId, familySize, budgetCategory }
+   * Ownership verificat prin tenantGuard (extrage projectId din body).
+   */
+  async suggestRooms(req: Request, res: Response): Promise<void> {
+    try {
+      const { projectId, familySize, budgetCategory, houseAreaSqm } = req.body;
+
+      if (!projectId || !familySize || !budgetCategory || !houseAreaSqm) {
+        res.status(400).json({ error: 'projectId, familySize, budgetCategory și houseAreaSqm sunt obligatorii.' });
+        return;
+      }
+
+      const validBudgets = ['economic', 'mediu', 'premium'];
+      if (!validBudgets.includes(budgetCategory)) {
+        res.status(400).json({ error: `budgetCategory invalid. Valori acceptate: ${validBudgets.join(', ')}` });
+        return;
+      }
+
+      const familySizeNum = parseInt(familySize, 10);
+      if (isNaN(familySizeNum) || familySizeNum < 1 || familySizeNum > 20) {
+        res.status(400).json({ error: 'familySize trebuie să fie un număr între 1 și 20.' });
+        return;
+      }
+
+      // Ownership deja verificat de tenantGuard — citim proiectul din DB
+      const project = await projectRepository.findById(parseInt(projectId, 10));
+      if (!project) {
+        res.status(404).json({ error: 'Proiect negăsit.' });
+        return;
+      }
+
+      const suggestion = await suggestRoomProgram({
+        houseAreaSqm:     Number(houseAreaSqm),
+        plotAreaSqm:      project.plotAreaSqm       ?? 300,
+        houseStyle:       project.houseStyle         ?? 'Modern',
+        totalFloors:      project.totalFloors        ?? 1,
+        hasBasement:      project.hasBasement,
+        streetOrientation: project.streetOrientation ?? 'S',
+        familySize:       familySizeNum,
+        budgetCategory:   budgetCategory as 'economic' | 'mediu' | 'premium',
+        buildingPurpose:  project.buildingPurpose    ?? 'residential',
+      });
+
+      res.json(suggestion);
+    } catch (e: any) {
+      console.error('[aiController.suggestRooms] Eroare:', e);
+      res.status(500).json({ error: e.message ?? 'Eroare internă.' });
+    }
+  },
 };
+

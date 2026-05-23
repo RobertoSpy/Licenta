@@ -1,21 +1,22 @@
-import { editorRepository } from '../repositories/editorRepository';
+import { editorRepository, type FloorKey } from '../repositories/editorRepository';
 
 export const editorService = {
   /**
-   * Salvare snapshot (auto-save sau manual Ctrl+S).
-   * Apelează cleanup automat după salvare.
+   * Salvare snapshot (auto-save sau manual Ctrl+S) pentru un etaj specific.
+   * Apelează cleanup automat după salvare (păstrează ultimele 20 per etaj).
    */
-  async saveSnapshot(projectId: number, planJSON: object, label?: string) {
-    const snapshot = await editorRepository.createSnapshot(projectId, planJSON, label);
-    await editorRepository.cleanupOldSnapshots(projectId);
+  async saveSnapshot(projectId: number, planJSON: object, floor: FloorKey = 'parter', label?: string) {
+    const snapshot = await editorRepository.createSnapshot(projectId, planJSON, floor, label);
+    await editorRepository.cleanupOldSnapshots(projectId, floor);
     return snapshot;
   },
 
   /**
-   * Lista ultimelor 20 snapshot-uri (metadate, fără JSON complet).
+   * Lista ultimelor 20 snapshot-uri pentru un proiect.
+   * Dacă floor e specificat — filtrează pe etaj.
    */
-  async listSnapshots(projectId: number) {
-    return editorRepository.listSnapshots(projectId);
+  async listSnapshots(projectId: number, floor?: FloorKey) {
+    return editorRepository.listSnapshots(projectId, floor);
   },
 
   /**
@@ -33,14 +34,14 @@ export const editorService = {
   },
 
   /**
-   * Cel mai recent snapshot al proiectului — pentru inițializarea editorului.
+   * Cel mai recent snapshot al unui proiect pe etajul specificat.
    */
-  async getLatestSnapshot(projectId: number) {
-    return editorRepository.getLatestSnapshot(projectId);
+  async getLatestSnapshot(projectId: number, floor?: FloorKey) {
+    return editorRepository.getLatestSnapshot(projectId, floor);
   },
 
   /**
-   * Publică snapshot ca versiune oficială → input pentru Faza 3 (BOM).
+   * Publică snapshot ca versiunea oficială → input pentru Faza 3 (BOM).
    */
   async publishSnapshot(snapshotId: number, projectId: number) {
     return editorRepository.publishSnapshot(snapshotId, projectId);

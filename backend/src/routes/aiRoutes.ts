@@ -20,4 +20,8 @@ router.get('/summary/:projectId', protect, tenantGuard, aiController.getSummary)
 // tenantGuard extrage projectId din req.body.projectId
 router.post('/summary', protect, tenantGuard, aiController.saveSummary);
 
+// POST /api/ai/suggest-rooms — generare program funcțional AI (listă camere + weightRatio)
+// tenantGuard extrage projectId din req.body.projectId
+router.post('/suggest-rooms', protect, tenantGuard, aiController.suggestRooms);
+
 export default router;

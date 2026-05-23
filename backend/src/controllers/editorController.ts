@@ -10,14 +10,17 @@ import { conformityService } from '../services/conformityService';
  */
 export const createSnapshot = async (req: Request, res: Response) => {
   try {
-    const { projectId, planJSON, label } = req.body;
+    const { projectId, planJSON, floor, label } = req.body;
 
     if (!projectId || !planJSON) {
       res.status(400).json({ message: 'projectId și planJSON sunt obligatorii.' });
       return;
     }
 
-    const snapshot = await editorService.saveSnapshot(projectId, planJSON, label);
+    const validFloors = ['parter', 'etaj1', 'etaj2', 'mansarda'];
+    const safeFloor = validFloors.includes(floor) ? floor : 'parter';
+
+    const snapshot = await editorService.saveSnapshot(projectId, planJSON, safeFloor, label);
     res.status(201).json(snapshot);
   } catch (err) {
     console.error('[editorController] createSnapshot:', err);
@@ -32,8 +35,11 @@ export const createSnapshot = async (req: Request, res: Response) => {
 export const listSnapshots = async (req: Request, res: Response) => {
   try {
     const projectId = parseInt(req.params.projectId as string);
+    const floor = req.query.floor as string | undefined;
+    const validFloors = ['parter', 'etaj1', 'etaj2', 'mansarda'];
+    const safeFloor = floor && validFloors.includes(floor) ? floor as 'parter' | 'etaj1' | 'etaj2' | 'mansarda' : undefined;
 
-    const snapshots = await editorService.listSnapshots(projectId);
+    const snapshots = await editorService.listSnapshots(projectId, safeFloor);
     res.json(snapshots);
   } catch (err) {
     console.error('[editorController] listSnapshots:', err);
@@ -74,8 +80,11 @@ export const getSnapshot = async (req: Request, res: Response) => {
 export const getLatestSnapshot = async (req: Request, res: Response) => {
   try {
     const projectId = parseInt(req.params.projectId as string);
+    const floor = req.query.floor as string | undefined;
+    const validFloors = ['parter', 'etaj1', 'etaj2', 'mansarda'];
+    const safeFloor = floor && validFloors.includes(floor) ? floor as 'parter' | 'etaj1' | 'etaj2' | 'mansarda' : undefined;
 
-    const snapshot = await editorService.getLatestSnapshot(projectId);
+    const snapshot = await editorService.getLatestSnapshot(projectId, safeFloor);
     res.json(snapshot ?? null);
   } catch (err) {
     console.error('[editorController] getLatestSnapshot:', err);
@@ -140,9 +149,10 @@ export const deleteSnapshot = async (req: Request, res: Response) => {
  */
 export const validateConformity = async (req: Request, res: Response) => {
   try {
-    const { rooms, doors } = req.body as {
+    const { rooms, doors, buildingPurpose } = req.body as {
       rooms?: Array<{ id: string; label?: string; usableSqm: number; widthM?: number; heightM?: number }>;
       doors?: Array<{ id: string; widthM: number }>;
+      buildingPurpose?: string;
     };
 
     if (!rooms || !Array.isArray(rooms)) {
@@ -150,7 +160,7 @@ export const validateConformity = async (req: Request, res: Response) => {
       return;
     }
 
-    const results = await conformityService.evaluateRooms(rooms, { doors });
+    const results = await conformityService.evaluateRooms(rooms, { doors, buildingPurpose });
     res.json(results);
   } catch (err) {
     console.error('[editorController] validateConformity:', err);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { api } from '../../api/axios';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -27,8 +27,9 @@ export const Login = () => {
       // Răspunsul trebuie să conțină accessToken-ul, cookie-ul de refresh e trimis automat de backend.
       login(response.data.accessToken, response.data.user);
       navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Conexiunea a eșuat. Verifică datele introduse.');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg || 'Conexiunea a eșuat. Verifică datele introduse.');
     } finally {
       setIsLoading(false);
     }

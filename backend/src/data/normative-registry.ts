@@ -188,6 +188,22 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
       { pattern: /dimensiuni.*uși|ușă.*accesibil|trecere.*liberă/i,                       agent: 'architectural' },
     ],
   },
+
+  'NP057-2002': {
+    // Normativ privind proiectarea clădirilor de locuințe — program funcțional
+    // Definește: zone funcționale (zi/noapte/distribuție), adiacențe obligatorii,
+    // iluminare naturală minimă, circulație, relații spațiale între camere.
+    // Folosit de suggestRoomProgram pentru validarea programului funcțional AI-generat.
+    defaultAgent: 'architectural',
+    skipPatterns: [],
+    agentRules: [
+      { pattern: /zonă.*zi|zonă.*noapte|zona de zi|zona de noapte|separare.*funcțional/i,  agent: 'architectural' },
+      { pattern: /circulație|distribuție|hol|antreu|coridor|acces/i,                       agent: 'architectural' },
+      { pattern: /iluminare naturală|ventilare naturală|orientare.*cameră/i,               agent: 'architectural' },
+      { pattern: /suprafață.*cameră|suprafață minimă|aria utilă|mp minim/i,                agent: 'legal' },
+      { pattern: /dormitor|living|bucătărie|baie|salon|sufragerie/i,                      agent: 'legal' },
+    ],
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -201,13 +217,14 @@ export const NORMATIVE_FILES: Record<string, string> = {
   'CR6-2013':      '', // nu există în docsAI — se va skip automat
   'NE012-1-2022':  'Monitorul Oficial Partea I nr. 53Bis - Ordin + anexa__NE 012-1-2022.pdf',
   'CR1-1-4-2012':  'CR-1-1-4-2012.pdf',
-  'Legea114-1996': 'Legea_locuintei.pdf', // Schimbat din .doc în .pdf (presupunând conversia utilizatorului) pentru a fi compatibil cu pdf-parse
+  'Legea114-1996': 'Legea_locuintei (2).pdf',
   'Legea50-1991':  'Lege 50 1991(r2).pdf',
   'Legea10-1995':  'Lege 10 1995.pdf',
   'NP074-2022':    'NP_074-2022_.pdf',
   'Legea350-2001': 'Lege 350 2001.pdf',
   'P118-99':       'P118-99.pdf',
   'NP051-2012':    '17_23_NP_051_2012.pdf',
+  'NP057-2002':    '17_18 _NP_057_2002.pdf',
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -220,17 +237,40 @@ const ACTIVE_SOURCES = Object.entries(NORMATIVE_FILES)
   .filter(([, file]) => file !== '')
   .map(([source]) => source);
 
-export const AGENT_SOURCES: Record<AgentType, string[]> = {
-  geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
-  seismic:       ['P100-1-2013'],
-  structural:    ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012', 'P118-99'],
-  // Legea350-2001 → architectural (POT/CUT/alinieri = reglementări de amplasament)
-  // P118-99, NP051-2012 → architectural (compartimentare, evacuare, handicap)
-  architectural: ['CR1-1-4-2012', 'P100-1-2013', 'Legea350-2001', 'P118-99', 'NP051-2012'],
-  // Legea350-2001 scoasă din legal — secțiunile de urbanism merg la architectural
-  legal:         ['Legea114-1996', 'Legea50-1991', 'Legea10-1995'],
-  general:       ACTIVE_SOURCES, // fallback fără filtru agent — caută în tot ce e indexat
-  // Phase 3 — array gol = searchHybrid returnează [] imediat, fără query DB
-  materiale:     [],
-  deviz:         [],
+export type BuildingPurpose = 'residential' | 'commercial' | 'mixed';
+
+const ACTIVE_SOURCES_RESIDENTIAL = ACTIVE_SOURCES.filter(s => s !== 'P118-99');
+
+// Normative PER TIP CLĂDIRE
+export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType, string[]>> = {
+  residential: {
+    architectural: ['CR1-1-4-2012', 'Legea350-2001', 'NP051-2012', 'NP057-2002'], // P118-99 exclus
+    legal:         ['Legea114-1996', 'Legea50-1991', 'Legea10-1995', 'NP057-2002'],
+    structural:    ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012'], // P118-99 exclus
+    seismic:       ['P100-1-2013'],
+    geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
+    general:       ACTIVE_SOURCES_RESIDENTIAL,
+    materiale:     [],
+    deviz:         [],
+  },
+  commercial: {
+    architectural: ['CR1-1-4-2012', 'P100-1-2013', 'Legea350-2001', 'P118-99', 'NP051-2012'],
+    legal:         ['Legea50-1991', 'Legea10-1995'],
+    structural:    ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012', 'P118-99'],
+    seismic:       ['P100-1-2013'],
+    geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
+    general:       ACTIVE_SOURCES,
+    materiale:     [],
+    deviz:         [],
+  },
+  mixed: {
+    architectural: ['CR1-1-4-2012', 'P100-1-2013', 'Legea350-2001', 'P118-99', 'NP051-2012', 'NP057-2002'],
+    legal:         ['Legea114-1996', 'Legea50-1991', 'Legea10-1995', 'NP057-2002'],
+    structural:    ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012', 'P118-99'],
+    seismic:       ['P100-1-2013'],
+    geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
+    general:       ACTIVE_SOURCES,
+    materiale:     [],
+    deviz:         [],
+  },
 };

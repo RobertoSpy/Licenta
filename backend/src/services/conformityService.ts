@@ -9,6 +9,7 @@ const conformityRules = rawRules as {
     min_sqm: number;
     severity: string;
     source_ref: string;
+    applies_to?: string[];
   }>;
   clearance_rules: Array<{
     code: string;
@@ -17,6 +18,7 @@ const conformityRules = rawRules as {
     value: number;
     severity: string;
     source_ref: string;
+    applies_to?: string[];
   }>;
 };
 
@@ -77,6 +79,7 @@ interface RoomMinRule {
   code: string;
   severity: ConformitySeverity;
   source_ref: string;
+  applies_to?: string[];
 }
 
 const ROOM_MIN_LOOKUP = new Map<string, RoomMinRule>();
@@ -90,6 +93,7 @@ for (const rule of conformityRules.room_min_sqm) {
         code: rule.code,
         severity: rule.severity as ConformitySeverity,
         source_ref: rule.source_ref,
+        applies_to: rule.applies_to,
       }
     );
   }
@@ -113,12 +117,16 @@ function normalizeLabel(label?: string): string {
 // Evaluare cameră — citit exclusiv din ROOM_MIN_LOOKUP (JSON)
 // ─────────────────────────────────────────────────────────────────
 
-function evaluateRoom(room: ConformityRoomInput): ConformityRoomResult {
+function evaluateRoom(room: ConformityRoomInput, buildingPurpose: string): ConformityRoomResult {
   const key = normalizeLabel(room.label);
   const rule = ROOM_MIN_LOOKUP.get(key);
   const issues: ConformityRuleIssue[] = [];
 
   if (!rule) {
+    return { id: room.id, status: 'ok', issues };
+  }
+
+  if (rule.applies_to && !rule.applies_to.includes(buildingPurpose)) {
     return { id: room.id, status: 'ok', issues };
   }
 
@@ -156,8 +164,8 @@ function evaluateRoom(room: ConformityRoomInput): ConformityRoomResult {
 // Lookup pentru clearance_rules (din JSON)
 // ─────────────────────────────────────────────────────────────────
 
-function getClearanceRule(code: string) {
-  return conformityRules.clearance_rules.find((r) => r.code === code);
+function getClearanceRule(code: string, buildingPurpose: string) {
+  return conformityRules.clearance_rules.find((r) => r.code === code && (!r.applies_to || r.applies_to.includes(buildingPurpose)));
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -167,19 +175,20 @@ function getClearanceRule(code: string) {
 export const conformityService = {
   async evaluateRooms(
     rooms: ConformityRoomInput[],
-    options?: { doors?: ConformityDoorInput[] }
+    options?: { doors?: ConformityDoorInput[]; buildingPurpose?: string }
   ): Promise<ConformityEvaluation> {
-    const roomResults = rooms.map(evaluateRoom);
+    const purpose = options?.buildingPurpose ?? 'residential';
+    const roomResults = rooms.map(r => evaluateRoom(r, purpose));
     const extraIssues: ConformityRuleIssue[] = [];
 
     // Reguli suplimentare din RAG (cached 6h)
-    const supplementalRules = await getSupplementalRules();
-    const corridorRuleRAG = supplementalRules.find((rule) => rule.code === 'P118_CORRIDOR_MIN_WIDTH');
-    const doorRuleRAG = supplementalRules.find((rule) => rule.code === 'P118_DOOR_MIN_WIDTH');
+    const supplementalRules = await getSupplementalRules(purpose as any);
+    const corridorRuleRAG = supplementalRules.find((rule) => rule.code === 'CORRIDOR_MIN_WIDTH');
+    const doorRuleRAG = supplementalRules.find((rule) => rule.code === 'DOOR_MIN_WIDTH');
 
     // Fallback static din JSON dacă RAG nu a returnat valori
-    const corridorRuleJSON = getClearanceRule('L114_CORRIDOR_WIDTH');
-    const doorRuleJSON = getClearanceRule('P118_DOOR_WIDTH');
+    const corridorRuleJSON = getClearanceRule('L114_CORRIDOR_WIDTH', purpose);
+    const doorRuleJSON = getClearanceRule('P118_DOOR_WIDTH', purpose);
 
     const corridorMinM = corridorRuleRAG?.minValueM ?? corridorRuleJSON?.value ?? 1.2;
     const doorMinM = doorRuleRAG?.minValueM ?? doorRuleJSON?.value ?? 0.8;

@@ -140,8 +140,9 @@ export const ResetPassword = () => {
     try {
       await api.post('/auth/reset-password', { email, otp, newPassword });
       navigate('/login', { state: { message: 'Parola a fost resetată cu succes. Te poți autentifica.' } });
-    } catch (err: any) {
-      const msg = err.response?.data?.message || 'Cod invalid sau expirat. Încearcă din nou.';
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Cod invalid sau expirat. Încearcă din nou.';
       setError(msg);
       if (msg.toLowerCase().includes('cod')) {
         setStep('otp'); // Trimite înapoi la OTP dacă codul e greșit

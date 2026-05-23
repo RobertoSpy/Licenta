@@ -81,8 +81,9 @@ export const Register = () => {
       });
       // După înregistrare, redirecționăm către login
       navigate('/login');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Înregistrarea a eșuat. Această adresă ar putea fi deja folosită.');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg || 'Înregistrarea a eșuat. Această adresă ar putea fi deja folosită.');
     } finally {
       setIsLoading(false);
     }

@@ -9,16 +9,13 @@ import { EditorToolbar } from '../../components/editor/EditorToolbar';
 import { EditorRoomsPanel } from '../../components/editor/EditorRoomsPanel';
 import { EditorPropertiesPanel } from '../../components/editor/EditorPropertiesPanel';
 import { EditorConformityAlert } from '../../components/editor/EditorConformityAlert';
-import { EditorRuler } from '../../components/editor/EditorRuler';
 import { EditorVersionHistory } from '../../components/editor/EditorVersionHistory';
 import { EditorChatSidebar } from '../../components/editor/EditorChatSidebar';
-import { GenerateLayoutModal } from '../../components/editor/GenerateLayoutModal';
 import { apiPrivate } from '../../api/axios';
-import { editorApi } from '../../api/editorApi';
-import { ArrowLeft } from 'lucide-react';
+import { editorApi, FLOOR_LABELS, type FloorKey } from '../../api/editorApi';
+import { ArrowLeft, Layers, ChevronRight } from 'lucide-react';
 import Konva from 'konva';
-import { v4 as uuidv4 } from 'uuid';
-import { metersToPx, pxToMeters } from '../../hooks/useEditorState';
+import { pxToMeters } from '../../hooks/useEditorState';
 
 // Dialog simplu pentru label cameră (inline, fără librărie externă)
 interface RoomLabelDialogProps {
@@ -96,23 +93,23 @@ export const ProjectEditor: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [projectTitle, setProjectTitle] = useState('Proiect');
-  const [projectData, setProjectData] = useState<any>(null);
+  const [projectData, setProjectData] = useState<Record<string, unknown> | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [isSwitchingFloor, setIsSwitchingFloor] = useState(false);
 
   // Stare dialog label
   const [labelDialog, setLabelDialog] = useState<{ id: string; x: number; y: number } | null>(null);
 
-  const { elements, loadFromJSON, updateElement, markClean, undo, redo, deleteSelected, setTool, setZoom, canvasScale, canvasOffset } = useEditorState();
+  const { elements, updateElement, markClean, undo, redo, deleteSelected, setTool, setZoom, initializeFromProject, activeFloor, switchFloor } = useEditorState();
   const rooms = useRoomCalculator(elements);
   const doors = elements
     .filter((el) => el.type === 'door')
     .map((el) => ({
       id: el.id,
-      widthM: pxToMeters(el.width),
+      widthM: pxToMeters(Math.max(el.width, el.height)),
     }));
 
-  // Hook dedicat pentru validare conformitate (cu debounce 2s, conform plan_faza2.md)
+  // Hook dedicat pentru validare conformitate (cu debounce 2s) + reguli locale geometrice
   const {
     rooms: roomsWithStatus,
     violations,
@@ -120,7 +117,7 @@ export const ProjectEditor: React.FC = () => {
     violationIssues,
     warningIssues,
     isPending: isConformityPending,
-  } = useConformityCheck(rooms, doors);
+  } = useConformityCheck(rooms, doors, elements, projectData?.buildingPurpose as string);
 
   // Auto-save
   useEditorAutoSave(projectId);
@@ -164,18 +161,22 @@ export const ProjectEditor: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [undo, redo, deleteSelected, setTool, setZoom]);
 
-  // Inițializare: load proiect + snapshot
+  // Inițializare: load proiect + snapshot Parter
   useEffect(() => {
     const init = async () => {
       try {
-        const [{ data: project }, { data: snapshot }] = await Promise.all([
-          apiPrivate.get(`/projects/${projectId}`),
-          apiPrivate.get(`/editor/latest/${projectId}`).catch(() => ({ data: null })),
-        ]);
+        const { data: project } = await apiPrivate.get(`/projects/${projectId}`);
         setProjectData(project);
         setProjectTitle(project.title ?? 'Proiect');
-        if (snapshot?.planJSON?.elements) {
-          loadFromJSON(snapshot.planJSON.elements);
+
+        // Îrcărcăm planul parterului din DB
+        const parterElements = await editorApi.loadFloor(projectId, 'parter');
+        if (parterElements && parterElements.length > 0) {
+          // Am plan salvat — îll încărcăm
+          switchFloor('parter', parterElements);
+        } else {
+          // Plan nou — generăm din datele proiectului
+          initializeFromProject(project);
         }
       } catch (err) {
         console.error('[ProjectEditor] Eroare la inițializare:', err);
@@ -184,18 +185,14 @@ export const ProjectEditor: React.FC = () => {
       }
     };
     if (projectId) init();
-  }, [projectId, loadFromJSON]);
+  }, [projectId, switchFloor, initializeFromProject]);
 
-  // Salvare manuală
+  // Salvare manuala — salvează etajul curent
   const handleManualSave = useCallback(async () => {
     if (isSaving) return;
     setIsSaving(true);
     try {
-      await apiPrivate.post('/editor/snapshots', {
-        projectId,
-        planJSON: { elements, savedAt: Date.now() },
-        label: 'Salvare manuală',
-      });
+      await editorApi.saveFloor(projectId, activeFloor, elements, 'Salvare manuală');
       markClean();
       setLastSaved(new Date());
     } catch (err) {
@@ -203,7 +200,34 @@ export const ProjectEditor: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [elements, isSaving, projectId, markClean]);
+  }, [elements, isSaving, projectId, activeFloor, markClean]);
+
+  /**
+   * Switch floor:
+   * 1. Salvează etajul curent dacă e modificat
+   * 2. Încarcă elementele etajului nou din API
+   * 3. Apelează switchFloor din store
+   */
+  const handleSwitchFloor = useCallback(async (newFloor: FloorKey) => {
+    if (newFloor === activeFloor || isSwitchingFloor) return;
+    setIsSwitchingFloor(true);
+    try {
+      // 1. Salvează etajul curent
+      await editorApi.saveFloor(projectId, activeFloor, elements);
+      markClean();
+
+      // 2. Încarcă elementele etajului nou
+      const newElements = await editorApi.loadFloor(projectId, newFloor);
+
+      // 3. Comutăm store-ul
+      switchFloor(newFloor, newElements ?? []);
+      setLastSaved(new Date());
+    } catch (err) {
+      console.error('[ProjectEditor] Eroare la comutarea etajului:', err);
+    } finally {
+      setIsSwitchingFloor(false);
+    }
+  }, [activeFloor, elements, isSwitchingFloor, projectId, markClean, switchFloor]);
 
   // Export PNG — Konva nativ (zero backend)
   const handleExportPNG = useCallback(() => {
@@ -212,9 +236,9 @@ export const ProjectEditor: React.FC = () => {
     const dataURL = stage.toDataURL({ pixelRatio: 2 });
     const link = document.createElement('a');
     link.href = dataURL;
-    link.download = `plan-parter-${projectTitle}.png`;
+    link.download = `plan-${activeFloor}-${projectTitle}.png`;
     link.click();
-  }, [projectTitle]);
+  }, [projectTitle, activeFloor]);
 
   // Export PDF — trimitem PNG base64 la backend → Puppeteer generează PDF
   const handleExportPDF = useCallback(async () => {
@@ -241,30 +265,7 @@ export const ProjectEditor: React.FC = () => {
     }
   }, [projectId, projectTitle]);
 
-  // Generare layout (Cerere utilizator Faza 2)
-  const handleOpenGenerateModal = useCallback(() => {
-    setIsGenerateModalOpen(true);
-  }, []);
 
-  const handleGenerateLayout = useCallback(async (area: number, style: string, bedrooms: number) => {
-    if (!projectData) return;
-    
-    try {
-      const newElements = await editorApi.generateLayout({
-        projectId,
-        totalFloorAreaSqm: area,
-        style,
-        bedrooms
-      });
-      
-      loadFromJSON(newElements);
-      setZoom(0.8);
-      markClean(); // Resetează istoricul
-    } catch (err) {
-      console.error('[ProjectEditor] Eroare generare layout:', err);
-      throw err;
-    }
-  }, [projectData, projectId, loadFromJSON, setZoom, markClean]);
 
   // Dialog label cameră
   const handleRoomLabelRequest = (id: string, x: number, y: number) => {
@@ -289,20 +290,70 @@ export const ProjectEditor: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 overflow-hidden">
-      {/* Top bar cu titlu și buton back */}
-      <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-3 shrink-0 shadow-sm">
+      {/* Top bar cu titlu, selector etaj și buton back */}
+      <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-3 shrink-0 shadow-sm flex-wrap">
         <button
           onClick={() => navigate(`/dashboard/projects/${projectId}`)}
           className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors text-sm font-semibold"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span className="hidden sm:block">Înapoi la proiect</span>
+          <span className="hidden sm:block">Înapoi</span>
         </button>
         <div className="w-px h-5 bg-slate-200" />
         <div>
           <h1 className="text-sm font-black text-slate-900 leading-none">{projectTitle}</h1>
-          <p className="text-[10px] text-slate-400 font-medium mt-0.5">Editor Plan Parter — Faza 2</p>
+          <p className="text-[10px] text-slate-400 font-medium mt-0.5">Editor Plan 2D — Faza 2</p>
         </div>
+
+        {/* Selector etaj — se afișează dacă proiectul are mai mult de un nivel */}
+        {(() => {
+          const pd = projectData;
+          const floors: { key: FloorKey; label: string }[] = [];
+          if (pd?.hasGroundFloor !== false) floors.push({ key: 'parter', label: FLOOR_LABELS.parter });
+          const upper = Number(pd?.upperFloorsCount ?? 0);
+          if (upper >= 1) floors.push({ key: 'etaj1', label: FLOOR_LABELS.etaj1 });
+          if (upper >= 2) floors.push({ key: 'etaj2', label: FLOOR_LABELS.etaj2 });
+          if (pd?.hasMansard) floors.push({ key: 'mansarda', label: FLOOR_LABELS.mansarda });
+          if (floors.length <= 1) return null;
+          return (
+            <>
+              <div className="w-px h-5 bg-slate-200" />
+              <div className="flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5 text-slate-400" />
+                {floors.map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => handleSwitchFloor(f.key)}
+                    disabled={isSwitchingFloor}
+                    title={isSwitchingFloor ? 'Se salvează...' : `Comută la ${f.label}`}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all disabled:opacity-60 ${
+                      activeFloor === f.key
+                        ? 'bg-buildorange text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {isSwitchingFloor && activeFloor === f.key
+                      ? <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : f.label
+                    }
+                  </button>
+                ))}
+              </div>
+            </>
+          );
+        })()}
+
+        <div className="flex-1" />
+
+        {/* Buton Continuă — Faza 3 */}
+        <button
+          onClick={() => navigate(`/dashboard/projects/${projectId}`)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-sm"
+          title="Mergi la pagina proiectului pentru a vedea devizul (Faza 3)"
+        >
+          Continuă
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Toolbar */}
@@ -310,7 +361,6 @@ export const ProjectEditor: React.FC = () => {
         onSave={handleManualSave}
         onExportPNG={handleExportPNG}
         onExportPDF={handleExportPDF}
-        onGenerateLayout={handleOpenGenerateModal}
         isChatOpen={isChatOpen}
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
         isSaving={isSaving}
@@ -329,38 +379,19 @@ export const ProjectEditor: React.FC = () => {
       {/* Main layout: Panel stânga | Canvas | Panel dreapta */}
       <div className="flex flex-1 overflow-hidden">
         {/* Panel Camere (stânga) */}
-        <EditorRoomsPanel rooms={roomsWithStatus} />
+        <EditorRoomsPanel rooms={roomsWithStatus} projectId={projectId} projectData={projectData} />
 
-        {/* Canvas zona — padding de 24px (RULER_SIZE) pentru rigla metrică */}
+        {/* Canvas zona */}
         <div ref={containerRef} className="flex-1 relative overflow-hidden bg-slate-50">
-          {/* Riglă metrică (sus + stânga) */}
-          <EditorRuler
-            width={containerSize.width}
-            height={containerSize.height}
-            scale={canvasScale}
-            offset={canvasOffset}
-            onFitScreen={() => setZoom(1)}
-          />
 
-          {/* Canvas Konva — offset de 24px pentru a nu se suprapune cu rigla */}
-          <div style={{ position: 'absolute', top: 24, left: 24, right: 0, bottom: 0 }}>
+          {/* Canvas Konva */}
+          <div style={{ position: 'absolute', inset: 0 }}>
             <EditorCanvas
-              width={Math.max(0, containerSize.width - 24)}
-              height={Math.max(0, containerSize.height - 24)}
+              width={containerSize.width}
+              height={containerSize.height}
               stageRef={stageRef}
               onRoomLabelRequest={handleRoomLabelRequest}
             />
-          </div>
-
-          {/* Conformity alert — flotant deasupra canvas */}
-          <div className="absolute bottom-0 left-6 right-0 pointer-events-none">
-            <div className="pointer-events-auto">
-              <EditorConformityAlert
-                violations={violations}
-                violationIssues={violationIssues}
-                warningIssues={warningIssues}
-              />
-            </div>
           </div>
 
           {/* Indicator scală + status conformitate */}
@@ -381,6 +412,15 @@ export const ProjectEditor: React.FC = () => {
           </div>
         </div>
 
+        {/* Panou conformitate — coloană dreapta, între canvas și properties */}
+        <div className="flex flex-col justify-start p-2 shrink-0">
+          <EditorConformityAlert
+            violations={violations}
+            violationIssues={violationIssues}
+            warningIssues={warningIssues}
+          />
+        </div>
+
         {/* Panou Lateral: Copilot AI */}
         <EditorChatSidebar
           projectId={projectId}
@@ -390,7 +430,7 @@ export const ProjectEditor: React.FC = () => {
         />
 
         {/* Panel Proprietăți (dreapta) - doar dacă nu e chat-ul deschis */}
-        {!isChatOpen && <EditorPropertiesPanel onRenameRequest={(id) => setLabelDialog({ id, x: 0, y: 0 })} />}
+        {!isChatOpen && <EditorPropertiesPanel onRenameRequest={(id) => setLabelDialog({ id, x: 0, y: 0 })} rooms={roomsWithStatus} />}
       </div>
 
       {/* Dialog label cameră */}
@@ -404,16 +444,7 @@ export const ProjectEditor: React.FC = () => {
         />
       )}
 
-      {/* Modal Autogenerare Layout */}
-      {projectData && (
-        <GenerateLayoutModal
-          isOpen={isGenerateModalOpen}
-          onClose={() => setIsGenerateModalOpen(false)}
-          onGenerate={handleGenerateLayout}
-          initialArea={projectData.totalFloorAreaSqm || projectData.plotAreaSqm || 80}
-          initialStyle={projectData.houseStyle || 'Modern'}
-        />
-      )}
+
     </div>
   );
 };

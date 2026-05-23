@@ -89,7 +89,7 @@ function semanticChunk(text: string, source: string): SemanticChunk[] {
 
   const chunks: SemanticChunk[] = [];
   const headerPattern =
-    /(?=\n(?:\d+\.\d+(?:\.\d+(?:\.\d+)?)?|Art(?:icolul?)?\s*\d+|CAPITOLUL\s+(?:\d+|[IVX]+)|Anexa\s+[A-Z\d]+)[^\n]*\n)/gi;
+    /(?=\n\s*(?:\d+\.\d+(?:\.\d+(?:\.\d+)?)?|Art(?:icolul?)?\.?\s*\d+|CAPITOLUL\s+(?:\d+|[IVX]+)|Cap(?:itolul?)?\.?\s+(?:\d+|[IVX]+)|Anexa\s+(?:[Nn]r\.)?\s*[A-Z\d]+|[A-G]\.\s+[A-Z])[^\n]*\n)/gi;
 
   const rawSections = text.split(headerPattern).filter(s => s.trim().length > 0);
 
@@ -204,9 +204,13 @@ async function main(): Promise<void> {
   }
 
   // Procesăm doar normativele care au fișierul pe disc
+  const sourceArgIndex = process.argv.indexOf('--source');
+  const targetSource = sourceArgIndex !== -1 ? process.argv[sourceArgIndex + 1] : null;
+
   const entries = Object.entries(NORMATIVE_FILES);
-  const toProcess = entries.filter(([, file]) => {
+  const toProcess = entries.filter(([source, file]) => {
     if (!file) return false;
+    if (targetSource && source !== targetSource) return false;
     return fs.existsSync(path.join(docsDir, file));
   });
 

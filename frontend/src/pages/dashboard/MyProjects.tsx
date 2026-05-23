@@ -49,17 +49,26 @@ const SkeletonProjectCard = () => (
 export const MyProjects = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
     if (showWizard) return;
 
-    setIsLoading(true);
-    apiPrivate.get('/projects')
-      .then(res => setProjects(res.data))
-      .catch(err => console.error("Eroare preluare proiecte:", err))
-      .finally(() => setIsLoading(false));
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const res = await apiPrivate.get('/projects');
+        if (!cancelled) setProjects(res.data);
+      } catch (err) {
+        console.error("Eroare preluare proiecte:", err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [showWizard]);
 
   const startNewProject = () => {

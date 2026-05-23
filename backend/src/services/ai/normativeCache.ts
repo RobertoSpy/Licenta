@@ -42,9 +42,6 @@ export const normativeCache = {
       // P91-INCERC — Costuri orientative construcție rezidențială (lei/mc)
       const buildCosts = readJson('build-costs.json');
 
-      // Legea 114/1996 — Suprafețe minime pentru locuințe (text scurt, nu necesită fișier separat)
-      const minRooms = `Legea 114/1996: Cameră living min 18mp, dormitor min 9mp, baie min 3mp, înălțime liberă minim 2.55m.`;
-
       cache =
         `=== NORMATIVE STATICE CAG (date numerice exacte, referință fixă) ===\n\n` +
         `[P100-1/2013 — Zone Seismice per Județ]\n${seismicTable}\n\n` +
@@ -52,8 +49,7 @@ export const normativeCache = {
         `[P100-1/2013 + NP112-2014 — Etaje Maxime per Zonă Seismică și Tip Sol]\n${floorRules}\n\n` +
         `[CR1-1-3/2012 — Zone Zăpadă per Județ (sk0 kN/m²)]\n${snowZones}\n\n` +
         `[CR1-1-4/2012 — Zone Vânt per Județ (qb kPa)]\n${windZones}\n\n` +
-        `[P91-INCERC — Costuri Orientative Construcție Rezidențială (lei/mc)]\n${buildCosts}\n\n` +
-        `[Legea 114/1996 — Suprafețe Minime Locuințe]\n${minRooms}`;
+        `[P91-INCERC — Costuri Orientative Construcție Rezidențială (lei/mc)]\n${buildCosts}\n\n`;
 
       return cache;
     } catch (e: any) {

@@ -1,16 +1,14 @@
 import React from 'react';
-import { useEditorState, type ToolType } from '../../hooks/useEditorState';
+import { useEditorState } from '../../hooks/useEditorState';
 import {
-  MousePointer2, Square, Minus, DoorOpen, Maximize2,
-  Undo2, Redo2, Grid3x3, Magnet, ZoomIn, ZoomOut,
-  Save, Download, AlertTriangle, Wand2, Brain
+  Undo2, Redo2, Grid3x3, ZoomIn, ZoomOut,
+  Save, Download, Brain, MousePointer
 } from 'lucide-react';
 
 interface Props {
   onSave: () => void;
   onExportPNG: () => void;
   onExportPDF?: () => void;
-  onGenerateLayout?: () => void;
   isChatOpen?: boolean;
   onToggleChat?: () => void;
   isSaving: boolean;
@@ -19,23 +17,15 @@ interface Props {
   versionHistory?: React.ReactNode;
 }
 
-const TOOLS: { id: ToolType; label: string; icon: React.ReactNode; shortcut: string }[] = [
-  { id: 'select',    label: 'Selectare',  icon: <MousePointer2 className="w-4 h-4" />, shortcut: 'V' },
-  { id: 'room',      label: 'Cameră',     icon: <Square className="w-4 h-4" />,        shortcut: 'R' },
-  { id: 'wall',      label: 'Perete',     icon: <Minus className="w-4 h-4" />,         shortcut: 'W' },
-  { id: 'door',      label: 'Ușă',        icon: <DoorOpen className="w-4 h-4" />,      shortcut: 'D' },
-  { id: 'window',    label: 'Fereastră',  icon: <Maximize2 className="w-4 h-4" />,     shortcut: 'F' },
-  { id: 'staircase', label: 'Scări',      icon: <Grid3x3 className="w-4 h-4" />,       shortcut: 'S' },
-];
-
-export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, onExportPDF, onGenerateLayout, isChatOpen, onToggleChat, isSaving, lastSaved, versionHistory }) => {
+export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, onExportPDF, isChatOpen, onToggleChat, isSaving, lastSaved, versionHistory }) => {
   const {
-    activeTool, setTool, undo, redo, undoStack, redoStack,
-    canvasScale, setZoom, isSnapEnabled, toggleSnap, showGrid, toggleGrid,
+    undo, redo, undoStack, redoStack,
+    canvasScale, setZoom, showGrid, toggleGrid,
   } = useEditorState();
 
   const formatLastSaved = () => {
     if (!lastSaved) return null;
+    // eslint-disable-next-line react-hooks/purity
     const diff = Math.floor((Date.now() - lastSaved.getTime()) / 1000);
     if (diff < 60) return `acum ${diff}s`;
     if (diff < 3600) return `acum ${Math.floor(diff / 60)}min`;
@@ -44,23 +34,10 @@ export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, onExportPD
 
   return (
     <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-2 flex-wrap shadow-sm z-20 relative">
-      {/* Tool selector */}
-      <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
-        {TOOLS.map((tool) => (
-          <button
-            key={tool.id}
-            onClick={() => setTool(tool.id)}
-            title={`${tool.label} (${tool.shortcut})`}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              activeTool === tool.id
-                ? 'bg-buildorange text-white shadow-sm'
-                : 'text-slate-600 hover:bg-white hover:text-slate-900'
-            }`}
-          >
-            {tool.icon}
-            <span className="hidden lg:block">{tool.label}</span>
-          </button>
-        ))}
+      {/* Mode Indicator */}
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-100 rounded-xl text-orange-800 text-xs font-bold shadow-sm">
+        <MousePointer className="w-3.5 h-3.5 text-orange-500" />
+        <span>Mod Configurator (Drag pentru swap)</span>
       </div>
 
       <div className="w-px h-7 bg-slate-200" />
@@ -87,21 +64,14 @@ export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, onExportPD
 
       <div className="w-px h-7 bg-slate-200" />
 
-      {/* Grid & Snap toggles */}
+      {/* Grid toggle */}
       <div className="flex gap-1">
         <button
           onClick={toggleGrid}
-          title="Toggle Grid (G)"
-          className={`p-2 rounded-lg text-xs font-bold transition-all ${showGrid ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+          title="Ascunde/Arată Grila (G)"
+          className={`p-2 rounded-lg text-xs font-bold transition-all ${showGrid ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
         >
           <Grid3x3 className="w-4 h-4" />
-        </button>
-        <button
-          onClick={toggleSnap}
-          title="Toggle Snap (Shift+G)"
-          className={`p-2 rounded-lg text-xs font-bold transition-all ${isSnapEnabled ? 'bg-buildorange text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-        >
-          <Magnet className="w-4 h-4" />
         </button>
       </div>
 
@@ -111,53 +81,43 @@ export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, onExportPD
       <div className="flex items-center gap-1">
         <button
           onClick={() => setZoom(canvasScale / 1.2)}
-          title="Zoom Out (-)"
+          title="Micsorează (-)"
           className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
         >
           <ZoomOut className="w-4 h-4" />
         </button>
         <button
-          onClick={() => setZoom(1)}
+          onClick={() => setZoom(1.2)}
           className="px-2 py-1 text-xs font-bold text-slate-700 bg-slate-100 rounded-md min-w-[48px] text-center hover:bg-slate-200 transition-colors"
-          title="Reset Zoom (Ctrl+0)"
+          title="Resetează Zoom (Ctrl+0)"
         >
           {Math.round(canvasScale * 100)}%
         </button>
         <button
           onClick={() => setZoom(canvasScale * 1.2)}
-          title="Zoom In (+)"
+          title="Mărește (+)"
           className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="w-px h-7 bg-slate-200" />
-
-      {/* Auto-Generate Button */}
-      {onGenerateLayout && (
-        <button
-          onClick={onGenerateLayout}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-bold transition-all"
-        >
-          <Wand2 className="w-4 h-4" />
-          <span className="hidden lg:block">Generează Basic</span>
-        </button>
-      )}
-
       {/* Copilot AI Button */}
       {onToggleChat && (
-        <button
-          onClick={onToggleChat}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-            isChatOpen
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-          }`}
-        >
-          <Brain className="w-4 h-4" />
-          <span>Copilot AI</span>
-        </button>
+        <>
+          <div className="w-px h-7 bg-slate-200" />
+          <button
+            onClick={onToggleChat}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              isChatOpen
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+            }`}
+          >
+            <Brain className="w-4 h-4" />
+            <span>Copilot AI</span>
+          </button>
+        </>
       )}
 
       <div className="flex-1" />
@@ -192,7 +152,7 @@ export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, onExportPD
       <button
         onClick={onExportPNG}
         title="Export PNG"
-        className="flex items-center gap-1.5 bg-buildorange text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-600 transition-colors"
+        className="flex items-center gap-1.5 bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-600 shadow-sm transition-colors"
       >
         <Download className="w-4 h-4" />
         <span className="hidden sm:block">PNG</span>
@@ -201,7 +161,7 @@ export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, onExportPD
       {onExportPDF && (
         <button
           onClick={onExportPDF}
-          title="Export PDF Prezentare (2 pagini)"
+          title="Export PDF Prezentare"
           className="flex items-center gap-1.5 bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-600 transition-colors"
         >
           <Download className="w-4 h-4" />

@@ -1,34 +1,37 @@
 import { prisma } from '../lib/prisma';
 
+export type FloorKey = 'parter' | 'etaj1' | 'etaj2' | 'mansarda';
+
 export const editorRepository = {
   /**
-   * Creare snapshot nou — auto-increment version per proiect.
+   * Creare snapshot nou — auto-increment version per (proiect, etaj).
    */
-  async createSnapshot(projectId: number, planJSON: object, label?: string) {
-    // Calculăm versiunea: max(version) + 1 pentru proiectul dat
+  async createSnapshot(projectId: number, planJSON: object, floor: FloorKey = 'parter', label?: string) {
+    // Versiunea se incrementează per (proiect, etaj) — nu global
     const last = await prisma.planSnapshot.findFirst({
-      where: { projectId },
+      where: { projectId, floor },
       orderBy: { version: 'desc' },
       select: { version: true },
     });
     const nextVersion = (last?.version ?? 0) + 1;
 
     return prisma.planSnapshot.create({
-      data: { projectId, planJSON, version: nextVersion, label },
+      data: { projectId, planJSON, floor, version: nextVersion, label },
     });
   },
 
   /**
-   * Ultimele 20 snapshot-uri pentru un proiect (fără planJSON — doar metadate).
+   * Ultimele 20 snapshot-uri pentru un proiect, opțional filtrate pe etaj.
    */
-  async listSnapshots(projectId: number) {
+  async listSnapshots(projectId: number, floor?: FloorKey) {
     return prisma.planSnapshot.findMany({
-      where: { projectId },
+      where: { projectId, ...(floor ? { floor } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 20,
       select: {
         id: true,
         version: true,
+        floor: true,
         label: true,
         isPublished: true,
         createdAt: true,
@@ -55,17 +58,18 @@ export const editorRepository = {
   },
 
   /**
-   * Obține cel mai recent snapshot al unui proiect (sau cel publicat).
+   * Cel mai recent snapshot al unui proiect pe un anumit etaj.
+   * Dacă floor nu e specificat → returnează cel mai recent indiferent de etaj (backward compat).
    */
-  async getLatestSnapshot(projectId: number) {
+  async getLatestSnapshot(projectId: number, floor?: FloorKey) {
     return prisma.planSnapshot.findFirst({
-      where: { projectId },
+      where: { projectId, ...(floor ? { floor } : {}) },
       orderBy: { createdAt: 'desc' },
     });
   },
 
   /**
-   * Publică un snapshot — marchează ca versiunea oficială → input Faza 3.
+   * Publică un snapshot — marchează ca versiunea oficială → input pentru Faza 3 (BOM).
    * Dezactivează flag-ul isPublished pe toate celelalte snapshot-uri ale proiectului.
    */
   async publishSnapshot(snapshotId: number, projectId: number) {
@@ -95,11 +99,11 @@ export const editorRepository = {
   },
 
   /**
-   * Auto-cleanup: păstrăm doar ultimele 20 snapshot-uri per proiect.
+   * Auto-cleanup: păstrăm doar ultimele 20 snapshot-uri per (proiect, etaj).
    */
-  async cleanupOldSnapshots(projectId: number) {
+  async cleanupOldSnapshots(projectId: number, floor: FloorKey = 'parter') {
     const snapshots = await prisma.planSnapshot.findMany({
-      where: { projectId, isPublished: false },
+      where: { projectId, floor, isPublished: false },
       orderBy: { createdAt: 'desc' },
       select: { id: true },
     });

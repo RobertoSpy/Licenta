@@ -21,8 +21,8 @@ export const ForgotPassword = () => {
       await api.post('/auth/forgot-password', { email });
       // Redirecționăm cu emailul în state — ResetPassword îl va folosi
       navigate('/reset-password', { state: { email } });
-    } catch (err: any) {
-      // Backend-ul returnează mereu 200, deci erorile apar doar la probleme de rețea
+    } catch {
+      // Backend returnează mereu 200, erorile apar doar la probleme de rețea
       setError('Eroare de rețea. Verifică conexiunea și încearcă din nou.');
     } finally {
       setIsLoading(false);

@@ -25,8 +25,8 @@ export const GenerateLayoutModal: React.FC<Props> = ({ isOpen, onClose, onGenera
       setError('');
       await onGenerate(area, style, bedrooms);
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Eroare la generarea planului.');
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : null) || 'Eroare la generarea planului.');
     } finally {
       setIsGenerating(false);
     }

@@ -3,11 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useZidarioChat } from '../../hooks/useZidarioChat';
 import { useEditorState } from '../../hooks/useEditorState';
 import { useRoomCalculator } from '../../hooks/useRoomCalculator';
-import { Brain, X, Send, ChevronRight, MessageSquareText } from 'lucide-react';
+import { Brain, X, Send } from 'lucide-react';
 
 interface Props {
   projectId: number;
-  projectData: any; // Datele din Faza 1
+  projectData: Record<string, unknown>; // Datele din Faza 1
   isOpen: boolean;
   onToggle: () => void;
 }
@@ -90,10 +90,25 @@ export const EditorChatSidebar: React.FC<Props> = ({ projectId, projectData, isO
           {/* Chat History */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 relative">
             {messages.length === 0 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-slate-400">
-                <MessageSquareText className="w-12 h-12 text-slate-200 mb-4" />
-                <p className="text-sm font-medium text-slate-500 mb-2">Asistentul AI este activ.</p>
-                <p className="text-xs">Orice modificare aduci pe planșă este trimisă invizibil în fundal. Întreabă-mă orice despre normative sau optimizări spațiale!</p>
+              <div className="flex justify-start">
+                <div className="max-w-[90%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed shadow-sm bg-white border border-slate-200 text-slate-700 rounded-bl-sm space-y-3">
+                  <div className="flex items-center gap-2 text-slate-800 font-bold">
+                    <Brain className="w-4 h-4 text-amber-500" />
+                    <span>Salutare! Sunt Copilotul tău Zidario. 🏠</span>
+                  </div>
+                  <p>Iată ce poți face în acest **Editor de Plan 2D (Mod Configurator)**:</p>
+                  <ul className="list-disc pl-4 space-y-1.5 text-xs text-slate-600">
+                    <li><strong>Schimbă forma casei</strong> (Dreptunghi, L, U, T) din panoul din stânga.</li>
+                    <li><strong>Redimensionează lățimea și lungimea</strong> introducând valori exacte în metri.</li>
+                    <li><strong>Bifează/debifează camere</strong> (ex. adaugă sau elimină WC, dormitoare, debarale).</li>
+                    <li><strong>Rearanjează pozițiile camerelor</strong> trăgând (drag-and-drop) o cameră peste alta pentru a le schimba poziția.</li>
+                    <li><strong>Ajustează dimensiunea unei camere</strong> apăsând pe ea și alegând o pondere de mărime (de la "Foarte Mică" la "Foarte Mare").</li>
+                    <li><strong>Adaugă/șterge uși și ferestre</strong> manual selectându-le pe ecran sau folosind butoanele din proprietăți.</li>
+                  </ul>
+                  <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 font-medium">
+                    Pune-mi orice întrebare tehnică sau de design, iar eu îți voi răspunde pe baza reglementărilor din Legea 114/1996!
+                  </p>
+                </div>
               </div>
             )}
 

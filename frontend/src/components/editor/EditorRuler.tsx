@@ -37,7 +37,6 @@ export const EditorRuler: React.FC<RulerProps> = ({
   onFitScreen,
 }) => {
   const tickIntervalM = getTickInterval(scale);
-  const tickIntervalPx = tickIntervalM * PIXELS_PER_METER * scale;
 
   // ── Ticks orizontale ──────────────────────────────────────────
   const hTicks = useMemo(() => {

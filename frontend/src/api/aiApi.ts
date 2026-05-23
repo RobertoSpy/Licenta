@@ -20,6 +20,34 @@ export interface SaveSummaryPayload {
   summary: string;
 }
 
+// ── Room Suggestion types (mirror backend types/roomSuggestion.ts) ─────────
+export interface SuggestedRoom {
+  type: string;
+  label: string;
+  weightRatio: number;
+  zone: 'distributie' | 'zi' | 'noapte' | 'tehnic';
+  floor: 'parter' | 'etaj1' | 'etaj2' | 'mansarda';
+  reasoning: string;
+  minSqm: number;
+  maxSqm: number;
+  mustAdjacentTo: string[];
+  hasDoorTo: string[];
+  isCirculation: boolean;
+  hasStaircase: boolean;
+  naturalLight: boolean;
+  orientation: string[];
+}
+
+export interface RoomSuggestion {
+  rooms: SuggestedRoom[];
+  totalEstimatedSqm: number;
+  layoutAdvice: string;
+  normativeNote: string;
+}
+
+export type BudgetCategory = 'economic' | 'mediu' | 'premium';
+
+
 export const aiApi = {
   /**
    * Streaming SSE chat cu Zidario.
@@ -198,7 +226,28 @@ Returnează DOAR rezumatul, fără introducere sau formulă de încheiere.
       }
     }
   },
+
+  /**
+   * POST /api/ai/suggest-rooms
+   * Solicită AI-ului să genereze programul funcțional recomandat (lista de camere).
+   * Răspunsul conține rooms[] cu weightRatio gata de injectat în Slice-and-Dice.
+   */
+  async suggestRooms(
+    projectId: number,
+    familySize: number,
+    budgetCategory: BudgetCategory,
+    houseAreaSqm: number
+  ): Promise<RoomSuggestion> {
+    const response = await apiPrivate.post('/ai/suggest-rooms', {
+      projectId,
+      familySize,
+      budgetCategory,
+      houseAreaSqm,
+    });
+    return response.data as RoomSuggestion;
+  },
 };
+
 
 // ── Utilitar local ────────────────────────────────────────────────────────────
 function phaseForScreen(screen: string): string {

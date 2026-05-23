@@ -15,6 +15,16 @@ interface Props {
   updateData: (fields: Partial<ProjectFormData>) => void;
 }
 
+// Nominatim API result shape
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  type?: string;
+  class?: string;
+}
+
 // MapController forțează camera hărții să încadreze poligonul generat
 const MapBoundsController = ({ positions }: { positions: [number, number][] }) => {
   const map = useMap();
@@ -42,7 +52,7 @@ export const Step1Location = ({ data, updateData }: Props) => {
 
   // Stări pentru Flux B - Căutare Nominatim
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -120,7 +130,7 @@ export const Step1Location = ({ data, updateData }: Props) => {
     }, 600);
   };
 
-  const handleSelectLocation = async (result: any) => {
+  const handleSelectLocation = async (result: NominatimResult) => {
     setSearchQuery(result.display_name.split(',')[0]); // afișezi doar numele scurt
     setSearchResults([]); // închizi dropdown-ul
 
@@ -170,11 +180,22 @@ export const Step1Location = ({ data, updateData }: Props) => {
         <h3 className="text-xl font-bold text-slate-900 mb-2">1. Numele Proiectului</h3>
         <input
           type="text"
-          className="w-full bg-white border border-slate-300 rounded-xl p-4 text-lg outline-none focus:ring-2 focus:ring-buildorange/50 focus:border-buildorange transition-all"
+          className="w-full bg-white border border-slate-300 rounded-xl p-4 text-lg outline-none focus:ring-2 focus:ring-buildorange/50 focus:border-buildorange transition-all mb-4"
           placeholder="Ex: Casa Visurilor Mele"
           value={data.title}
           onChange={(e) => updateData({ title: e.target.value })}
         />
+
+        <h3 className="text-xl font-bold text-slate-900 mb-2">Destinația Clădirii</h3>
+        <select
+          className="w-full bg-white border border-slate-300 rounded-xl p-4 text-lg outline-none focus:ring-2 focus:ring-buildorange/50 focus:border-buildorange transition-all"
+          value={data.buildingPurpose}
+          onChange={(e) => updateData({ buildingPurpose: e.target.value })}
+        >
+          <option value="residential">Locuință / Familie</option>
+          <option value="commercial">Spațiu Comercial / Birouri</option>
+          <option value="mixed">Mixt</option>
+        </select>
       </div>
 
       <div className="flex-1 flex flex-col md:flex-row gap-8 min-h-[400px]">

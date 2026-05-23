@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { type ConformityRoom, type ConformityRuleIssue } from '../../hooks/useConformityCheck';
 import { aiApi } from '../../api/aiApi';
-import { AlertTriangle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, XCircle, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Props {
   violations: ConformityRoom[];
@@ -15,9 +15,11 @@ export const EditorConformityAlert: React.FC<Props> = ({
   violationIssues,
   warningIssues,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [aiExplanation, setAiExplanation] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+
+  const totalIssues = violationIssues.length + warningIssues.length + violations.length;
 
   const renderSources = (sources?: ConformityRuleIssue['sources']) => {
     if (!sources || sources.length === 0) return null;
@@ -38,7 +40,6 @@ export const EditorConformityAlert: React.FC<Props> = ({
   useEffect(() => {
     if (violations.length === 0) {
       setAiExplanation('');
-      setIsOpen(false);
       return;
     }
     setIsOpen(true);
@@ -49,7 +50,6 @@ export const EditorConformityAlert: React.FC<Props> = ({
   const fetchAiExplanation = async () => {
     setAiExplanation('');
     setIsStreaming(true);
-
     try {
       await aiApi.streamConformityExplanation(
         violations.map((v) => ({
@@ -66,61 +66,80 @@ export const EditorConformityAlert: React.FC<Props> = ({
     }
   };
 
-  if (violations.length === 0 && violationIssues.length === 0 && warningIssues.length === 0) return null;
+  if (totalIssues === 0) return null;
+
+  const hasViolations = violationIssues.length > 0 || violations.length > 0;
 
   return (
     <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ y: 60, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 60, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-2xl bg-white border border-red-200 rounded-2xl shadow-2xl overflow-hidden z-30"
+      <motion.div
+        key="conformity-panel"
+        initial={{ x: 40, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: 40, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+        className={`
+          flex flex-col w-72 bg-white border rounded-2xl shadow-2xl z-30 overflow-hidden
+          ${hasViolations ? 'border-red-200' : 'border-amber-200'}
+        `}
+        style={{ maxHeight: 'calc(100vh - 120px)' }}
+      >
+        {/* ── Header (sticky) ─────────────────────────────── */}
+        <div
+          className={`flex items-center justify-between px-4 py-3 cursor-pointer shrink-0
+            ${hasViolations ? 'bg-red-50' : 'bg-amber-50'}`}
+          onClick={() => setIsOpen(v => !v)}
         >
-          {/* Header */}
-          <div
-            className="bg-red-50 px-5 py-3 flex items-center justify-between cursor-pointer"
-            onClick={() => setIsOpen((v) => !v)}
-          >
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <span className="text-sm font-bold text-red-800">
-                {violationIssues.length || violations.length} încălcări · {warningIssues.length} recomandări
-              </span>
-            </div>
-            {isOpen ? <ChevronDown className="w-4 h-4 text-red-500" /> : <ChevronUp className="w-4 h-4 text-red-500" />}
+          <div className="flex items-center gap-2">
+            <AlertTriangle className={`w-4 h-4 ${hasViolations ? 'text-red-500' : 'text-amber-500'}`} />
+            <span className={`text-xs font-bold ${hasViolations ? 'text-red-800' : 'text-amber-800'}`}>
+              {violationIssues.length + violations.length > 0
+                ? `${violationIssues.length + violations.length} încălcări`
+                : ''}
+              {violationIssues.length + violations.length > 0 && warningIssues.length > 0 ? ' · ' : ''}
+              {warningIssues.length > 0 ? `${warningIssues.length} recomandări` : ''}
+            </span>
           </div>
 
-          {/* Body */}
-          <div className="p-5 space-y-4">
-            {/* Lista violări */}
-            <div className="space-y-2">
-              {violationIssues.map((issue) => (
-                <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-3 bg-red-50 rounded-xl px-3 py-2">
-                  <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                  <div className="flex-1 text-sm">
-                    <span className="font-bold text-slate-900">{issue.message}</span>
-                    <div className="text-red-700">
-                      {issue.currentValue} → {issue.requiredValue} ({issue.deltaValue} lipsă)
-                    </div>
-                    <div className="text-xs text-red-500 mt-1">{issue.suggestion}</div>
-                    {renderSources(issue.sources)}
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="flex items-center gap-1">
+            {isOpen
+              ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+              : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            }
+            {/* X — întotdeauna vizibil, nu afectat de collapse */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                // Ascunde panoul complet resetând starea locală
+                setIsOpen(false);
+                setAiExplanation('');
+              }}
+              className="p-1 rounded-lg hover:bg-black/10 transition-colors ml-1"
+              title="Închide"
+            >
+              <X className="w-4 h-4 text-slate-500" />
+            </button>
+          </div>
+        </div>
 
-            {warningIssues.length > 0 && (
+        {/* ── Body scrollabil ─────────────────────────────── */}
+        {isOpen && (
+          <div className="overflow-y-auto flex-1 p-4 space-y-3">
+
+            {/* Violări (erori) */}
+            {violationIssues.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">Recomandări</p>
-                {warningIssues.map((issue) => (
-                  <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-3 bg-amber-50 rounded-xl px-3 py-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <div className="flex-1 text-sm text-amber-800">
-                      <div className="font-bold">{issue.message}</div>
-                      <div>{issue.currentValue} → {issue.requiredValue} ({issue.deltaValue} lipsă)</div>
-                      <div className="text-xs text-amber-600 mt-1">{issue.suggestion}</div>
+                <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide">Încălcări legale</p>
+                {violationIssues.map((issue) => (
+                  <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-2 bg-red-50 rounded-xl px-3 py-2">
+                    <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    <div className="flex-1 text-xs">
+                      <div className="font-bold text-slate-900 leading-snug">{issue.message}</div>
+                      <div className="text-red-700 mt-0.5">
+                        {issue.currentValue} → {issue.requiredValue}
+                        {issue.deltaValue ? ` (−${Math.abs(issue.deltaValue)} lipsă)` : ''}
+                      </div>
+                      <div className="text-red-500 mt-1">{issue.suggestion}</div>
                       {renderSources(issue.sources)}
                     </div>
                   </div>
@@ -128,21 +147,38 @@ export const EditorConformityAlert: React.FC<Props> = ({
               </div>
             )}
 
-            {/* AI explicație SSE */}
+            {/* Avertismente */}
+            {warningIssues.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Recomandări</p>
+                {warningIssues.map((issue) => (
+                  <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-2 bg-amber-50 rounded-xl px-3 py-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="flex-1 text-xs text-amber-800">
+                      <div className="font-bold leading-snug">{issue.message}</div>
+                      <div className="mt-1 text-amber-600">{issue.suggestion}</div>
+                      {renderSources(issue.sources)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* AI Explicație */}
             {(aiExplanation || isStreaming) && (
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   🤖 Zidario explică
-                  {isStreaming && <span className="inline-block w-1.5 h-4 bg-buildorange animate-pulse rounded-sm" />}
+                  {isStreaming && <span className="inline-block w-1.5 h-3.5 bg-buildorange animate-pulse rounded-sm" />}
                 </p>
-                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
                   {aiExplanation}
                 </p>
               </div>
             )}
           </div>
-        </motion.div>
-      )}
+        )}
+      </motion.div>
     </AnimatePresence>
   );
 };

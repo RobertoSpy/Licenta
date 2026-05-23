@@ -118,12 +118,12 @@ body: JSON.stringify({
                 aiExplanationRef.current = newText;
                 return newText;
               });
-            } catch (e) {}
+            } catch { /* ignore malformed SSE chunk */ }
           }
         }
       }
       updateData({ zoningRestrictions: aiExplanationRef.current });
-    } catch (err) {
+    } catch {
       setAiExplanation("Eroare la generarea explicației AI. Te rugăm să verifici conexiunea.");
     } finally {
       setIsAiLoading(false);

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect } from 'react';
 import { api, setAccessToken } from '../api/axios';
 
 interface User {
@@ -16,7 +16,8 @@ interface AuthContextType {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// eslint-disable-next-line react-refresh/only-export-components
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -32,9 +33,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setAccessToken(accessToken);
         setUser(userData);
-      } catch (err) {
-        // Dacă eșuează înseamnă că utilizatorul nu e logat deloc. Rămânem la starea nulă.
-        console.log("No active session detected.");
+      } catch {
+        // Seșiune inactivă sau expirată — ignorăm eroarea, utilizatorul nu este autentificat.
       } finally {
         setIsLoading(false);
       }
@@ -61,8 +61,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     try {
       await api.post('/auth/logout'); // Spune backend-ului să invalideze cookie-ul refresh
-    } catch (err) {
-      console.error(err);
+    } catch {
+      // Ignorăm erorile de logout (token deja expirat pe server)
     } finally {
       setAccessToken(null);
       setUser(null);
@@ -76,10 +76,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+// useAuth hook — importat din './useAuth' pentru a respecta react-refresh/only-export-components

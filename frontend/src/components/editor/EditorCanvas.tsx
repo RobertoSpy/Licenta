@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { Stage, Layer, Line, Rect, Text, Group, Transformer } from 'react-konva';
+import React, { useEffect, useCallback } from 'react';
+import { Stage, Layer, Line, Rect, Circle, Text, Group } from 'react-konva';
 import Konva from 'konva';
-import { useEditorState, type CanvasElement, type ToolType, GRID_SIZE_PX, metersToPx } from '../../hooks/useEditorState';
+import { useEditorState, type ToolType, pxToMeters } from '../../hooks/useEditorState';
 
 interface Props {
   width: number;
@@ -10,324 +10,187 @@ interface Props {
   onRoomLabelRequest: (id: string, x: number, y: number) => void;
 }
 
-// Snap la grid
-const snapToGrid = (value: number, gridSize: number) =>
-  Math.round(value / gridSize) * gridSize;
+// ── Premium color palette per room type ─────────────────────────────
+function getRoomColors(label: string, isSelected: boolean): { fill: string; stroke: string; labelColor: string } {
+  if (isSelected) return { fill: '#eff6ff', stroke: '#ef4444', labelColor: '#1e293b' };
 
-// Snap la element vecin
-const snapToElements = (
-  value: number,
-  axis: 'x' | 'y',
-  elements: CanvasElement[],
-  currentId: string,
-  threshold = 15
-): number => {
-  for (const el of elements) {
-    if (el.id === currentId) continue;
-    const candidates = axis === 'x'
-      ? [el.x, el.x + el.width]
-      : [el.y, el.y + el.height];
-    for (const c of candidates) {
-      if (Math.abs(value - c) < threshold) return c;
-    }
+  const n = (label ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '');
+
+  // Night zone — bedrooms
+  if (n.includes('dormitor') || n.includes('camera')) {
+    return { fill: '#f0fdf4', stroke: '#86efac', labelColor: '#166534' };
   }
-  return value;
-};
+  // Day zone — living spaces
+  if (n.includes('living') || n.includes('sufragerie')) {
+    return { fill: '#fff7ed', stroke: '#fdba74', labelColor: '#9a3412' };
+  }
+  // Kitchen / dining
+  if (n.includes('bucatarie') || n.includes('dining') || n.includes('camara')) {
+    return { fill: '#fefce8', stroke: '#fde047', labelColor: '#713f12' };
+  }
+  // Wet rooms
+  if (n.includes('baie') || n.includes('wc') || n.includes('toaleta') || n.includes('dus')) {
+    return { fill: '#eff6ff', stroke: '#93c5fd', labelColor: '#1e40af' };
+  }
+  // Hall / corridor
+  if (n.includes('hol') || n.includes('antreu') || n.includes('coridor') || n.includes('vestibul')) {
+    return { fill: '#f8fafc', stroke: '#cbd5e1', labelColor: '#475569' };
+  }
+  // Default
+  return { fill: '#fafafa', stroke: '#d1d5db', labelColor: '#374151' };
+}
 
-// Generare culori stabile per tip
-const ELEMENT_COLORS: Record<ToolType, { fill: string; stroke: string }> = {
-  room:      { fill: '#eff6ff', stroke: '#3b82f6' },
-  wall:      { fill: '#1e293b', stroke: '#0f172a' },
-  door:      { fill: '#fef3c7', stroke: '#f59e0b' },
-  window:    { fill: '#e0f2fe', stroke: '#0ea5e9' },
-  staircase: { fill: '#faf5ff', stroke: '#8b5cf6' },
+// Opening colors
+const OPENING_COLORS: Record<string, { fill: string; stroke: string }> = {
+  door:      { fill: '#fef3c7', stroke: '#d97706' },
+  window:    { fill: '#e0f2fe', stroke: '#0284c7' },
+  wall:      { fill: '#334155', stroke: '#1e293b' },
+  staircase: { fill: '#faf5ff', stroke: '#7c3aed' },
   select:    { fill: 'transparent', stroke: 'transparent' },
-};
+  room:      { fill: '#fafafa', stroke: '#d1d5db' },
+} satisfies Record<ToolType, { fill: string; stroke: string }>;
 
-export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef, onRoomLabelRequest }) => {
+export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
   const {
     elements, selectedId, activeTool, canvasScale, canvasOffset,
-    isSnapEnabled, showGrid, gridSize,
-    addElement, updateElement, selectElement, setOffset, setZoom,
+    showGrid, gridSize, dimensions, houseShape,
+    selectElement, setOffset, setZoom, swapRooms
   } = useEditorState();
 
-  const transformerRef = useRef<Konva.Transformer>(null);
-  const isDrawing = useRef(false);
-  const drawStart = useRef({ x: 0, y: 0 });
-  const [drawingRect, setDrawingRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const isPanning = useRef(false);
-  const lastPanPos = useRef({ x: 0, y: 0 });
-
-  // Actualizare Transformer la schimbarea elementului selectat
+  // ── Auto-fit: center the house footprint every time shape/size changes ──
   useEffect(() => {
-    const transformer = transformerRef.current;
-    if (!transformer) return;
-    const stage = stageRef.current;
-    if (!stage) return;
-    const selectedNode = selectedId ? stage.findOne(`#${selectedId}`) : null;
-    transformer.nodes(selectedNode ? [selectedNode] : []);
-    transformer.getLayer()?.batchDraw();
-  }, [selectedId, stageRef]);
+    if (width <= 0 || height <= 0) return;
 
-  // ─── Grid rendering ───────────────────────────────────────
-  const renderGrid = () => {
+    const marginM = 3; // generous padding in meters
+    const footprintWidthPx  = (dimensions.widthM  + marginM * 2) * 20;
+    const footprintHeightPx = (dimensions.heightM + marginM * 2) * 20;
+
+    const scale = Math.min(width / footprintWidthPx, height / footprintHeightPx);
+    const finalScale = Math.min(Math.max(scale, 0.4), 2.5);
+
+    const contentWidth  = footprintWidthPx  * finalScale;
+    const contentHeight = footprintHeightPx * finalScale;
+
+    setZoom(finalScale);
+    setOffset({
+      x: (width  - contentWidth)  / 2,
+      y: (height - contentHeight) / 2,
+    });
+  }, [width, height, dimensions.widthM, dimensions.heightM, houseShape, setZoom, setOffset]);
+
+  // ── Reset cursor on tool change ──────────────────────────────────────
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (stage) stage.container().style.cursor = 'default';
+  }, [activeTool, stageRef]);
+
+  // ── Premium dot-grid background ──────────────────────────────────────
+  const renderBackground = () => {
     if (!showGrid) return null;
-    const lines: React.ReactElement[] = [];
-    const cols = Math.ceil(width / gridSize) + 1;
-    const rows = Math.ceil(height / gridSize) + 1;
+    const dots: React.ReactElement[] = [];
+    // Only major dots (every 5 cells = 5m)
+    const majorStep = gridSize * 5;
+    const cols = Math.ceil(width / majorStep) + 2;
+    const rows = Math.ceil(height / majorStep) + 2;
 
     for (let i = 0; i <= cols; i++) {
-      const x = i * gridSize;
-      const isMajor = i % 5 === 0;
-      lines.push(
-        <Line
-          key={`v-${i}`}
-          points={[x, 0, x, height]}
-          stroke={isMajor ? '#cbd5e1' : '#f1f5f9'}
-          strokeWidth={isMajor ? 0.8 : 0.4}
-          listening={false}
-        />
-      );
-    }
-    for (let j = 0; j <= rows; j++) {
-      const y = j * gridSize;
-      const isMajor = j % 5 === 0;
-      lines.push(
-        <Line
-          key={`h-${j}`}
-          points={[0, y, width, y]}
-          stroke={isMajor ? '#cbd5e1' : '#f1f5f9'}
-          strokeWidth={isMajor ? 0.8 : 0.4}
-          listening={false}
-        />
-      );
-    }
-    return lines;
-  };
-
-  // ─── Drag handlers cu snap & collision ──────────────────
-  const isOverlapping = (x: number, y: number, w: number, h: number, ignoreId: string) => {
-    for (const el of elements) {
-      if (el.id === ignoreId) continue;
-      // toleranță de 1px pentru alăturare perfectă (snap)
-      if (
-        x < el.x + el.width - 1 &&
-        x + w > el.x + 1 &&
-        y < el.y + el.height - 1 &&
-        y + h > el.y + 1
-      ) {
-        return true;
+      for (let j = 0; j <= rows; j++) {
+        dots.push(
+          <Circle
+            key={`d-${i}-${j}`}
+            x={i * majorStep}
+            y={j * majorStep}
+            radius={1}
+            fill="#d1d5db"
+            listening={false}
+          />
+        );
       }
     }
-    return false;
+    // Minor dots (every cell = 1m)
+    for (let i = 0; i <= Math.ceil(width / gridSize) + 2; i++) {
+      for (let j = 0; j <= Math.ceil(height / gridSize) + 2; j++) {
+        if (i % 5 === 0 && j % 5 === 0) continue; // already drawn as major
+        dots.push(
+          <Circle
+            key={`dm-${i}-${j}`}
+            x={i * gridSize}
+            y={j * gridSize}
+            radius={0.5}
+            fill="#e5e7eb"
+            listening={false}
+          />
+        );
+      }
+    }
+    return dots;
   };
 
-  const handleDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>, id: string) => {
-    // În Konva e mai curat să folosim dragBoundFunc, dar snap-ul e calculat manual aici
-    if (!isSnapEnabled) return;
-    const node = e.target;
-    let x = node.x();
-    let y = node.y();
-    x = snapToGrid(x, gridSize);
-    y = snapToGrid(y, gridSize);
-    x = snapToElements(x, 'x', elements, id);
-    y = snapToElements(y, 'y', elements, id);
-    
-    // Verificăm coliziunea. Dacă overlap, nu aplicăm snap-ul (lăsăm dragBoundFunc să blocheze)
-    if (!isOverlapping(x, y, node.width(), node.height(), id)) {
-       node.x(x);
-       node.y(y);
-    }
-  }, [isSnapEnabled, gridSize, elements]);
-
+  // ── Drag-to-swap with intersection logic & forced snap-back ───────────────
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>, id: string) => {
     const node = e.target;
-    let newX = node.x();
-    let newY = node.y();
-    
-    // Dacă utilizatorul a drop-uit cumva peste un alt element (fără snap),
-    // îi dăm revert la poziția anterioară salvată în state (elements)
-    if (isOverlapping(newX, newY, node.width(), node.height(), id)) {
-       const oldEl = elements.find(el => el.id === id);
-       if (oldEl) {
-         node.x(oldEl.x);
-         node.y(oldEl.y);
-         return; // nu salvăm update
-       }
-    }
-    
-    updateElement(id, { x: newX, y: newY });
-  }, [updateElement, elements]);
 
-  const handleTransformEnd = useCallback((e: Konva.KonvaEventObject<Event>, id: string) => {
-    const node = e.target;
-    const scaleX = node.scaleX();
-    const scaleY = node.scaleY();
-    node.scaleX(1);
-    node.scaleY(1);
-    
-    let newW = Math.max(metersToPx(1), node.width() * scaleX);
-    let newH = Math.max(metersToPx(1), node.height() * scaleY);
-    
-    // Verificăm dacă resize-ul se suprapune
-    if (isOverlapping(node.x(), node.y(), newW, newH, id)) {
-      // Revert resize
-      const oldEl = elements.find(el => el.id === id);
-      if (oldEl) {
-        newW = oldEl.width;
-        newH = oldEl.height;
+    const nodeX = node.x();
+    const nodeY = node.y();
+    const nodeW = node.width();
+    const nodeH = node.height();
+
+    let closestRoomId: string | null = null;
+    let maxIntersectionArea = 0;
+
+    for (const el of elements) {
+      if (el.type === 'room' && el.id !== id) {
+        // Calculate intersection bounds
+        const overlapX = Math.max(nodeX, el.x);
+        const overlapY = Math.max(nodeY, el.y);
+        const overlapW = Math.min(nodeX + nodeW, el.x + el.width) - overlapX;
+        const overlapH = Math.min(nodeY + nodeH, el.y + el.height) - overlapY;
+
+        if (overlapW > 0 && overlapH > 0) {
+          const area = overlapW * overlapH;
+          if (area > maxIntersectionArea) {
+            maxIntersectionArea = area;
+            closestRoomId = el.id;
+          }
+        }
       }
     }
-    
-    updateElement(id, {
-      x: node.x(),
-      y: node.y(),
-      width: newW,
-      height: newH,
-    });
-  }, [updateElement, elements]);
 
-  // ─── Drawing (Room tool) ──────────────────────────────────
-  const getRelativePos = (stage: Konva.Stage) => {
-    const pos = stage.getPointerPosition();
-    if (!pos) return { x: 0, y: 0 };
-    return {
-      x: (pos.x - canvasOffset.x) / canvasScale,
-      y: (pos.y - canvasOffset.y) / canvasScale,
-    };
-  };
-
-  const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const stage = e.target.getStage();
-    if (!stage) return;
-
-    // Middle-click sau Space+click → pan
-    if (e.evt.button === 1 || (e.evt.button === 0 && e.evt.altKey)) {
-      isPanning.current = true;
-      lastPanPos.current = { x: e.evt.clientX, y: e.evt.clientY };
-      stage.container().style.cursor = 'grabbing';
-      return;
+    // Require a minimum intersection area to prevent accidental grazing swaps
+    if (closestRoomId && maxIntersectionArea > 400) {
+      swapRooms(id, closestRoomId);
+    } else {
+      // ── Snap back: restore original position AND force Konva redraw ──
+      const original = elements.find(el => el.id === id);
+      if (original) {
+        node.x(original.x);
+        node.y(original.y);
+        node.getLayer()?.batchDraw(); // Force immediate visual update
+      }
     }
+  }, [elements, swapRooms]);
 
-    if (activeTool === 'room') {
-      const pos = getRelativePos(stage);
-      const snappedX = isSnapEnabled ? snapToGrid(pos.x, gridSize) : pos.x;
-      const snappedY = isSnapEnabled ? snapToGrid(pos.y, gridSize) : pos.y;
-      isDrawing.current = true;
-      drawStart.current = { x: snappedX, y: snappedY };
-      setDrawingRect({ x: snappedX, y: snappedY, w: 0, h: 0 });
-      return;
+  // ── Magnetic Snapping during drag ────────────────────────────────────
+  const dragBoundFunc = useCallback((pos: Konva.Vector2d, nodeWidth: number, nodeHeight: number, id: string) => {
+    let { x, y } = pos;
+    const snapThreshold = 15; // magnetic radius
+
+    for (const el of elements) {
+      if (el.id === id) continue;
+      if (el.type !== 'room' && el.type !== 'wall') continue;
+
+      // Vertical snapping (X axis)
+      if (Math.abs(x - (el.x + el.width)) < snapThreshold) x = el.x + el.width; // Snap left edge to right edge
+      else if (Math.abs((x + nodeWidth) - el.x) < snapThreshold) x = el.x - nodeWidth; // Snap right edge to left edge
+      else if (Math.abs(x - el.x) < snapThreshold) x = el.x; // Snap left to left
+
+      // Horizontal snapping (Y axis)
+      if (Math.abs(y - (el.y + el.height)) < snapThreshold) y = el.y + el.height; // Snap top edge to bottom edge
+      else if (Math.abs((y + nodeHeight) - el.y) < snapThreshold) y = el.y - nodeHeight; // Snap bottom edge to top edge
+      else if (Math.abs(y - el.y) < snapThreshold) y = el.y; // Snap top to top
     }
-
-    // Click pe spațiu gol → deselect
-    if (e.target === stage) {
-      selectElement(null);
-    }
-  };
-
-  const handleStageMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const stage = e.target.getStage();
-    if (!stage) return;
-
-    if (isPanning.current) {
-      const dx = e.evt.clientX - lastPanPos.current.x;
-      const dy = e.evt.clientY - lastPanPos.current.y;
-      setOffset({ x: canvasOffset.x + dx, y: canvasOffset.y + dy });
-      lastPanPos.current = { x: e.evt.clientX, y: e.evt.clientY };
-      return;
-    }
-
-    if (!isDrawing.current || activeTool !== 'room') return;
-    const pos = getRelativePos(stage);
-    const snappedX = isSnapEnabled ? snapToGrid(pos.x, gridSize) : pos.x;
-    const snappedY = isSnapEnabled ? snapToGrid(pos.y, gridSize) : pos.y;
-    setDrawingRect({
-      x: Math.min(drawStart.current.x, snappedX),
-      y: Math.min(drawStart.current.y, snappedY),
-      w: Math.abs(snappedX - drawStart.current.x),
-      h: Math.abs(snappedY - drawStart.current.y),
-    });
-  };
-
-  const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const stage = e.target.getStage();
-    if (stage && isPanning.current) {
-      isPanning.current = false;
-      stage.container().style.cursor = activeTool === 'select' ? 'default' : 'crosshair';
-      return;
-    }
-
-    if (!isDrawing.current || !drawingRect) return;
-    isDrawing.current = false;
-
-    const minPx = metersToPx(1); // minim 1m × 1m
-    if (drawingRect.w < minPx || drawingRect.h < minPx) {
-      setDrawingRect(null);
-      return;
-    }
-
-    if (isOverlapping(drawingRect.x, drawingRect.y, drawingRect.w, drawingRect.h, 'new')) {
-      setDrawingRect(null);
-      // Putem adăuga un toast aici în viitor, dar acum pur și simplu nu permite desenarea
-      return;
-    }
-
-    const newElement = addElement({
-      type: 'room',
-      x: drawingRect.x,
-      y: drawingRect.y,
-      width: drawingRect.w,
-      height: drawingRect.h,
-      rotation: 0,
-      label: 'Cameră',
-      wallThicknessCm: 25,
-    });
-
-    setDrawingRect(null);
-
-    // Cerem label-ul camerei prin dialog
-    // setTimeout de 50ms — Konva are nevoie de un tick pentru a randa noul nod
-    const stage2 = stageRef.current;
-    if (stage2) {
-      const stageBox = stage2.container().getBoundingClientRect();
-      const cx = (drawingRect.x + drawingRect.w / 2) * canvasScale + canvasOffset.x + stageBox.left;
-      const cy = (drawingRect.y + drawingRect.h / 2) * canvasScale + canvasOffset.y + stageBox.top;
-      setTimeout(() => onRoomLabelRequest(newElement.id, cx, cy), 50);
-    }
-  };
-
-  // ─── Wheel zoom ───────────────────────────────────────────
-  const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
-    e.evt.preventDefault();
-    const scaleBy = 1.08;
-    const stage = stageRef.current;
-    if (!stage) return;
-    const oldScale = canvasScale;
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
-
-    const mousePointTo = {
-      x: (pointer.x - canvasOffset.x) / oldScale,
-      y: (pointer.y - canvasOffset.y) / oldScale,
-    };
-    const direction = e.evt.deltaY > 0 ? -1 : 1;
-    const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
-    const clamped = Math.min(Math.max(newScale, 0.25), 3);
-
-    setZoom(clamped);
-    setOffset({
-      x: pointer.x - mousePointTo.x * clamped,
-      y: pointer.y - mousePointTo.y * clamped,
-    });
-  };
-
-  // ─── Cursor per tool ─────────────────────────────────────
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (stage) {
-      stage.container().style.cursor = activeTool === 'select' ? 'default' : 'crosshair';
-    }
-  }, [activeTool, stageRef]);
+    return { x, y };
+  }, [elements]);
 
   return (
     <Stage
@@ -338,59 +201,68 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef, onRoomL
       scaleY={canvasScale}
       x={canvasOffset.x}
       y={canvasOffset.y}
-      onMouseDown={handleStageMouseDown}
-      onMouseMove={handleStageMouseMove}
-      onMouseUp={handleStageMouseUp}
-      onWheel={handleWheel}
-      className="bg-slate-50"
+      style={{ background: '#f8fafc' }}
     >
-      {/* Layer 1 — Grid (în spate, niciodată nu interacționează) */}
+      {/* Layer 1 — Premium dot background */}
       <Layer listening={false}>
-        {renderGrid()}
+        {renderBackground()}
       </Layer>
 
-      {/* Layer 2 — Elemente */}
+      {/* Layer 2 — Elements */}
       <Layer>
         {elements.map((el) => {
-          const colors = ELEMENT_COLORS[el.type] ?? ELEMENT_COLORS.room;
           const isSelected = selectedId === el.id;
 
           if (el.type === 'room') {
+            const { fill, stroke, labelColor } = getRoomColors(el.label ?? '', isSelected);
             return (
               <Group
                 key={el.id}
                 id={el.id}
                 x={el.x}
                 y={el.y}
-                draggable={activeTool === 'select'}
-                onDragMove={(e) => handleDragMove(e, el.id)}
+                draggable={true}
+                onDragStart={(e) => e.target.moveToTop()}
+                dragBoundFunc={(pos) => dragBoundFunc(pos, el.width, el.height, el.id)}
                 onDragEnd={(e) => handleDragEnd(e, el.id)}
-                onTransformEnd={(e) => handleTransformEnd(e, el.id)}
-                onClick={() => activeTool === 'select' && selectElement(el.id)}
+                onClick={() => selectElement(el.id)}
+                onTap={() => selectElement(el.id)}
               >
                 <Rect
                   width={el.width}
                   height={el.height}
-                  fill={isSelected ? '#dbeafe' : colors.fill}
-                  stroke={isSelected ? '#f97316' : colors.stroke}
+                  fill={fill}
+                  stroke={isSelected ? '#ef4444' : stroke}
                   strokeWidth={isSelected ? 2.5 : 1.5}
-                  cornerRadius={2}
-                  shadowEnabled={isSelected}
-                  shadowColor="rgba(249,115,22,0.3)"
-                  shadowBlur={8}
+                  cornerRadius={6}
+                  shadowEnabled={true}
+                  shadowColor="rgba(15,23,42,0.06)"
+                  shadowBlur={isSelected ? 20 : 8}
+                  shadowOffsetY={isSelected ? 2 : 1}
                 />
-                {/* Label cameră */}
-                <Text
-                  text={el.label ?? 'Cameră'}
-                  x={8}
-                  y={el.height / 2 - 8}
-                  width={el.width - 16}
-                  fontSize={Math.max(10, Math.min(14, el.width / 8))}
-                  fontStyle="bold"
-                  fill="#1e40af"
-                  align="center"
-                  listening={false}
-                />
+
+                {/* Room label + area */}
+                <Group x={0} y={el.height / 2 - 14} listening={false}>
+                  <Text
+                    text={el.label ?? 'Cameră'}
+                    width={el.width}
+                    fontSize={Math.max(10, Math.min(13, el.width / 9))}
+                    fontStyle="bold"
+                    fontFamily="Inter, system-ui, sans-serif"
+                    fill={labelColor}
+                    align="center"
+                  />
+                  <Text
+                    text={`${parseFloat((pxToMeters(el.width) * pxToMeters(el.height)).toFixed(1))} m²`}
+                    y={15}
+                    width={el.width}
+                    fontSize={Math.max(9, Math.min(11, el.width / 11))}
+                    fontFamily="Inter, system-ui, sans-serif"
+                    fill={labelColor}
+                    opacity={0.65}
+                    align="center"
+                  />
+                </Group>
               </Group>
             );
           }
@@ -404,120 +276,89 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef, onRoomL
                 y={el.y}
                 width={el.width}
                 height={el.height}
-                fill={colors.fill}
-                stroke={isSelected ? '#f97316' : colors.stroke}
-                strokeWidth={isSelected ? 2 : 1}
-                draggable={activeTool === 'select'}
-                onDragMove={(e) => handleDragMove(e, el.id)}
-                onDragEnd={(e) => handleDragEnd(e, el.id)}
-                onClick={() => activeTool === 'select' && selectElement(el.id)}
+                fill={OPENING_COLORS.wall.fill}
+                stroke={OPENING_COLORS.wall.stroke}
+                strokeWidth={1}
+                listening={false}
               />
             );
           }
 
           if (el.type === 'door') {
+            const isVertical = el.width < el.height;
+            const colors = OPENING_COLORS.door;
             return (
               <Group
                 key={el.id}
                 id={el.id}
                 x={el.x}
                 y={el.y}
-                rotation={el.rotation}
-                draggable={activeTool === 'select'}
-                onDragMove={(e) => handleDragMove(e, el.id)}
-                onDragEnd={(e) => handleDragEnd(e, el.id)}
-                onClick={() => activeTool === 'select' && selectElement(el.id)}
+                listening={true}
+                onClick={() => selectElement(el.id)}
+                onTap={() => selectElement(el.id)}
               >
-                <Rect width={el.width} height={el.height} fill={colors.fill} stroke={colors.stroke} strokeWidth={1.5} />
-                {/* Arc ușă */}
+                <Rect
+                  width={el.width}
+                  height={el.height}
+                  fill={isSelected ? '#fef08a' : colors.fill}
+                  stroke={isSelected ? '#ef4444' : colors.stroke}
+                  strokeWidth={isSelected ? 2.5 : 1.5}
+                  cornerRadius={1}
+                />
+                {/* Swing arc */}
                 <Line
-                  points={[0, el.height, el.width, el.height, el.width, 0]}
+                  points={
+                    isVertical
+                      ? [0, 0, el.height, el.height, el.height, 0]
+                      : [0, el.height, el.width, el.height, el.width, 0]
+                  }
                   stroke={colors.stroke}
                   strokeWidth={1}
-                  dash={[4, 4]}
-                  listening={false}
+                  dash={[3, 3]}
                 />
               </Group>
             );
           }
 
           if (el.type === 'window') {
+            const isVertical = el.width < el.height;
+            const colors = OPENING_COLORS.window;
             return (
               <Group
                 key={el.id}
                 id={el.id}
                 x={el.x}
                 y={el.y}
-                draggable={activeTool === 'select'}
-                onDragMove={(e) => handleDragMove(e, el.id)}
-                onDragEnd={(e) => handleDragEnd(e, el.id)}
-                onClick={() => activeTool === 'select' && selectElement(el.id)}
+                listening={true}
+                onClick={() => selectElement(el.id)}
+                onTap={() => selectElement(el.id)}
               >
-                <Rect width={el.width} height={el.height} fill={colors.fill} stroke={colors.stroke} strokeWidth={1.5} />
-                <Line points={[el.width / 3, 0, el.width / 3, el.height]} stroke={colors.stroke} strokeWidth={1} listening={false} />
-                <Line points={[(el.width / 3) * 2, 0, (el.width / 3) * 2, el.height]} stroke={colors.stroke} strokeWidth={1} listening={false} />
-              </Group>
-            );
-          }
-
-          if (el.type === 'staircase') {
-            const steps = 8;
-            return (
-              <Group
-                key={el.id}
-                id={el.id}
-                x={el.x}
-                y={el.y}
-                draggable={activeTool === 'select'}
-                onDragMove={(e) => handleDragMove(e, el.id)}
-                onDragEnd={(e) => handleDragEnd(e, el.id)}
-                onClick={() => activeTool === 'select' && selectElement(el.id)}
-              >
-                <Rect width={el.width} height={el.height} fill={colors.fill} stroke={colors.stroke} strokeWidth={1.5} />
-                {Array.from({ length: steps }).map((_, i) => (
-                  <Line
-                    key={i}
-                    points={[0, (el.height / steps) * i, el.width, (el.height / steps) * i]}
-                    stroke="#8b5cf6"
-                    strokeWidth={0.8}
-                    listening={false}
-                  />
-                ))}
+                <Rect
+                  width={el.width}
+                  height={el.height}
+                  fill={isSelected ? '#bae6fd' : colors.fill}
+                  stroke={isSelected ? '#ef4444' : colors.stroke}
+                  strokeWidth={isSelected ? 2.5 : 1.5}
+                  cornerRadius={1}
+                />
+                {/* Window pane dividers */}
+                {isVertical ? (
+                  <>
+                    <Line points={[0, el.height / 3, el.width, el.height / 3]} stroke={colors.stroke} strokeWidth={1} />
+                    <Line points={[0, (el.height / 3) * 2, el.width, (el.height / 3) * 2]} stroke={colors.stroke} strokeWidth={1} />
+                  </>
+                ) : (
+                  <>
+                    <Line points={[el.width / 3, 0, el.width / 3, el.height]} stroke={colors.stroke} strokeWidth={1} />
+                    <Line points={[(el.width / 3) * 2, 0, (el.width / 3) * 2, el.height]} stroke={colors.stroke} strokeWidth={1} />
+                  </>
+                )}
               </Group>
             );
           }
 
           return null;
         })}
-
-        {/* Rectangle preview în timp ce desenezi */}
-        {drawingRect && drawingRect.w > 0 && drawingRect.h > 0 && (
-          <Rect
-            x={drawingRect.x}
-            y={drawingRect.y}
-            width={drawingRect.w}
-            height={drawingRect.h}
-            fill="rgba(59,130,246,0.1)"
-            stroke="#3b82f6"
-            strokeWidth={1.5}
-            dash={[6, 4]}
-            listening={false}
-          />
-        )}
-
-        {/* Transformer — handles de resize */}
-        <Transformer
-          ref={transformerRef}
-          boundBoxFunc={(oldBox, newBox) => {
-            if (newBox.width < metersToPx(0.5) || newBox.height < metersToPx(0.5)) return oldBox;
-            return newBox;
-          }}
-          rotateEnabled={false}
-          anchorStroke="#f97316"
-          borderStroke="#f97316"
-          anchorFill="white"
-          anchorSize={8}
-        />
       </Layer>
     </Stage>
   );

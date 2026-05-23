@@ -12,6 +12,7 @@ import { useProjectGuard } from '../../hooks/useProjectGuard';
 
 export interface ProjectFormData {
   title: string;
+  buildingPurpose: string;
   lat: number | null;
   lng: number | null;
   plotCoordinates: { x: string; y: string }[];
@@ -37,6 +38,7 @@ export interface ProjectFormData {
 
 const initialData: ProjectFormData = {
   title: '',
+  buildingPurpose: 'residential',
   lat: null,
   lng: null,
   plotCoordinates: [

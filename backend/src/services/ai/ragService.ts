@@ -1,6 +1,6 @@
 import { NormativeChunk } from '@prisma/client';
 import { embeddingService } from './embeddingService';
-import { AgentType, AGENT_SOURCES } from '../../data/normative-registry';
+import { AgentType, AGENT_SOURCES_BY_PURPOSE } from '../../data/normative-registry';
 import { normativeChunkRepository, RawChunkResult } from '../../repositories/normativeChunkRepository';
 
 // ─────────────────────────────────────────────────────────────────
@@ -22,10 +22,11 @@ import { normativeChunkRepository, RawChunkResult } from '../../repositories/nor
 export async function searchHybrid(
   question: string,
   agent: AgentType,
-  limit: number = 5
+  limit: number = 5,
+  sourcesOverride?: string[]
 ): Promise<NormativeChunk[]> {
 
-  const allowedSources = AGENT_SOURCES[agent];
+  const allowedSources = sourcesOverride ?? AGENT_SOURCES_BY_PURPOSE['residential'][agent];
   // Agenții fără surse configurate (Phase 3: materiale, deviz) nu au chunks în DB
   if (allowedSources.length === 0) {
     console.debug(`[ragService] Agentul "${agent}" nu are surse configurate — skip.`);

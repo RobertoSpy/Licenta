@@ -1,4 +1,4 @@
-import { AgentType } from '../data/normative-registry';
+import { AgentType, AGENT_SOURCES_BY_PURPOSE, BuildingPurpose } from '../data/normative-registry';
 import { searchHybrid } from '../services/ai/ragService';
 import { NormativeChunk } from '@prisma/client';
 
@@ -26,18 +26,18 @@ interface RuleSeed {
 
 const RULE_SEEDS: RuleSeed[] = [
   {
-    code: 'P118_CORRIDOR_MIN_WIDTH',
-    label: 'Lățime minimă coridor/hol (evacuare)',
+    code: 'CORRIDOR_MIN_WIDTH',
+    label: 'Lățime minimă coridor/hol',
     agent: 'architectural',
-    query: 'latime minima coridor evacuare locuinta P118-99',
+    query: 'latime minima coridor hol circulatie interioara trecere libera',
     minRangeM: 0.8,
     maxRangeM: 2.5,
   },
   {
-    code: 'P118_DOOR_MIN_WIDTH',
-    label: 'Lățime minimă ușă evacuare locuință',
+    code: 'DOOR_MIN_WIDTH',
+    label: 'Lățime minimă ușă',
     agent: 'architectural',
-    query: 'latime minima usa evacuare locuinta P118-99',
+    query: 'dimensiuni minime goluri usi interioare latime minima trecere',
     minRangeM: 0.6,
     maxRangeM: 1.5,
   },
@@ -72,8 +72,9 @@ function buildExcerpt(chunk: NormativeChunk): string {
     : `${content.slice(0, EXCERPT_LEN)}…`;
 }
 
-async function resolveRuleSeed(seed: RuleSeed): Promise<SupplementalRule | null> {
-  const chunks = await searchHybrid(seed.query, seed.agent, 5);
+async function resolveRuleSeed(seed: RuleSeed, purpose: BuildingPurpose): Promise<SupplementalRule | null> {
+  const sources = AGENT_SOURCES_BY_PURPOSE[purpose][seed.agent];
+  const chunks = await searchHybrid(seed.query, seed.agent, 5, sources);
 
   for (const chunk of chunks) {
     const value = extractMeters(chunk.content, seed.minRangeM, seed.maxRangeM);
@@ -100,24 +101,30 @@ async function resolveRuleSeed(seed: RuleSeed): Promise<SupplementalRule | null>
 // In-memory cache — 6h TTL, inflight deduplication
 // ─────────────────────────────────────────────────────────────────
 
-let cachedRules: SupplementalRule[] | null = null;
-let cacheExpiresAt = 0;
-let inflight: Promise<SupplementalRule[]> | null = null;
+const rulesCache = new Map<BuildingPurpose, {
+  rules: SupplementalRule[];
+  expiresAt: number;
+}>();
+const inflight = new Map<BuildingPurpose, Promise<SupplementalRule[]>>();
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h
 
-export async function getSupplementalRules(): Promise<SupplementalRule[]> {
+export async function getSupplementalRules(purpose: BuildingPurpose = 'residential'): Promise<SupplementalRule[]> {
   const now = Date.now();
-  if (cachedRules && now < cacheExpiresAt) return cachedRules;
-  if (inflight) return inflight;
+  const cached = rulesCache.get(purpose);
+  if (cached && now < cached.expiresAt) return cached.rules;
 
-  inflight = (async () => {
-    const resolved = await Promise.all(RULE_SEEDS.map(resolveRuleSeed));
-    cachedRules = resolved.filter((r): r is SupplementalRule => r !== null);
-    cacheExpiresAt = Date.now() + CACHE_TTL_MS;
-    inflight = null;
-    return cachedRules;
+  const existingInflight = inflight.get(purpose);
+  if (existingInflight) return existingInflight;
+
+  const promise = (async () => {
+    const resolved = await Promise.all(RULE_SEEDS.map(seed => resolveRuleSeed(seed, purpose)));
+    const rules = resolved.filter((r): r is SupplementalRule => r !== null);
+    rulesCache.set(purpose, { rules, expiresAt: Date.now() + CACHE_TTL_MS });
+    inflight.delete(purpose);
+    return rules;
   })();
 
-  return inflight;
+  inflight.set(purpose, promise);
+  return promise;
 }

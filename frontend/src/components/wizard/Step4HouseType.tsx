@@ -198,22 +198,7 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
               </div>
             </div>
 
-            {/* Mansard Toggle */}
-            <div className="flex items-center justify-between pt-6 border-t border-slate-100">
-              <div>
-                <h4 className="font-bold text-slate-900">Mansardă Locuibilă</h4>
-                <p className="text-xs text-slate-500">Transformă podul în spațiu activ de locuit.</p>
-              </div>
-              <button 
-                onClick={toggleMansard}
-                className={`w-14 h-8 rounded-full transition-colors relative ${data.hasMansard ? 'bg-amber-500' : 'bg-slate-200'}`}
-              >
-                <motion.div 
-                  animate={{ x: data.hasMansard ? 24 : 4 }}
-                  className="w-6 h-6 bg-white rounded-full absolute top-1 shadow-sm"
-                />
-              </button>
-            </div>
+
 
             {/* Summary Alert */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex gap-3">

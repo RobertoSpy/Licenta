@@ -1,0 +1,211 @@
+{
+  "room_min_sqm": [
+    {
+      "code": "L114_LIVING_MIN",
+      "targets": [
+        "living",
+        "sufragerie",
+        "cameradezi",
+        "salon"
+      ],
+      "min_sqm": 18,
+      "severity": "error",
+      "source_ref": "Legea 114/1996, Anexa 1",
+      "applies_to": [
+        "residential",
+        "mixed"
+      ]
+    },
+    {
+      "code": "L114_BEDROOM_MIN",
+      "targets": [
+        "dormitor",
+        "camera",
+        "cameraparintilor",
+        "cameracopilului"
+      ],
+      "min_sqm": 12,
+      "severity": "error",
+      "source_ref": "Legea 114/1996, Anexa 1",
+      "applies_to": [
+        "residential",
+        "mixed"
+      ]
+    },
+    {
+      "code": "L114_BEDROOM_SINGLE_MIN",
+      "targets": [
+        "dormitorsimplu",
+        "camerasimpla"
+      ],
+      "min_sqm": 8,
+      "severity": "error",
+      "source_ref": "Legea 114/1996, Anexa 1",
+      "applies_to": [
+        "residential",
+        "mixed"
+      ]
+    },
+    {
+      "code": "L114_KITCHEN_MIN",
+      "targets": [
+        "bucatarie",
+        "bucătărie"
+      ],
+      "min_sqm": 5,
+      "severity": "error",
+      "source_ref": "Legea 114/1996, Anexa 1",
+      "applies_to": [
+        "residential",
+        "mixed"
+      ]
+    },
+    {
+      "code": "L114_BATHROOM_MIN",
+      "targets": [
+        "baie",
+        "baiemare",
+        "baieprincipal"
+      ],
+      "min_sqm": 3.5,
+      "severity": "warning",
+      "source_ref": "Legea 114/1996, Anexa 1",
+      "applies_to": [
+        "residential",
+        "mixed"
+      ]
+    },
+    {
+      "code": "L114_WC_MIN",
+      "targets": [
+        "wc",
+        "toaleta",
+        "toaletă",
+        "grupсаниtar",
+        "grupanitar"
+      ],
+      "min_sqm": 1.2,
+      "severity": "warning",
+      "source_ref": "Legea 114/1996, Anexa 1",
+      "applies_to": [
+        "residential",
+        "mixed"
+      ]
+    },
+    {
+      "code": "L114_HALL_MIN",
+      "targets": [
+        "hol",
+        "holentru",
+        "holprincipala",
+        "antreu",
+        "vestibul"
+      ],
+      "min_sqm": 4,
+      "severity": "warning",
+      "source_ref": "Legea 114/1996, Anexa 1",
+      "applies_to": [
+        "residential",
+        "mixed"
+      ]
+    },
+    {
+      "code": "L114_STORAGE_MIN",
+      "targets": [
+        "debara",
+        "spatiumdepozitare",
+        "camaredepozitare"
+      ],
+      "min_sqm": 1.5,
+      "severity": "warning",
+      "source_ref": "Legea 114/1996, Anexa 1",
+      "applies_to": [
+        "residential",
+        "mixed"
+      ]
+    },
+    {
+      "code": "L114_DININGROOM_MIN",
+      "targets": [
+        "sufragariediningroom",
+        "dining",
+        "sufragarie"
+      ],
+      "min_sqm": 12,
+      "severity": "warning",
+      "source_ref": "Legea 114/1996, Anexa 1",
+      "applies_to": [
+        "residential",
+        "mixed"
+      ]
+    },
+    {
+      "code": "L114_OFFICE_MIN",
+      "targets": [
+        "birou",
+        "cabinet",
+        "studiu"
+      ],
+      "min_sqm": 8,
+      "severity": "warning",
+      "source_ref": "Legea 114/1996, Anexa 1",
+      "applies_to": [
+        "residential",
+        "mixed",
+        "commercial"
+      ]
+    }
+  ],
+  "clearance_rules": [
+    {
+      "code": "L114_CORRIDOR_WIDTH",
+      "targets": [
+        "hol",
+        "coridor",
+        "vestibul",
+        "circulatie",
+        "circulație"
+      ],
+      "property": "widthM",
+      "value": 1.2,
+      "severity": "error",
+      "source_ref": "Legea 114/1996",
+      "applies_to": [
+        "residential",
+        "mixed"
+      ]
+    },
+    {
+      "code": "P118_DOOR_WIDTH",
+      "targets": [
+        "usa",
+        "usaexterior",
+        "usainterior"
+      ],
+      "property": "widthM",
+      "value": 0.8,
+      "severity": "warning",
+      "source_ref": "P118-99",
+      "applies_to": [
+        "residential",
+        "mixed",
+        "commercial"
+      ]
+    },
+    {
+      "code": "P118_EMERGENCY_DOOR_WIDTH",
+      "targets": [
+        "usaevacuare",
+        "iesireurgenta"
+      ],
+      "property": "widthM",
+      "value": 0.9,
+      "severity": "error",
+      "source_ref": "P118-99, Art. 2.6.4",
+      "applies_to": [
+        "commercial",
+        "mixed"
+      ]
+    }
+  ]
+}

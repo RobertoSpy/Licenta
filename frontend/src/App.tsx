@@ -11,7 +11,7 @@ import { Materials } from './pages/dashboard/Materials';
 import { Experts } from './pages/dashboard/Experts';
 import { ProjectDetail } from './pages/dashboard/ProjectDetail';
 import { ProjectEditor } from './pages/dashboard/ProjectEditor';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './context/useAuth';
 
 function App() {
   const { isLoading } = useAuth();
