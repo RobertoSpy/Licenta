@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "source": "Heuristici extrase din Ernst Neufert - Architects' Data și Legea 114/1996",
-    "description": "Matrice de partiționare spațială pentru autogenerarea planurilor 2D. Stilurile definesc topologia (layout_matrix) și ierarhia vizuală (ratios). Fiecare celulă din layout_matrix este un label de cameră. Camerele cu același label formează o singură cameră unificată prin BFS.",
+    "source": "Heuristici extrase din practici arhitecturale comune",
+    "description": "Ponderi estetice și proporții stilistice pentru autogenerarea planurilor 2D. NU sunt valori normative. Definește topologia (layout_matrix) și ierarhia vizuală (ratios). Regulile legale se extrag separat din conformity-rules.json.",
     "version": "2.0"
   },
   "templates": {
@@ -153,44 +153,6 @@
           "ratios": {
             "living": 0.27, "bucatarie": 0.11, "dormitor1": 0.18,
             "dormitor2": 0.14, "dormitor3": 0.12, "baie": 0.09, "hol": 0.09
-          }
-        }
-      }
-    },
-    "Rustic": {
-      "concept": "Bucătăria este inima casei, spații mari de depozitare (cămară), formă compactă.",
-      "configurations": {
-        "1_dormitor": {
-          "layout_matrix": [
-            ["debara",    "bucatarie", "bucatarie"],
-            ["hol",       "living",    "living"],
-            ["baie",      "hol",       "dormitor1"]
-          ],
-          "ratios": {
-            "living": 0.30, "bucatarie": 0.20, "dormitor1": 0.20,
-            "baie": 0.10, "hol": 0.10, "debara": 0.10
-          }
-        },
-        "2_dormitoare": {
-          "layout_matrix": [
-            ["debara",    "bucatarie", "bucatarie"],
-            ["hol",       "living",    "dormitor2"],
-            ["baie",      "hol",       "dormitor1"]
-          ],
-          "ratios": {
-            "living": 0.25, "bucatarie": 0.18, "dormitor1": 0.19,
-            "dormitor2": 0.14, "baie": 0.09, "hol": 0.09, "debara": 0.06
-          }
-        },
-        "3_dormitoare": {
-          "layout_matrix": [
-            ["debara",    "bucatarie", "dormitor3"],
-            ["hol",       "living",    "dormitor2"],
-            ["baie",      "hol",       "dormitor1"]
-          ],
-          "ratios": {
-            "living": 0.22, "bucatarie": 0.16, "dormitor1": 0.17,
-            "dormitor2": 0.13, "dormitor3": 0.12, "baie": 0.09, "hol": 0.08, "debara": 0.03
           }
         }
       }

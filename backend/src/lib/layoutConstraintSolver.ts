@@ -8,7 +8,7 @@ const conformityRules = rawRules as {
     targets: string[];
     min_sqm: number;
     severity: string;
-    source_ref: string;
+    _source: string;
   }>;
 };
 

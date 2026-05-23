@@ -210,15 +210,65 @@ export function useConformityCheck(
     const currentRequestId = ++requestIdRef.current;
 
     timerRef.current = setTimeout(() => {
+      // Find all windows
+      const windows = elements?.filter(e => e.type === 'window') ?? [];
+
       const payload = {
-        rooms: rooms.map((r) => ({
-          id: r.id,
-          label: r.label,
-          usableSqm: r.usableSqm,
-          widthM: r.widthM,
-          heightM: r.heightM,
-        })),
-        doors: doors?.map((d) => ({ id: d.id, widthM: d.widthM })),
+        rooms: rooms.map((r) => {
+          // Calculate windowAreaSqm
+          let windowAreaSqm = 0;
+          const roomEl = elements?.find(el => el.id === r.id);
+          if (roomEl) {
+            const adjacentWindows = windows.filter(win => {
+              const cx = win.x + win.width / 2;
+              const cy = win.y + win.height / 2;
+              return (
+                cx >= roomEl.x - 15 && cx <= roomEl.x + roomEl.width + 15 &&
+                cy >= roomEl.y - 15 && cy <= roomEl.y + roomEl.height + 15
+              );
+            });
+            
+            // PxToMeters conversion logic is usually room.widthM / roomEl.width
+            // Or we just calculate meters directly. We assume standard window height 1.5m
+            for (const win of adjacentWindows) {
+              const scale = r.widthM! / roomEl.width; // pixels to meters scale for this room
+              const winWidthM = Math.max(win.width, win.height) * scale;
+              windowAreaSqm += winWidthM * 1.5; // WINDOW_STANDARD_HEIGHT_M = 1.5
+            }
+          }
+
+          return {
+            id: r.id,
+            label: r.label,
+            usableSqm: r.usableSqm,
+            widthM: r.widthM,
+            heightM: r.heightM,
+            windowAreaSqm,
+          };
+        }),
+        doors: doors?.map((d) => {
+          const doorEl = elements?.find(el => el.id === d.id);
+          let isExterior = false;
+          if (doorEl) {
+             if (doorEl.metadata?.isMainEntrance) {
+               isExterior = true;
+             } else {
+               // Fallback geometric: Check how many rooms it intersects
+               const cx = doorEl.x + doorEl.width / 2;
+               const cy = doorEl.y + doorEl.height / 2;
+               const intersectingRooms = elements?.filter(el => {
+                 if (el.type !== 'room') return false;
+                 return (
+                   cx >= el.x - 15 && cx <= el.x + el.width + 15 &&
+                   cy >= el.y - 15 && cy <= el.y + el.height + 15
+                 );
+               }) ?? [];
+               // If it intersects < 2 rooms, it's an exterior door
+               isExterior = intersectingRooms.length < 2;
+             }
+          }
+          return { id: d.id, widthM: d.widthM, isExterior };
+        }),
         buildingPurpose: buildingPurpose ?? 'residential',
       };
 

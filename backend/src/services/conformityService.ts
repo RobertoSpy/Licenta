@@ -8,7 +8,7 @@ const conformityRules = rawRules as {
     targets: string[];
     min_sqm: number;
     severity: string;
-    source_ref: string;
+    _source: string;
     applies_to?: string[];
   }>;
   clearance_rules: Array<{
@@ -17,7 +17,16 @@ const conformityRules = rawRules as {
     property: string;
     value: number;
     severity: string;
-    source_ref: string;
+    _source: string;
+    applies_to?: string[];
+  }>;
+  environmental_rules: Array<{
+    code: string;
+    targets: string[];
+    property: string;
+    value: number;
+    severity: string;
+    _source: string;
     applies_to?: string[];
   }>;
 };
@@ -33,11 +42,13 @@ export interface ConformityRoomInput {
   usableSqm: number;
   widthM?: number;
   heightM?: number;
+  windowAreaSqm?: number;
 }
 
 export interface ConformityDoorInput {
   id: string;
   widthM: number;
+  isExterior?: boolean;
 }
 
 export type ConformitySeverity = 'warning' | 'error';
@@ -71,14 +82,14 @@ export interface ConformityEvaluation {
 
 // ─────────────────────────────────────────────────────────────────
 // Construim lookup-ul din JSON la startup (O(1) la runtime)
-// { "living": { min: 18, source_ref: "...", code: "...", severity: "error" }, ... }
+// { "living": { min: 18, _source: "...", code: "...", severity: "error" }, ... }
 // ─────────────────────────────────────────────────────────────────
 
 interface RoomMinRule {
   min: number;
   code: string;
   severity: ConformitySeverity;
-  source_ref: string;
+  _source: string;
   applies_to?: string[];
 }
 
@@ -92,7 +103,7 @@ for (const rule of conformityRules.room_min_sqm) {
         min: rule.min_sqm,
         code: rule.code,
         severity: rule.severity as ConformitySeverity,
-        source_ref: rule.source_ref,
+        _source: rule._source,
         applies_to: rule.applies_to,
       }
     );
@@ -117,47 +128,69 @@ function normalizeLabel(label?: string): string {
 // Evaluare cameră — citit exclusiv din ROOM_MIN_LOOKUP (JSON)
 // ─────────────────────────────────────────────────────────────────
 
+function getEnvironmentalRule(code: string, buildingPurpose: string) {
+  return conformityRules.environmental_rules?.find((r) => r.code === code && (!r.applies_to || r.applies_to.includes(buildingPurpose)));
+}
+
 function evaluateRoom(room: ConformityRoomInput, buildingPurpose: string): ConformityRoomResult {
   const key = normalizeLabel(room.label);
   const rule = ROOM_MIN_LOOKUP.get(key);
   const issues: ConformityRuleIssue[] = [];
 
-  if (!rule) {
-    return { id: room.id, status: 'ok', issues };
+  // Validare Suprafață (Existent)
+  if (rule && (!rule.applies_to || rule.applies_to.includes(buildingPurpose))) {
+    const isWarning = room.usableSqm < rule.min && room.usableSqm >= rule.min * 0.9;
+    const isError = room.usableSqm < rule.min * 0.9;
+
+    if (isWarning || isError) {
+      const severity: ConformitySeverity = isError ? 'error' : 'warning';
+      const delta = parseFloat((rule.min - room.usableSqm).toFixed(2));
+
+      issues.push({
+        targetType: 'room',
+        targetId: room.id,
+        code: rule.code,
+        severity,
+        article: rule._source,
+        message: `Suprafața utilă este sub minimul legal pentru "${room.label ?? 'Cameră'}" (${rule._source}).`,
+        currentValue: room.usableSqm,
+        requiredValue: rule.min,
+        deltaValue: delta,
+        suggestion: `Mărește camera cu cel puțin ${delta} m² util.`,
+      });
+    }
   }
 
-  if (rule.applies_to && !rule.applies_to.includes(buildingPurpose)) {
-    return { id: room.id, status: 'ok', issues };
+  // Validare Fereastră (Ratios)
+  if (room.windowAreaSqm !== undefined) {
+    const isDayRoom = ['living', 'sufragerie', 'cameradezi', 'dormitor', 'camera', 'cameraparintilor'].some(k => key.includes(k));
+    const code = isDayRoom ? 'NP057_WINDOW_FLOOR_RATIO_LIVING' : 'NP057_WINDOW_FLOOR_RATIO_OTHER';
+    const envRule = getEnvironmentalRule(code, buildingPurpose);
+
+    if (envRule) {
+      const ratio = room.windowAreaSqm / room.usableSqm;
+      if (ratio < envRule.value) {
+        issues.push({
+          targetType: 'room',
+          targetId: room.id,
+          code: envRule.code,
+          severity: envRule.severity as ConformitySeverity,
+          article: envRule._source,
+          message: `Raportul de arie vitrată (fereastră/pardoseală) este insuficient pentru iluminat natural corespunzător.`,
+          currentValue: parseFloat(ratio.toFixed(3)),
+          requiredValue: envRule.value,
+          deltaValue: parseFloat((envRule.value - ratio).toFixed(3)),
+          suggestion: `Mărește lățimea ferestrei din proprietăți sau adaugă ferestre noi pentru a atinge raportul minim.`,
+        });
+      }
+    }
   }
 
-  const isWarning = room.usableSqm < rule.min && room.usableSqm >= rule.min * 0.9;
-  const isError = room.usableSqm < rule.min * 0.9;
+  const hasError = issues.some(i => i.severity === 'error');
+  const hasWarning = issues.some(i => i.severity === 'warning');
+  const status: ConformityRoomResult['status'] = hasError ? 'error' : hasWarning ? 'warning' : 'ok';
 
-  if (isWarning || isError) {
-    const severity: ConformitySeverity = isError ? 'error' : 'warning';
-    const delta = parseFloat((rule.min - room.usableSqm).toFixed(2));
-
-    issues.push({
-      targetType: 'room',
-      targetId: room.id,
-      code: rule.code,
-      severity,
-      article: rule.source_ref,
-      message: `Suprafața utilă este sub minimul legal pentru "${room.label ?? 'Cameră'}" (${rule.source_ref}).`,
-      currentValue: room.usableSqm,
-      requiredValue: rule.min,
-      deltaValue: delta,
-      suggestion: `Mărește camera cu cel puțin ${delta} m² util.`,
-    });
-  }
-
-  const status: ConformityRoomResult['status'] = isError
-    ? 'error'
-    : isWarning
-      ? 'warning'
-      : 'ok';
-
-  return { id: room.id, status, minRequiredSqm: rule.min, issues };
+  return { id: room.id, status, minRequiredSqm: rule?.min, issues };
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -221,26 +254,41 @@ export const conformityService = {
       }
     }
 
+    const mainDoorRuleJSON = getClearanceRule('NP057_DOOR_ENTRANCE_MAIN', purpose);
+    const intDoorRuleJSON = getClearanceRule('NP057_DOOR_INTERIOR_WIDTH', purpose);
+    const mainDoorMinM = mainDoorRuleJSON?.value ?? 0.9;
+    const intDoorMinM = intDoorRuleJSON?.value ?? 0.8;
+
     // Verificare lățime uși
     if (options?.doors?.length) {
       for (const door of options.doors) {
-        if (door.widthM < doorMinM) {
-          const delta = parseFloat((doorMinM - door.widthM).toFixed(2));
+        const isExterior = door.isExterior;
+        const requiredMinM = isExterior ? mainDoorMinM : intDoorMinM;
+        const code = isExterior ? 'NP057_DOOR_ENTRANCE_MAIN' : 'NP057_DOOR_INTERIOR_WIDTH';
+        
+        if (door.widthM < requiredMinM) {
+          const delta = parseFloat((requiredMinM - door.widthM).toFixed(2));
           extraIssues.push({
             targetType: 'door',
             targetId: door.id,
-            code: 'P118_DOOR_WIDTH',
-            severity: 'warning',
-            article: 'P118-99',
-            message: 'Lățimea ușii este sub minimul recomandat pentru evacuare.',
+            code,
+            severity: 'error',
+            article: 'NP057/2002',
+            message: `Lățimea ușii ${isExterior ? 'principale' : 'interioare'} este sub minimul legal.`,
             currentValue: door.widthM,
-            requiredValue: doorMinM,
+            requiredValue: requiredMinM,
             deltaValue: delta,
             suggestion: `Mărește lățimea ușii cu cel puțin ${delta} m.`,
-            sources: doorRuleRAG?.sources,
           });
         }
       }
+    }
+
+    // Validare implicită pentru înălțimea tavanului (trece automat de 2.0m pe etaje curente cu 2.7m)
+    const ceilingRule = getClearanceRule('NP057_INTERIOR_HEIGHT', purpose);
+    if (ceilingRule) {
+       // În plan 2D nu avem control pe Z, asumăm standardul de 2.7m.
+       // Nu ridicăm eroare, doar dacă ar fi necesar un raport info.
     }
 
     const roomIssues = roomResults.flatMap((room) => room.issues);

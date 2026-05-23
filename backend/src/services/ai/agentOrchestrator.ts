@@ -5,6 +5,7 @@ import { searchHybrid, ragService } from './ragService';
 import { embeddingService } from './embeddingService';
 import { bomService } from '../bomService';
 import type { RoomSuggestion, SuggestRoomsInput } from '../../types/roomSuggestion';
+import conformityRules from '../../data/conformity-rules.json';
 
 // ============================================================
 // SEMANTIC ROUTING DESCRIPTIONS
@@ -16,7 +17,8 @@ const AGENT_DESCRIPTIONS: Partial<Record<AgentType, string>> = {
   structural: "Structura de rezistență, materiale de construcție, beton, armătură, fier, zidărie, stâlpi, grinzi, planșee și acoperiș.",
   architectural: "Design, arhitectură, planul casei, spații, compartimentare, scări, uși, ferestre, fațadă, iluminat, ventilare și funcționalitate.",
   legal: "Legislație, autorizații de construire, certificat de urbanism, primărie, vecini, retrageri, limite de proprietate, suprafețe minime legale și avize.",
-  deviz: "Costuri, prețuri, buget, estimare financiară, cheltuieli, oferte și achiziții de materiale."
+  deviz: "Costuri, prețuri, buget, estimare financiară, cheltuieli, oferte și achiziții de materiale.",
+  energetic: "Eficiență energetică, clasă energetică, izolație termică, audit energetic, norme NZEB, consum energie."
 };
 
 let cachedAgentEmbeddings: Record<string, number[]> | null = null;
@@ -86,6 +88,7 @@ export const SCREEN_AGENTS: Record<string, AgentType[]> = {
   editor:  ['legal', 'structural'],
   bom:     ['structural', 'materiale', 'deviz'],
   timeline:['legal', 'structural'],
+  energy:  ['energetic', 'structural'],
 };
 
 // ============================================================
@@ -260,6 +263,7 @@ function agentLabel(agents: AgentType[]): string {
     legal:         'Legislație & Urbanism',
     materiale:     'Cataloage Materiale',
     deviz:         'Deviz & Estimare Costuri',
+    energetic:     'Eficiență Energetică',
     general:       'General',
   };
   return agents.map(a => labels[a]).join(', ');
@@ -269,10 +273,14 @@ function agentLabel(agents: AgentType[]): string {
 // STATUS DISCLAIMER — pentru normative în revizuire
 // ============================================================
 function getStatusDisclaimer(agents: AgentType[]): string {
+  let disclaimer = '';
   if (agents.includes('seismic')) {
-    return '\n⚠️ **Notă normativ:** P100-1/2013 este versiunea în vigoare. P100-1/2025 este în stadiu de redactare și nu a intrat în vigoare.\n';
+    disclaimer += '\n⚠️ **Notă normativ:** P100-1/2013 este versiunea în vigoare. P100-1/2025 este în stadiu de redactare și nu a intrat în vigoare.\n';
   }
-  return '';
+  if (agents.includes('legal') || agents.includes('architectural')) {
+    disclaimer += '\n⚠️ **Notă normativ:** NP057-2002 (normativul locuințelor) se află pe lista MDLPA de reglementări propuse spre revizuire. Cifrele folosite reprezintă prevederile legal în vigoare la acest moment.\n';
+  }
+  return disclaimer;
 }
 
 // ============================================================
@@ -507,7 +515,7 @@ weightRatio: 0.5 (mic) → 4.0 (mare)`;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const response = await getAi().models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-pro',
         contents: prompt,
         config: { 
           temperature: 0.2, // predictibil, nu creativ
@@ -524,6 +532,17 @@ weightRatio: 0.5 (mic) → 4.0 (mare)`;
 
       if (parsed.totalEstimatedSqm < targetArea * 0.75) {
         throw new Error(`Validare eșuată: AI a generat doar ${parsed.totalEstimatedSqm}mp din ${targetArea}mp ceruți.`);
+      }
+
+      // După parsare JSON, validare deterministă (SSOT din conformity-rules.json)
+      const normalizeLabel = (label?: string) => (label ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+      for (const room of parsed.rooms) {
+        const rule = conformityRules.room_min_sqm.find(r => 
+          r.targets.includes(normalizeLabel(room.type))
+        );
+        if (rule && (room.minSqm === null || room.minSqm < rule.min_sqm)) {
+          room.minSqm = rule.min_sqm; // corectare automată
+        }
       }
 
       console.log(`[suggestRoomProgram] OK — ${parsed.rooms.length} camere, ${input.familySize} pers, stil ${input.houseStyle}.`);

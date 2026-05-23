@@ -72,6 +72,13 @@ model Project {
   totalFloorAreaSqm   Float?   // calculat la publish din plan
   planStatus          String?  // "draft" | "published" | "approved"
 
+  // Faza 3 — BOM, timeline și energie
+  estimatedCost   Float?    // suma totală BOM cu TVA
+  energyClass     String?   // "A" | "B" | "C" | "D" | "E" | "F" | "G"
+  energyKwhYear   Float?    // consum estimat kWh/mp/an
+  bomGeneratedAt  DateTime? // ultima generare BOM
+  constructionPhases ConstructionPhase[]
+
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
@@ -80,28 +87,80 @@ model Project {
 
 // 3. Catalogul de Materiale 
 model Material {
-  id          Int      @id @default(autoincrement())
-  name        String   
-  category    String   
-  unit        String   
-  price       Float    
-  storeUrl    String?  
+  id           Int      @id @default(autoincrement())
+  internalCode String   @unique // "bca-ytong-25cm", "bca-ytong-12cm"
+  name         String   // "BCA Ytong 25cm"
+  category     String   // "Zidărie" | "Fundație" | "Finisaje" | "Acoperiș" | "Tâmplărie"
+  subcategory  String?  // "Pereți exteriori" | "Pereți interiori"
+  unit         String   // "mp" | "mc" | "buc" | "kg" | "ml"
+  pricePerUnit Float    // RON (prețul de bază din seedMaterials, actualizat prin scraping)
+  brand        String?  // "Ytong" | "Tondach" | "Porta Doors"
+  storeUrl     String?  // URL produs direct în magazin
+  description  String?  // scurtă descriere tehnică
+  uValue       Float?   // coeficient transmitanță termică (W/m²K) pentru calcul energetic
+  isDefault    Boolean  @default(false) // materialul implicit pentru categoria sa
   
-  bomItems    ProjectBOM[] 
+  alternatives Material[] @relation("MaterialAlternatives") // materiale alternative similare
+  alternativeOf Material[] @relation("MaterialAlternatives")
+
+  bomItems     ProjectBOM[]
+  priceHistory PriceHistory[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([category])
+  @@index([internalCode])
 }
 
-// 4. Devizul 
+// Istoricul de preț — pentru grafice trend și alertă variație
+model PriceHistory {
+  id         Int      @id @default(autoincrement())
+  materialId Int
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  price      Float
+  scrapedAt  DateTime @default(now())
+  source     String   // "leroy-merlin" | "dedeman" | "baumit" | "manual"
+
+  @@index([materialId])
+}
+
+// 4. Devizul proiectului
 model ProjectBOM {
   id          Int      @id @default(autoincrement())
-  
   projectId   Int
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
   materialId  Int
-  material    Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  
-  quantity    Float    
-  totalPrice  Float   
+  material    Material @relation(fields: [materialId], references: [id])
+
+  phase       String   // "Fundație" | "Structură" | "Planșeu" | "Acoperiș" | "Tâmplărie" | "Finisaje Brute" | "Finisaje Fine"
+  formulaKey  String   // "wall_exterior_bca_25cm" — referință la formula folosită
+  quantity    Float    // cantitatea calculată (după waste factor)
+  unitPrice   Float    // prețul snapshot la momentul calculului
+  totalPrice  Float    // quantity × unitPrice
+  note        String?  // "24ml perete exterior × 2.7m înălțime = 64.8mp"
+
+  createdAt   DateTime @default(now())
+
+  @@index([projectId, phase])
+}
+
+// Etapele construcției — generate per proiect din construction-phases.json
+model ConstructionPhase {
+  id          Int      @id @default(autoincrement())
+  projectId   Int
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  phaseOrder  Int      // 1-7 (ordinea cronologică)
+  name        String   // "Fundație", "Structură", "Acoperiș" etc.
+  description String?  // scurtă descriere a lucrărilor
+  durationDays Int?    // estimare durata în zile (din construction-phases.json)
+  isCompleted Boolean  @default(false) // utilizatorul poate bifa etapele completate
+  completedAt DateTime?
+  notes       String?  // note ale utilizatorului per etapă
+
+  @@index([projectId])
+  @@unique([projectId, phaseOrder])
 }
 
 // === PENTRU RAG ===

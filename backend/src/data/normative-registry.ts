@@ -36,6 +36,7 @@ export type AgentType =
   | 'architectural'
   | 'legal'
   | 'general'
+  | 'energetic'  // Phase 3 placeholder — AGENT_SOURCES gol, nu face query DB
   | 'materiale'  // Phase 3 placeholder — AGENT_SOURCES gol, nu face query DB
   | 'deviz';     // Phase 3 placeholder — AGENT_SOURCES gol, nu face query DB
 
@@ -250,6 +251,7 @@ export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType,
     seismic:       ['P100-1-2013'],
     geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
     general:       ACTIVE_SOURCES_RESIDENTIAL,
+    energetic:     [], // populated in Phase 3 — Legea372-2005, MC001-2022
     materiale:     [],
     deviz:         [],
   },
@@ -260,6 +262,7 @@ export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType,
     seismic:       ['P100-1-2013'],
     geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
     general:       ACTIVE_SOURCES,
+    energetic:     [],
     materiale:     [],
     deviz:         [],
   },
@@ -270,6 +273,7 @@ export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType,
     seismic:       ['P100-1-2013'],
     geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
     general:       ACTIVE_SOURCES,
+    energetic:     [],
     materiale:     [],
     deviz:         [],
   },

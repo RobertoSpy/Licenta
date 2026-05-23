@@ -7,7 +7,8 @@
     "predev": "npx prisma generate && npx prisma migrate deploy",
     "dev": "nodemon -L src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "seed:normatives": "ts-node -T src/scripts/seedNormatives.ts"
+    "seed:normatives": "ts-node -T src/scripts/seedNormatives.ts",
+    "seed:materials": "ts-node -T src/scripts/seedMaterials.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
