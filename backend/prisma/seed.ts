@@ -7,9 +7,9 @@ async function main() {
 
   await prisma.material.createMany({
     data: [
-      { name: 'Cărămidă Porotherm 25', category: 'Zidărie', unit: 'Bucată', price: 8.5, storeUrl: 'https://dedeman.ro/caramida' },
-      { name: 'Ciment Structo Plus 40kg', category: 'Fundație', unit: 'Sac', price: 25.9, storeUrl: 'https://dedeman.ro/ciment' },
-      { name: 'Parchet Laminat Stejar 8mm', category: 'Finisaje', unit: 'Mp', price: 45.0, storeUrl: 'https://dedeman.ro/parchet' },
+      { internalCode: 'seed-porotherm-25', name: 'Cărămidă Porotherm 25', category: 'Zidărie', unit: 'Bucată', pricePerUnit: 8.5, storeUrl: 'https://dedeman.ro/caramida' },
+      { internalCode: 'seed-structo-40', name: 'Ciment Structo Plus 40kg', category: 'Fundație', unit: 'Sac', pricePerUnit: 25.9, storeUrl: 'https://dedeman.ro/ciment' },
+      { internalCode: 'seed-parchet-stejar', name: 'Parchet Laminat Stejar 8mm', category: 'Finisaje', unit: 'Mp', pricePerUnit: 45.0, storeUrl: 'https://dedeman.ro/parchet' },
     ],
   })
 

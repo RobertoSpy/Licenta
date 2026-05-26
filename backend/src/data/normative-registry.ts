@@ -38,6 +38,7 @@ export type AgentType =
   | 'general'
   | 'energetic'  // Phase 3 placeholder — AGENT_SOURCES gol, nu face query DB
   | 'materiale'  // Phase 3 placeholder — AGENT_SOURCES gol, nu face query DB
+  | 'instalatii' // I9-2022 (sanitare) si I7-2011 (electrice)
   | 'deviz';     // Phase 3 placeholder — AGENT_SOURCES gol, nu face query DB
 
 export interface NormativeConfig {
@@ -205,6 +206,38 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
       { pattern: /dormitor|living|bucătărie|baie|salon|sufragerie/i,                      agent: 'legal' },
     ],
   },
+
+  'MC001-2022': {
+    defaultAgent: 'energetic',
+    skipPatterns: [],
+    agentRules: [
+      { pattern: /performanță.*energetică|calcul.*energetic|izolație|audit.*energetic|NZEB|consum/i, agent: 'energetic' },
+    ],
+  },
+
+  'Legea372-2005': {
+    defaultAgent: 'energetic',
+    skipPatterns: [],
+    agentRules: [
+      { pattern: /certificat.*energetic|auditor|NZEB|performanță.*energetică/i, agent: 'energetic' },
+    ],
+  },
+
+  'I9-2022': {
+    defaultAgent: 'instalatii',
+    skipPatterns: [],
+    agentRules: [
+      { pattern: /apă.*rece|apă.*caldă|conductă|țeavă|canalizare|scurgere|sanitar/i, agent: 'instalatii' },
+    ],
+  },
+
+  'I7-2011': {
+    defaultAgent: 'instalatii',
+    skipPatterns: [],
+    agentRules: [
+      { pattern: /curent|electric|tensiune|cablu|priză|iluminat|tablou|împământare/i, agent: 'instalatii' },
+    ],
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -214,8 +247,8 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
 
 export const NORMATIVE_FILES: Record<string, string> = {
   'P100-1-2013':   'cod-de-proiectare-seismic-indicativ-P100-1-2013.pdf',
-  'NP112-2014':    'III_26_NP_112_2014.pdf',
-  'CR6-2013':      '', // nu există în docsAI — se va skip automat
+  'NP112-2014':    'III_26_NP_112_2014.md',
+  'CR6-2013':      'V_9_3_CR_6_2013.pdf',
   'NE012-1-2022':  'Monitorul Oficial Partea I nr. 53Bis - Ordin + anexa__NE 012-1-2022.pdf',
   'CR1-1-4-2012':  'CR-1-1-4-2012.pdf',
   'Legea114-1996': 'Legea_locuintei (2).pdf',
@@ -225,7 +258,11 @@ export const NORMATIVE_FILES: Record<string, string> = {
   'Legea350-2001': 'Lege 350 2001.pdf',
   'P118-99':       'P118-99.pdf',
   'NP051-2012':    '17_23_NP_051_2012.pdf',
-  'NP057-2002':    '17_18 _NP_057_2002.pdf',
+  'NP057-2002':    '17_18_NP_057_2002.md',
+  'I9-2022':       '45 NORMATIV I9 - 2022.pdf',
+  'I7-2011':       'Normativ-pentru-proiectarea-executia-si-exploatarea-instalatiilor-electrice-aferente-cladirilor-indicativ-I-7—2011.pdf',
+  'MC001-2022':    'Mc-001-2022-Metodologie-calcul-performanta-energetica-cladiri.pdf',
+  'Legea372-2005': 'legea-nr-372-2005-privind-performanta-energetica-a-cladirilor.pdf',
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -240,18 +277,17 @@ const ACTIVE_SOURCES = Object.entries(NORMATIVE_FILES)
 
 export type BuildingPurpose = 'residential' | 'commercial' | 'mixed';
 
-const ACTIVE_SOURCES_RESIDENTIAL = ACTIVE_SOURCES.filter(s => s !== 'P118-99');
-
 // Normative PER TIP CLĂDIRE
 export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType, string[]>> = {
   residential: {
-    architectural: ['CR1-1-4-2012', 'Legea350-2001', 'NP051-2012', 'NP057-2002'], // P118-99 exclus
+    architectural: ['CR1-1-4-2012', 'Legea350-2001', 'NP051-2012', 'NP057-2002', 'P118-99'],
     legal:         ['Legea114-1996', 'Legea50-1991', 'Legea10-1995', 'NP057-2002'],
-    structural:    ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012'], // P118-99 exclus
+    structural:    ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012', 'P118-99'],
     seismic:       ['P100-1-2013'],
     geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
-    general:       ACTIVE_SOURCES_RESIDENTIAL,
-    energetic:     [], // populated in Phase 3 — Legea372-2005, MC001-2022
+    general:       ACTIVE_SOURCES,
+    energetic:     ['MC001-2022', 'Legea372-2005'],
+    instalatii:    ['I9-2022', 'I7-2011'],
     materiale:     [],
     deviz:         [],
   },
@@ -262,7 +298,8 @@ export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType,
     seismic:       ['P100-1-2013'],
     geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
     general:       ACTIVE_SOURCES,
-    energetic:     [],
+    energetic:     ['MC001-2022', 'Legea372-2005'],
+    instalatii:    ['I9-2022', 'I7-2011'],
     materiale:     [],
     deviz:         [],
   },
@@ -273,7 +310,8 @@ export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType,
     seismic:       ['P100-1-2013'],
     geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
     general:       ACTIVE_SOURCES,
-    energetic:     [],
+    energetic:     ['MC001-2022', 'Legea372-2005'],
+    instalatii:    ['I9-2022', 'I7-2011'],
     materiale:     [],
     deviz:         [],
   },

@@ -20,11 +20,83 @@ export const validateRequest = (schema: z.ZodTypeAny) => {
   };
 };
 
+// ==========================================
+// SCHEME PENTRU AUTH
+// ==========================================
+export const registerSchema = z.object({
+  nume: z.string().min(2),
+  prenume: z.string().min(2),
+  telefon: z.string().optional(),
+  email: z.string().email(),
+  parola: z.string().min(6),
+}).strip();
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+}).strip();
+
+export const emailOnlySchema = z.object({
+  email: z.string().email(),
+}).strip();
+
+export const resetPasswordSchema = z.object({
+  token: z.string(),
+  newPassword: z.string().min(6),
+}).strip();
+
+// ==========================================
+// SCHEME PENTRU AI
+// ==========================================
+export const chatSchema = z.object({
+  message: z.string().min(1),
+  contextString: z.string().optional(),
+  conversationHistory: z.array(z.any()).optional(),
+  screenContext: z.any().optional(),
+  historySummary: z.string().nullable().optional(),
+}).strip();
+
+export const summarizeSchema = z.object({
+  conversationHistory: z.array(z.any()),
+  currentSummary: z.string().nullable().optional(),
+  projectId: z.union([z.string(), z.number()]).optional(), // pentru rutele cu save DB
+}).strip();
+
+export const suggestRoomsSchema = z.object({
+  projectId: z.union([z.string(), z.number()]),
+  projectData: z.any().optional(),
+  houseAreaSqm: z.number().min(10),
+  totalFloors: z.number().min(1),
+  screenContext: z.any().optional(),
+}).strip();
+
+// ==========================================
+// SCHEME PENTRU EDITOR / PROIECT
+// ==========================================
+export const createSnapshotSchema = z.object({
+  projectId: z.union([z.string(), z.number()]),
+  floorKey: z.string(),
+  elements: z.array(z.any()),
+  title: z.string().optional(),
+  isManual: z.boolean().optional(),
+}).strip();
+
+export const validateConformitySchema = z.object({
+  elements: z.array(z.any()),
+  floorKey: z.string().optional(),
+  projectData: z.any().optional(),
+}).strip();
+
+export const explainConformitySchema = z.object({
+  ruleId: z.string(),
+  itemContext: z.any(),
+}).strip();
+
 export const screen1Schema = z.object({
   lat: z.number().min(-90).max(90).nullable().optional(),
   lng: z.number().min(-180).max(180).nullable().optional(),
   county: z.string().optional(),
-}).refine(
+}).strip().refine(
   (data) => {
     if (data.lat != null && data.lng == null) return false;
     if (data.lng != null && data.lat == null) return false;

@@ -1,6 +1,6 @@
 import { NormativeChunk } from '@prisma/client';
 import { embeddingService } from './embeddingService';
-import { AgentType, AGENT_SOURCES_BY_PURPOSE } from '../../data/normative-registry';
+import { AgentType, AGENT_SOURCES_BY_PURPOSE, BuildingPurpose } from '../../data/normative-registry';
 import { normativeChunkRepository, RawChunkResult } from '../../repositories/normativeChunkRepository';
 
 // ─────────────────────────────────────────────────────────────────
@@ -19,75 +19,72 @@ import { normativeChunkRepository, RawChunkResult } from '../../repositories/nor
 //   de business: generare embeddings, filtrare surse, algoritm RRF și ordonare.
 // ─────────────────────────────────────────────────────────────────
 
+import { prisma } from '../../lib/prisma';
+
 export async function searchHybrid(
   question: string,
   agent: AgentType,
   limit: number = 5,
-  sourcesOverride?: string[]
+  sourcesOverride?: string[],
+  buildingPurpose: BuildingPurpose = 'residential'
 ): Promise<NormativeChunk[]> {
-
-  const allowedSources = sourcesOverride ?? AGENT_SOURCES_BY_PURPOSE['residential'][agent];
+  
+  const allowedSources = sourcesOverride ?? AGENT_SOURCES_BY_PURPOSE[buildingPurpose][agent];
   // Agenții fără surse configurate (Phase 3: materiale, deviz) nu au chunks în DB
   if (allowedSources.length === 0) {
     console.debug(`[ragService] Agentul "${agent}" nu are surse configurate — skip.`);
     return [];
   }
 
+  // Generează embedding din întrebarea ORIGINALĂ a utilizatorului
+  // Dense search e semantic — "sol argilos" găsește chunks cu "argilă", "pământ argilos" etc.
+  // Nu ai nevoie de keyword extraction pentru asta
   const questionVectorArray = await embeddingService.embed(question);
   const vectorStr = `[${questionVectorArray.join(',')}]`;
 
-  // Dacă agentul este 'general', nu filtrăm după agent în SQL
-  // (fallback global — caută în tot ce e indexat)
+  // Fallback global — caută în tot ce e indexat
   const isGeneral = agent === 'general';
+  
+  const sourcesPgArray = allowedSources.length > 0 ? allowedSources : ['_none_'];
 
-  // 1. DENSE SEARCH — similaritate semantică (cosine via pgvector)
-  const denseResults = await normativeChunkRepository.searchDense(vectorStr, agent, isGeneral);
+  // Query SQL direct din Prisma folosind pgvector
+  const denseSql = isGeneral
+    ? `SELECT id, source, agent, chapter, content, applicability,
+              1 - (embedding <=> $1::vector) as similarity
+       FROM "NormativeChunk"
+       WHERE status != 'abrogat'
+         AND source = ANY($2)
+         AND 1 - (embedding <=> $1::vector) > 0.55
+       ORDER BY similarity DESC
+       LIMIT $3`
+    : `SELECT id, source, agent, chapter, content, applicability,
+              1 - (embedding <=> $1::vector) as similarity
+       FROM "NormativeChunk"
+       WHERE agent = $2
+         AND status != 'abrogat'
+         AND source = ANY($3)
+         AND 1 - (embedding <=> $1::vector) > 0.55
+       ORDER BY similarity DESC
+       LIMIT $4`;
 
-  // Filtrare post-query pe sources — evită interpolare dinamică de array în SQL
-  const denseFiltered = denseResults.filter(r => allowedSources.includes(r.source));
+  const results = isGeneral
+    ? await prisma.$queryRawUnsafe<NormativeChunk[]>(denseSql, vectorStr, sourcesPgArray, limit)
+    : await prisma.$queryRawUnsafe<NormativeChunk[]>(denseSql, vectorStr, agent, sourcesPgArray, limit);
 
-  // 2. SPARSE SEARCH — BM25 via PostgreSQL full-text search
-  let sparseFiltered: RawChunkResult[] = [];
-  try {
-    const sparseResults = await normativeChunkRepository.searchSparse(question, agent, isGeneral);
-    sparseFiltered = sparseResults.filter(r => allowedSources.includes(r.source));
-  } catch {
-    // plainto_tsquery eșuează pe interogări prea scurte sau cu caractere speciale.
-    // Fallback silențios — dense-only e suficient în acest caz.
-    console.debug(`[ragService] Sparse search eșuat pentru agent="${agent}", fallback pe dense.`);
-  }
+  // Filtrare post-query pe applicability
+  const allowedApplicability: Array<'residential' | 'commercial' | 'mixed'> =
+    buildingPurpose === 'residential'
+      ? ['residential', 'mixed']
+      : buildingPurpose === 'commercial'
+      ? ['commercial', 'mixed']
+      : ['residential', 'commercial', 'mixed'];
 
-  if (sparseFiltered.length === 0) {
-    console.debug(`[ragService] Sparse: 0 rezultate pentru agent="${agent}".`);
-  }
-
-  // 3. RECIPROCAL RANK FUSION (RRF) — k=60 standard academic
-  // score(d) = Σ 1/(k + rank(d)), unde suma este peste toate listele de ranking
-  const k = 60;
-  const scoreMap = new Map<number, number>();
-
-  denseFiltered.forEach((r, rank) => {
-    scoreMap.set(r.id, (scoreMap.get(r.id) ?? 0) + 1 / (k + rank + 1));
-  });
-  sparseFiltered.forEach((r, rank) => {
-    scoreMap.set(r.id, (scoreMap.get(r.id) ?? 0) + 1 / (k + rank + 1));
-  });
-
-  if (scoreMap.size === 0) return [];
-
-  // Sortare după scor RRF → top `limit`
-  const sortedIds = [...scoreMap.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([id]) => id);
-
-  // Fetch final tip-safe prin repository
-  const finalChunks = await normativeChunkRepository.findChunksByIds(sortedIds);
-
-  // Re-sortare după scor RRF — Prisma nu garantează ordinea din IN clause
-  return finalChunks.sort(
-    (a, b) => (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0)
+  const finalResults = results.filter(
+    r => allowedApplicability.includes(r.applicability as any)
   );
+
+  console.log(`[denseSearch] agent=${agent}: ${finalResults.length} rezultate`);
+  return finalResults;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -102,7 +99,7 @@ export const ragService = {
    */
   async searchRelevantChunks(question: string, limit: number = 3): Promise<string> {
     try {
-      const chunks = await searchHybrid(question, 'general', limit);
+      const chunks = await searchHybrid(question, 'general', limit, undefined, 'mixed');
 
       if (!chunks || chunks.length === 0) {
         return 'Nu am găsit informații relevante în normativele indexate.';

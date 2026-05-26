@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getAccessToken } from '../../api/axios';
+import { fetchWithAuth } from '../../api/axios';
 
 // Icons simple svg
 const BrainIcon = () => (
@@ -64,9 +64,6 @@ export const AIChatBubble: React.FC<AIChatBubbleProps> = ({ contextData, welcome
     setIsStreaming(true);
 
     try {
-      // Token-ul se citește din memorie (in-memory token pattern), NU din localStorage
-      const token = getAccessToken();
-
       // Construim istoricul conversației pentru backend (ultimele 10 mesaje pentru context)
       // Excludem ultimul mesaj AI (încă gol) din history
       const conversationHistory = messages.slice(-10).map(m => ({
@@ -74,11 +71,10 @@ export const AIChatBubble: React.FC<AIChatBubbleProps> = ({ contextData, welcome
         text: m.content,
       }));
 
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetchWithAuth('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           message: userMessageText,

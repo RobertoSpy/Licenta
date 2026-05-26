@@ -67,3 +67,32 @@ apiPrivate.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Utilitar pentru apeluri `fetch` (SSE) care au nevoie de Refresh Token automat
+// deoarece fetch() nu trece prin interceptorul axios de mai sus.
+export const fetchWithAuth = async (url: string, options: RequestInit = {}): Promise<Response> => {
+  let token = getAccessToken();
+  const getHeaders = () => ({
+    ...options.headers,
+    'Authorization': `Bearer ${token}`,
+  });
+
+  let response = await fetch(url, { ...options, headers: getHeaders() });
+
+  if (response.status === 401) {
+    try {
+      const refreshRes = await api.post('/auth/refresh');
+      token = refreshRes.data.accessToken;
+      setAccessToken(token);
+      
+      // Retry
+      response = await fetch(url, { ...options, headers: getHeaders() });
+    } catch (err) {
+      setAccessToken(null);
+      window.dispatchEvent(new Event('auth:unauthorized'));
+      throw err;
+    }
+  }
+
+  return response;
+};

@@ -7,6 +7,7 @@ const getAi = () => {
 };
 
 export interface MaterialAnalysis {
+  standardCode: string;
   category: string;
   subcategory: string;
   unit: string;
@@ -21,6 +22,10 @@ export interface MaterialAnalysis {
 export const materialAnalysisSchema: Schema = {
   type: Type.OBJECT,
   properties: {
+    standardCode: {
+      type: Type.STRING,
+      description: "Codul standard al materialului din taxonomia de bază. Trebuie să alegi obligatoriu una din aceste valori: STANDARD_BETON_C20_25, STANDARD_FIER_12, STANDARD_PLACAJ_COFRARE, STANDARD_BCA_25, STANDARD_BCA_12, STANDARD_TIGLA_CERAMICA, STANDARD_LEMN_STRUCTURA, STANDARD_SAPA, STANDARD_TENCUIALA, STANDARD_USA_EXTERIOR, STANDARD_USA_INTERIOR, STANDARD_FEREASTRA_PVC, STANDARD_VATA_BAZALTICA, sau CUSTOM_MATERIAL dacă nu se potrivește cu nimic."
+    },
     category: {
       type: Type.STRING,
       description: "Categoria principală. Valori posibile: Zidărie, Fundație, Finisaje Brute, Finisaje Fine, Acoperiș, Tâmplărie, Izolație, Armătură"
@@ -59,20 +64,21 @@ export const materialAnalysisSchema: Schema = {
       description: "Un array cu 1-3 tipuri generice de materiale alternative (ex: pentru BCA, alternativa e 'Cărămidă portantă')."
     }
   },
-  required: ["category", "unit", "pros", "cons", "description", "genericAlternatives"]
+  required: ["standardCode", "category", "unit", "pros", "cons", "description", "genericAlternatives"]
 };
 
 export class MaterialAnalyzerService {
   async analyzeMaterial(rawTitle: string, price: number, url: string): Promise<MaterialAnalysis | null> {
     const ai = getAi();
     
-    const prompt = `Ești un expert în materiale de construcții rezidențiale din România.
-Sistemul nostru a extras următorul material dintr-un magazin online:
+    const prompt = `Ești un Data Engineer și expert în materiale de construcții rezidențiale din România.
+Sistemul nostru a extras următorul produs real dintr-un magazin online:
 Titlu: "${rawTitle}"
 Preț: ${price} RON
 URL Sursă: ${url}
 
-Analizează acest material și întoarce un JSON structurat conform schemei cerute. Deduceți corect categoria și unitatea de măsură folosită de regulă în devize pentru el.
+Analizează acest material și întoarce un JSON structurat conform schemei cerute. Deduceți corect categoria și unitatea de măsură folosită de regulă în devize.
+Mapează-l obligatoriu pe un 'standardCode' corespunzător sistemului de devize (BOM).
 Furnizează argumente 'pros' și 'cons' utile pentru un viitor proprietar de casă.`;
 
     try {

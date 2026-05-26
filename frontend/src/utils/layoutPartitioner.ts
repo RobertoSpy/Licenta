@@ -41,6 +41,30 @@ export interface ConfiguratorDimensions {
   wingLengthM?: number;
 }
 
+export function calculateShapeArea(shape: string, dims: ConfiguratorDimensions): number {
+  const w = dims.widthM;
+  const h = dims.heightM;
+  const ww = dims.wingWidthM ?? 4;
+  const wl = dims.wingLengthM ?? 4;
+
+  if (shape === 'rectangle') {
+    return w * h;
+  } else if (shape === 'l_shape') {
+    const w1 = Math.min(ww, w - 2);
+    const h2 = Math.min(wl, h - 2);
+    return w1 * h + (w - w1) * h2;
+  } else if (shape === 'u_shape') {
+    const w1 = Math.min(ww, w / 2.5);
+    const h2 = Math.min(wl, h - 2);
+    return 2 * w1 * h + (w - 2 * w1) * h2;
+  } else if (shape === 't_shape') {
+    const h1 = Math.min(wl, h / 2.2);
+    const w2 = Math.min(ww, w - 2);
+    return w * h1 + w2 * (h - h1);
+  }
+  return w * h;
+}
+
 // Bounding box interface in meters
 interface BBoxM {
   x: number;
@@ -594,6 +618,15 @@ export function generateConfiguratorLayout(
       });
     }
   }
+
+  console.log('Elements generate:', {
+    total: elements.length,
+    walls: elements.filter(e => e.type === 'wall').length,
+    rooms: elements.filter(e => e.type === 'room').length,
+    doors: elements.filter(e => e.type === 'door').length,
+    windows: elements.filter(e => e.type === 'window').length,
+    stairs: elements.filter(e => e.type === 'stairs').length,
+  });
 
   return elements;
 }

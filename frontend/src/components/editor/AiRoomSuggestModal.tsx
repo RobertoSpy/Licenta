@@ -64,7 +64,7 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
   const [error, setError]             = useState<string | null>(null);
   const [isSavingFloors, setIsSavingFloors] = useState(false);
 
-  const { setActiveRooms, setDimensions, houseShape, switchFloor, streetOrientation } = useEditorState();
+  const { setActiveRooms, houseShape, dimensions, switchFloor, streetOrientation } = useEditorState();
 
   const handleGenerate = async () => {
     setStep('loading');
@@ -83,33 +83,16 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
     if (!suggestion) return;
     setIsSavingFloors(true);
     
-    // Bounding Box Math logic — per etaj
-    const A = houseAreaSqm / totalFloors; // suprafață pe un nivel
-    let W = 10;
-    let H = 10;
+    // Folosim dimensiunile EXISTENTE din store — nu le recalculăm
+    // Astfel, forma și dimensiunile setate manual de utilizator sunt respectate
+    const dims = {
+      widthM: dimensions.widthM,
+      heightM: dimensions.heightM,
+      wingWidthM: dimensions.wingWidthM ?? Math.round(dimensions.widthM / 2.5),
+      wingLengthM: dimensions.wingLengthM ?? Math.round(dimensions.heightM / 2),
+    };
 
-    if (houseShape === 'rectangle') {
-      H = Math.sqrt(A / 1.3);
-      W = H * 1.3;
-    } else if (houseShape === 'l_shape') {
-      W = Math.sqrt(A / 0.75);
-      H = Math.sqrt(A / 0.75);
-    } else if (houseShape === 'u_shape') {
-      H = Math.sqrt(A / (0.65 * 1.3));
-      W = H * 1.3;
-    } else if (houseShape === 't_shape') {
-      W = Math.sqrt(A / 0.70);
-      H = Math.sqrt(A / 0.70);
-    } else {
-      W = Math.sqrt(A);
-      H = Math.sqrt(A);
-    }
-
-    const finalW = Math.round(W * 10) / 10;
-    const finalH = Math.round(H * 10) / 10;
-    setDimensions({ widthM: finalW, heightM: finalH });
-
-    // Grupăm camerele pe etaje
+    // Grupăm camerele AI pe etaje
     const FLOOR_ORDER: FloorKey[] = ['parter', 'etaj1', 'etaj2', 'mansarda'];
     const byFloor: Record<string, typeof suggestion.rooms> = {};
     for (const room of suggestion.rooms) {
@@ -117,13 +100,10 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
       if (!byFloor[f]) byFloor[f] = [];
       byFloor[f].push(room);
     }
-
-    // Asigurăm că parterul are mereu camere (fallback)
+    // Fallback: dacă parterul e gol, punem toate camerele acolo
     if (!byFloor['parter'] || byFloor['parter'].length === 0) {
       byFloor['parter'] = suggestion.rooms;
     }
-
-    const dims = { widthM: finalW, heightM: finalH, wingWidthM: Math.round(finalW / 2.5), wingLengthM: Math.round(finalH / 2) };
 
     try {
       // Generăm și salvăm fiecare etaj în ordine
@@ -135,6 +115,15 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
           id: `ai-${floorKey}-${i}`,
           label: r.label,
           ratioValue: r.weightRatio,
+          // ── Proprietăți critice pentru generarea ferestrelor și ușilor ──
+          naturalLight:    r.naturalLight    ?? false,
+          hasDoorTo:       r.hasDoorTo       ?? [],
+          isCirculation:   r.isCirculation   ?? false,
+          hasStaircase:    r.hasStaircase    ?? false,
+          orientation:     r.orientation     ?? [],
+          minSqm:          r.minSqm          ?? undefined,
+          maxSqm:          r.maxSqm          ?? undefined,
+          mustAdjacentTo:  r.mustAdjacentTo  ?? [],
         }));
 
         const floorElements = generateConfiguratorLayout(houseShape, dims, configRooms, streetOrientation);
@@ -147,7 +136,20 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
         label: r.label,
         weightRatio: r.weightRatio,
       }));
-      const parterConfigRooms = parterRooms.map((r, i) => ({ id: `ai-parter-${i}`, label: r.label, ratioValue: r.weightRatio }));
+      const parterConfigRooms = byFloor['parter'].map((r, i) => ({
+        id: `ai-parter-${i}`,
+        label: r.label,
+        ratioValue: r.weightRatio,
+        // ── Proprietăți critice pentru generarea ferestrelor și ușilor ──
+        naturalLight:    r.naturalLight    ?? false,
+        hasDoorTo:       r.hasDoorTo       ?? [],
+        isCirculation:   r.isCirculation   ?? false,
+        hasStaircase:    r.hasStaircase    ?? false,
+        orientation:     r.orientation     ?? [],
+        minSqm:          r.minSqm          ?? undefined,
+        maxSqm:          r.maxSqm          ?? undefined,
+        mustAdjacentTo:  r.mustAdjacentTo  ?? [],
+      }));
       const parterElements = generateConfiguratorLayout(houseShape, dims, parterConfigRooms, streetOrientation);
       switchFloor('parter', parterElements);
       setActiveRooms(parterRooms);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiPrivate } from '../../api/axios';
-import { PackageSearch, Search, SlidersHorizontal } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { PackageSearch, Search, SlidersHorizontal, RefreshCw, CheckCircle2, XCircle, Plus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Material {
   id: number;
@@ -9,6 +9,9 @@ interface Material {
   category: string;
   price: number;
   unit: string;
+  inStock?: boolean;
+  stockQuantity?: number;
+  description?: string;
 }
 
 export const Materials = () => {
@@ -16,8 +19,13 @@ export const Materials = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Toate');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newMaterialUrl, setNewMaterialUrl] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
 
-  useEffect(() => {
+  const fetchMaterials = () => {
+    setIsLoading(true);
     apiPrivate.get('/materials')
       .then(res => {
         setMaterials(res.data);
@@ -28,7 +36,50 @@ export const Materials = () => {
       .finally(() => {
         setIsLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchMaterials();
   }, []);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await apiPrivate.post('/admin/scrape/sync');
+      fetchMaterials();
+    } catch (err) {
+      console.error("Eroare la sincronizare:", err);
+      alert("A apărut o eroare la sincronizare. Verifică consola.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleAddMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMaterialUrl) return;
+    
+    setIsAdding(true);
+    try {
+      // Pentru demo, folosim hardcodări generice care vor fi suprascrise de scraper
+      await apiPrivate.post('/admin/scrape/add', {
+        url: newMaterialUrl,
+        internalCode: `DEDEMAN_${Date.now()}`,
+        name: 'Se extrage...', // Va fi suprascris sau păstrat dacă nu găsește
+        category: 'Scraping Nou',
+        subcategory: 'Altele',
+        unit: 'buc'
+      });
+      setIsAddModalOpen(false);
+      setNewMaterialUrl('');
+      fetchMaterials();
+    } catch (err) {
+      console.error("Eroare la adăugare:", err);
+      alert("Eroare la importul materialului de pe Dedeman.");
+    } finally {
+      setIsAdding(false);
+    }
+  };
 
   const categories = ['Toate', ...Array.from(new Set(materials.map(m => m.category)))];
 
@@ -45,6 +96,7 @@ export const Materials = () => {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Materiale Bricolaj</h1>
           <p className="text-slate-500 mt-1">Găsește cele mai bune oferte de pe piață pentru construcția ta.</p>
         </div>
+        
         <div className="flex bg-white rounded-xl shadow-sm border border-slate-200 p-1">
           <div className="relative">
             <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -60,6 +112,25 @@ export const Materials = () => {
           <button className="hidden md:flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-buildorange transition-colors">
             <SlidersHorizontal className="w-5 h-5" />
             <span className="font-medium text-sm">Filtrează</span>
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-2.5 rounded-xl font-medium transition-colors shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            Adaugă prin URL
+          </button>
+          
+          <button 
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="flex items-center gap-2 bg-buildnavy hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-medium transition-colors shadow-sm disabled:opacity-70"
+          >
+            <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Se sincronizează...' : 'Sincronizare Live'}
           </button>
         </div>
       </div>
@@ -105,9 +176,24 @@ export const Materials = () => {
                   {mat.category}
                 </span>
               </div>
-              <h3 className="font-bold text-slate-800 text-lg leading-tight mb-4 flex-1">
+              <h3 className="font-bold text-slate-800 text-lg leading-tight mb-2 flex-1">
                 {mat.name}
               </h3>
+              
+              <div className="mb-4">
+                {mat.inStock !== false ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    În Stoc {mat.stockQuantity ? `(${mat.stockQuantity})` : ''}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-md">
+                    <XCircle className="w-3.5 h-3.5" />
+                    Stoc Epuizat
+                  </span>
+                )}
+              </div>
+
               <div className="flex items-end justify-between mt-auto pt-4 border-t border-slate-100">
                 <div>
                   <span className="text-2xl font-black text-buildorange">{mat.price.toFixed(2)}</span>
@@ -118,6 +204,59 @@ export const Materials = () => {
           ))}
         </div>
       )}
+
+      {/* Modal Adăugare URL */}
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl"
+            >
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Importă Material Dedeman</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                Lipește link-ul produsului de pe dedeman.ro. Sistemul (Puppeteer) va extrage automat detaliile.
+              </p>
+              
+              <form onSubmit={handleAddMaterial}>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://www.dedeman.ro/ro/..."
+                  value={newMaterialUrl}
+                  onChange={(e) => setNewMaterialUrl(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-buildorange focus:ring-1 focus:ring-buildorange outline-none mb-6"
+                />
+                
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium"
+                  >
+                    Anulează
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isAdding}
+                    className="flex items-center gap-2 bg-buildorange hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-medium disabled:opacity-70"
+                  >
+                    {isAdding && <RefreshCw className="w-4 h-4 animate-spin" />}
+                    {isAdding ? 'Se extrage...' : 'Importă'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

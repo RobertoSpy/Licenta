@@ -12,6 +12,9 @@ import aiRoutes from './routes/aiRoutes';
 import materialRoutes from './routes/materialRoutes';
 import editorRoutes from './routes/editorRoutes';
 import exportRoutes from './routes/exportRoutes';
+import bomRoutes from './routes/bomRoutes';
+import constructionRoutes from './routes/constructionRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 dotenv.config();
 
@@ -64,6 +67,9 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/materials', materialRoutes);
 app.use('/api/editor', editorRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/bom', bomRoutes);
+app.use('/api/construction', constructionRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ─────────────────────────────────────────────
 // 7. FALLBACK: Rută necunoscută

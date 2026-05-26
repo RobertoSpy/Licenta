@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import {
   generateConfiguratorLayout,
+  calculateShapeArea,
   type ConfiguratorRoom,
   type ConfiguratorDimensions,
 } from '../utils/layoutPartitioner';
@@ -283,9 +284,30 @@ export const useEditorState = create<EditorStore>((set, get) => ({
   markClean: () => set({ isDirty: false }),
 
   // Configurator actions
-  setHouseShape: (houseShape) => {
+  setHouseShape: (newShape) => {
     get().pushToUndo();
-    set({ houseShape });
+    const { houseShape: oldShape, dimensions } = get();
+    
+    if (oldShape !== newShape) {
+      const oldArea = calculateShapeArea(oldShape, dimensions);
+      const tempNewArea = calculateShapeArea(newShape, dimensions);
+      
+      if (tempNewArea > 0 && oldArea > 0) {
+        const scale = Math.sqrt(oldArea / tempNewArea);
+        
+        const newDims = {
+          widthM: parseFloat((dimensions.widthM * scale).toFixed(1)),
+          heightM: parseFloat((dimensions.heightM * scale).toFixed(1)),
+          wingWidthM: parseFloat(((dimensions.wingWidthM ?? 4) * scale).toFixed(1)),
+          wingLengthM: parseFloat(((dimensions.wingLengthM ?? 4) * scale).toFixed(1))
+        };
+        
+        set({ houseShape: newShape, dimensions: newDims });
+      } else {
+        set({ houseShape: newShape });
+      }
+    }
+    
     get().regenerateLayout();
   },
 

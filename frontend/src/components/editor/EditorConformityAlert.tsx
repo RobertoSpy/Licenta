@@ -70,6 +70,23 @@ export const EditorConformityAlert: React.FC<Props> = ({
 
   const hasViolations = violationIssues.length > 0 || violations.length > 0;
 
+  if (!isOpen) {
+    return (
+      <button 
+        onClick={() => setIsOpen(true)}
+        className={`fixed right-6 top-24 z-40 p-3 rounded-full shadow-lg flex items-center justify-center border transition-all hover:scale-105
+          ${hasViolations ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}
+        title="Avertismente & Conformitate"
+      >
+        <AlertTriangle className={`w-6 h-6 ${hasViolations ? 'text-red-500' : 'text-amber-500'}`} />
+        <span className={`absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm
+          ${hasViolations ? 'bg-red-500' : 'bg-amber-500'}`}>
+          {totalIssues}
+        </span>
+      </button>
+    );
+  }
+
   return (
     <AnimatePresence>
       <motion.div
@@ -79,7 +96,7 @@ export const EditorConformityAlert: React.FC<Props> = ({
         exit={{ x: 40, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 28 }}
         className={`
-          flex flex-col w-72 bg-white border rounded-2xl shadow-2xl z-30 overflow-hidden
+          flex flex-col w-72 bg-white border rounded-2xl shadow-2xl z-30 overflow-hidden fixed right-6 top-24
           ${hasViolations ? 'border-red-200' : 'border-amber-200'}
         `}
         style={{ maxHeight: 'calc(100vh - 120px)' }}
@@ -102,19 +119,12 @@ export const EditorConformityAlert: React.FC<Props> = ({
           </div>
 
           <div className="flex items-center gap-1">
-            {isOpen
-              ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-              : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-            }
-            {/* X — întotdeauna vizibil, nu afectat de collapse */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                // Ascunde panoul complet resetând starea locală
                 setIsOpen(false);
-                setAiExplanation('');
               }}
-              className="p-1 rounded-lg hover:bg-black/10 transition-colors ml-1"
+              className="p-1 rounded-lg hover:bg-black/10 transition-colors"
               title="Închide"
             >
               <X className="w-4 h-4 text-slate-500" />
@@ -123,61 +133,58 @@ export const EditorConformityAlert: React.FC<Props> = ({
         </div>
 
         {/* ── Body scrollabil ─────────────────────────────── */}
-        {isOpen && (
-          <div className="overflow-y-auto flex-1 p-4 space-y-3">
-
-            {/* Violări (erori) */}
-            {violationIssues.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide">Încălcări legale</p>
-                {violationIssues.map((issue) => (
-                  <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-2 bg-red-50 rounded-xl px-3 py-2">
-                    <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                    <div className="flex-1 text-xs">
-                      <div className="font-bold text-slate-900 leading-snug">{issue.message}</div>
-                      <div className="text-red-700 mt-0.5">
-                        {issue.currentValue} → {issue.requiredValue}
-                        {issue.deltaValue ? ` (−${Math.abs(issue.deltaValue)} lipsă)` : ''}
-                      </div>
-                      <div className="text-red-500 mt-1">{issue.suggestion}</div>
-                      {renderSources(issue.sources)}
+        <div className="overflow-y-auto flex-1 p-4 space-y-3">
+          {/* Violări (erori) */}
+          {violationIssues.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide">Încălcări legale</p>
+              {violationIssues.map((issue) => (
+                <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-2 bg-red-50 rounded-xl px-3 py-2">
+                  <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 text-xs">
+                    <div className="font-bold text-slate-900 leading-snug">{issue.message}</div>
+                    <div className="text-red-700 mt-0.5">
+                      {issue.currentValue} → {issue.requiredValue}
+                      {issue.deltaValue ? ` (−${Math.abs(issue.deltaValue)} lipsă)` : ''}
                     </div>
+                    <div className="text-red-500 mt-1">{issue.suggestion}</div>
+                    {renderSources(issue.sources)}
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
+          )}
 
-            {/* Avertismente */}
-            {warningIssues.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Recomandări</p>
-                {warningIssues.map((issue) => (
-                  <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-2 bg-amber-50 rounded-xl px-3 py-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <div className="flex-1 text-xs text-amber-800">
-                      <div className="font-bold leading-snug">{issue.message}</div>
-                      <div className="mt-1 text-amber-600">{issue.suggestion}</div>
-                      {renderSources(issue.sources)}
-                    </div>
+          {/* Avertismente */}
+          {warningIssues.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Recomandări</p>
+              {warningIssues.map((issue) => (
+                <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-2 bg-amber-50 rounded-xl px-3 py-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 text-xs text-amber-800">
+                    <div className="font-bold leading-snug">{issue.message}</div>
+                    <div className="mt-1 text-amber-600">{issue.suggestion}</div>
+                    {renderSources(issue.sources)}
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
+          )}
 
-            {/* AI Explicație */}
-            {(aiExplanation || isStreaming) && (
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  🤖 Zidario explică
-                  {isStreaming && <span className="inline-block w-1.5 h-3.5 bg-buildorange animate-pulse rounded-sm" />}
-                </p>
-                <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
-                  {aiExplanation}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+          {/* AI Explicație */}
+          {(aiExplanation || isStreaming) && (
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                🤖 Zidario explică
+                {isStreaming && <span className="inline-block w-1.5 h-3.5 bg-buildorange animate-pulse rounded-sm" />}
+              </p>
+              <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                {aiExplanation}
+              </p>
+            </div>
+          )}
+        </div>
       </motion.div>
     </AnimatePresence>
   );

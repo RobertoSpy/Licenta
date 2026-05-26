@@ -32,6 +32,14 @@ export const aiController = {
       res.setHeader('Connection', 'keep-alive');
       res.flushHeaders();
 
+      const timeoutId = setTimeout(() => {
+        res.write(`data: ${JSON.stringify({ error: 'Timeout 90s: Procesarea a durat prea mult.' })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }, 90000);
+
+      res.on('close', () => clearTimeout(timeoutId));
+
       // Apelăm orchestratorul cu screenContext opțional
       const stream = await agentOrchestrator.getAiStreamForChat(
         message,
@@ -48,12 +56,90 @@ export const aiController = {
         }
       }
 
+      clearTimeout(timeoutId);
       res.write('data: [DONE]\n\n');
       res.end();
 
     } catch (e: any) {
       console.error('[aiController.chatStream] Eroare:', e);
-      res.write(`data: ${JSON.stringify({ text: '\n[EROARE DE CONEXIUNE. ÎNCERCAȚI DIN NOU.]' })}\n\n`);
+      if (e?.status === 503 || String(e?.message).includes('503') || String(e?.message).includes('indisponibil')) {
+        res.write(`data: ${JSON.stringify({ 
+          error: 'Asistentul este momentan suprasolicitat. Încearcă din nou în 30 de secunde.' 
+        })}\n\n`);
+      } else {
+        res.write(`data: ${JSON.stringify({ error: 'Eroare internă de server.' })}\n\n`);
+      }
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
+  },
+
+  async explainMaterial(req: Request, res: Response): Promise<void> {
+    try {
+      const base = req.query.base as string;
+      const alt = req.query.alt as string;
+
+      if (!base || !alt) {
+        res.status(400).json({ error: 'base și alt sunt obligatorii' });
+        return;
+      }
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      const timeoutId = setTimeout(() => {
+        res.write(`data: ${JSON.stringify({ text: '\n[Eroare: Timeout 90s]' })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }, 90000);
+
+      res.on('close', () => clearTimeout(timeoutId));
+
+      const prompt = `Ești Zidario AI, un expert în inginerie civilă și optimizare bugete construcții rezidențiale. Explică pe scurt de ce un client ar trebui să aleagă '${alt}' în loc de '${base}', referindu-te la normative tehnice (ex: CR 6-2013 pentru zidărie, NE012 etc.) și confort termic. Max 100 cuvinte. Fii direct și profesionist.`;
+
+      // Simulam un call de RAG sau folosim modelul Gemini direct cu fallback
+      const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      let stream: any = null;
+      let lastError: any = null;
+      
+      for (const modelName of FALLBACK_MODELS) {
+        try {
+          stream = await getAi().models.generateContentStream({
+            model: modelName,
+            contents: prompt
+          });
+          break; // Succes, ieșim din buclă
+        } catch (e: any) {
+          lastError = e;
+          const is503 = e?.status === 503 || String(e?.message).includes('503') || String(e?.message).toLowerCase().includes('high demand');
+          if (is503) {
+            console.warn(`[explainMaterial] 503 cu ${modelName}, încercăm următorul...`);
+            continue;
+          }
+          console.warn(`[explainMaterial] Eroare cu ${modelName}, încercăm următorul... Motiv: ${e?.message?.substring(0, 100)}...`);
+          continue; // Mergem la următorul model
+        }
+      }
+      
+      if (!stream) {
+        console.error(`[explainMaterial] Toate modelele au eșuat. Ultima eroare:`, lastError?.message);
+        throw new Error('Serviciul este momentan indisponibil.');
+      }
+
+      for await (const chunk of stream) {
+        if (chunk.text) {
+          res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+        }
+      }
+
+      clearTimeout(timeoutId);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    } catch (e: any) {
+      console.error('[aiController.explainMaterial] Eroare:', e);
+      res.write(`data: ${JSON.stringify({ text: '\n[Eroare la generarea explicației.]' })}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();
     }
@@ -78,14 +164,37 @@ export const aiController = {
         ? `${systemPrompt}\n\n${text}`
         : text;
 
-      const result = await getAi().models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: fullPrompt,
-        config: {
-          maxOutputTokens: 400,
-          temperature: 0.3  // mai puțin creativ, mai determinist la rezumat
+      const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      let result: any = null;
+      let lastError: any = null;
+
+      for (const modelName of FALLBACK_MODELS) {
+        try {
+          result = await getAi().models.generateContent({
+            model: modelName,
+            contents: fullPrompt,
+            config: {
+              maxOutputTokens: 400,
+              temperature: 0.3  // mai puțin creativ, mai determinist la rezumat
+            }
+          });
+          break;
+        } catch (e: any) {
+          lastError = e;
+          const is503 = e?.status === 503 || String(e?.message).includes('503') || String(e?.message).toLowerCase().includes('high demand');
+          if (is503) {
+            console.warn(`[summarizeConversation] 503 cu ${modelName}, încercăm următorul...`);
+            continue;
+          }
+          console.warn(`[summarizeConversation] Eroare cu ${modelName}, încercăm următorul... Motiv: ${e?.message?.substring(0, 100)}...`);
+          continue;
         }
-      });
+      }
+
+      if (!result) {
+        console.error(`[summarizeConversation] Toate modelele au eșuat. Ultima eroare:`, lastError?.message);
+        throw new Error('Serviciul este momentan indisponibil.');
+      }
 
       const summary = result.text ?? '';
       res.json({ summary });
@@ -203,3 +312,104 @@ export const aiController = {
   },
 };
 
+// ─────────────────────────────────────────────────────────────────
+// EXPORT NAMED — validateMaterialOverride
+//
+// POST /api/ai/validate-override
+// Verifică dacă înlocuirea unui material este conformă normativ.
+// Returnează SSE cu verdict concis (Conform / Atenție / Neconform).
+// ─────────────────────────────────────────────────────────────────
+
+export async function validateMaterialOverride(req: Request, res: Response): Promise<void> {
+  try {
+    const {
+      originalMaterialName,
+      newMaterialName,
+      formulaKey,
+      projectContext,   // string deja formatat (seismicZone, soilType etc.)
+    } = req.body;
+
+    if (!originalMaterialName || !newMaterialName || !formulaKey) {
+      res.status(400).json({ error: 'originalMaterialName, newMaterialName, formulaKey sunt obligatorii.' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const timeoutId = setTimeout(() => {
+      res.write(`data: ${JSON.stringify({ text: '\n[Eroare: Timeout 90s]' })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }, 90000);
+
+    res.on('close', () => clearTimeout(timeoutId));
+
+    // Construim un prompt concis + normativ
+    const contextBlock = projectContext
+      ? `\nContextul proiectului:\n${projectContext}\n`
+      : '';
+
+    const prompt = `Ești Zidario AI, expert în inginerie civilă și normative de construcții românești.
+${contextBlock}
+Utilizatorul vrea să înlocuiască materialul original cu unul alternativ în cadrul etapei "${formulaKey}":
+- Material original: "${originalMaterialName}"
+- Material alternativ propus: "${newMaterialName}"
+
+Verifică rapid dacă această înlocuire este conformă normativ (CR6-2013, NE012-1:2022, P100-1/2013, NP112-2014).
+Răspunde CONCIS în maxim 80 de cuvinte. Structura răspunsului:
+1. Primul cuvânt TREBUIE să fie exact: "✅ Conform" SAU "⚠️ Atenție" SAU "❌ Neconform"
+2. Motivul tehnic scurt (1-2 propoziții cu referința normativă exactă)
+3. Dacă e Neconform sau Atenție — indică ce trebuie să verifice beneficiarul
+
+Nu inventa normative. Dacă nu știi cu certitudine, folosește "⚠️ Atenție".`;
+
+    const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    let stream: any = null;
+    let lastError: any = null;
+    
+    for (const modelName of FALLBACK_MODELS) {
+      try {
+        stream = await getAi().models.generateContentStream({
+          model: modelName,
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: { temperature: 0.2, maxOutputTokens: 200 },
+        });
+        break;
+      } catch (e: any) {
+        lastError = e;
+        const is503 = e?.status === 503 || String(e?.message).includes('503') || String(e?.message).toLowerCase().includes('high demand');
+        if (is503) {
+          console.warn(`[validateMaterialOverride] 503 cu ${modelName}, încercăm următorul...`);
+          continue;
+        }
+        console.warn(`[validateMaterialOverride] Eroare cu ${modelName}, încercăm următorul... Motiv: ${e?.message?.substring(0, 100)}...`);
+        continue;
+      }
+    }
+    
+    if (!stream) {
+      console.error(`[validateMaterialOverride] Toate modelele au eșuat. Ultima eroare:`, lastError?.message);
+      throw new Error('Serviciul este momentan indisponibil.');
+    }
+
+    for await (const chunk of stream) {
+      const text = chunk.text ?? '';
+      if (text) {
+        res.write(`data: ${JSON.stringify({ text })}\n\n`);
+      }
+    }
+
+    clearTimeout(timeoutId);
+    res.write('data: [DONE]\n\n');
+    res.end();
+
+  } catch (e: any) {
+    console.error('[validateMaterialOverride] Eroare:', e);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ Eroare la verificarea conformității. Verificați manual normativele aplicabile.' })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+}

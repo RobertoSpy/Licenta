@@ -37,6 +37,7 @@ interface Project {
   upperFloorsCount?: number;
   hasMansard?: boolean;
   totalFloors?: number;
+  planStatus?: string;
 }
 
 const containerVariants = {
@@ -277,19 +278,12 @@ export const ProjectDetail = () => {
                   transition={{ duration: 1.5, repeat: Infinity }}
                   className="w-1.5 h-1.5 rounded-full bg-buildorange inline-block"
                 />
-                Următorul pas — Faza 2
+                Faza 2
               </div>
               <h3 className="text-2xl font-black mb-2">Editor Plan 2D Interactiv</h3>
               <p className="text-slate-400 text-sm max-w-lg leading-relaxed">
                 Vei putea desena planul parterului, dimensiona camerele, valida față de <strong className="text-white">Legea 114/1996</strong> și exporta un PDF de prezentare. Salvare automată la 30 secunde.
               </p>
-              <div className="flex flex-wrap gap-2 mt-4 justify-center md:justify-start">
-                {['Canvas Konva.js', 'Suprafețe live', 'Validare AI', 'Export PDF'].map(tag => (
-                  <span key={tag} className="px-3 py-1 bg-white/10 border border-white/10 rounded-full text-xs font-medium text-slate-300">
-                    {tag}
-                  </span>
-                ))}
-              </div>
             </div>
 
             <div className="shrink-0">
@@ -300,6 +294,49 @@ export const ProjectDetail = () => {
                 <span>Deschide Editorul 2D</span>
                 <span className="text-lg">✏️</span>
               </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Banner Faza 3 — BOM & Timeline (Vizibil doar dacă planul e publicat) */}
+      {project.planStatus === 'published' && (
+        <motion.div
+          variants={cardVariants}
+          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-900 p-10 text-white mt-6"
+        >
+          <div className="absolute -top-20 -right-20 w-64 h-64 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
+            <div className="flex-1 text-center md:text-left">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-400/20 border border-emerald-400/30 text-emerald-400 text-xs font-bold uppercase tracking-widest mb-3">
+                <motion.span
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"
+                />
+                Faza 3
+              </div>
+              <h3 className="text-2xl font-black mb-2">Deviz & Etape Construcție</h3>
+              <p className="text-emerald-100/70 text-sm max-w-lg leading-relaxed mb-4">
+                Planul tău a fost aprobat! Acum poți vedea lista completă de materiale (BOM) estimată și poți urmări vizual etapele de construcție.
+              </p>
+              
+              <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                <button
+                  onClick={() => navigate(`/dashboard/projects/${project.id}/bom`)}
+                  className="flex items-center gap-2 px-6 py-3 bg-white text-emerald-900 rounded-2xl text-sm font-black hover:bg-emerald-50 transition-all shadow-lg hover:scale-105"
+                >
+                  <span>📊 Vezi Deviz (BOM)</span>
+                </button>
+                <button
+                  onClick={() => navigate(`/dashboard/projects/${project.id}/timeline`)}
+                  className="flex items-center gap-2 px-6 py-3 bg-emerald-700/50 text-white border border-emerald-500/30 rounded-2xl text-sm font-black hover:bg-emerald-600/50 transition-all shadow-lg hover:scale-105"
+                >
+                  <span>⏱️ Etape Construcție</span>
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>

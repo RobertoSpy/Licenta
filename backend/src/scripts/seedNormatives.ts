@@ -24,6 +24,7 @@ interface SemanticChunk {
   title: string;
   content: string;
   agent: AgentType;
+  applicability: 'residential' | 'commercial' | 'mixed';
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -38,6 +39,22 @@ function detectAgent(sectionText: string, config: NormativeConfig): AgentType {
   return config.defaultAgent;
 }
 
+function detectApplicability(sectionText: string, source: string): 'residential' | 'commercial' | 'mixed' {
+  if (source === 'Legea114-1996' || source === 'NP057-2002') return 'residential';
+
+  const commercialKeywords = /comercial|public|birou|hotel|restaurant|spital|sala|spectatori|magazin|depozit|industrie|institutie/i;
+  const residentialKeywords = /locuint|locuință|casa|casă|apartament|dormitor|bucatarie|bucătărie|baie|garsonier/i;
+
+  const sample = sectionText.slice(0, 400);
+  const hasCommercial = commercialKeywords.test(sample);
+  const hasResidential = residentialKeywords.test(sample);
+
+  if (hasCommercial && !hasResidential) return 'commercial';
+  if (hasResidential && !hasCommercial) return 'residential';
+
+  return 'mixed';
+}
+
 // ─────────────────────────────────────────────────────────────────
 // SPLIT LA PARAGRAFE COMPLETE
 // ─────────────────────────────────────────────────────────────────
@@ -46,6 +63,7 @@ function splitAtParagraphs(
   text: string,
   baseTitle: string,
   agent: AgentType,
+  applicability: 'residential' | 'commercial' | 'mixed',
   maxWords: number
 ): SemanticChunk[] {
   const result: SemanticChunk[] = [];
@@ -60,6 +78,7 @@ function splitAtParagraphs(
         title: part === 1 ? baseTitle : `${baseTitle} (partea ${part})`,
         content: buffer.trim(),
         agent,
+        applicability,
       });
       buffer = para;
       part++;
@@ -73,6 +92,7 @@ function splitAtParagraphs(
       title: part === 1 ? baseTitle : `${baseTitle} (partea ${part})`,
       content: buffer.trim(),
       agent,
+      applicability,
     });
   }
 
@@ -110,12 +130,13 @@ function semanticChunk(text: string, source: string): SemanticChunk[] {
     if (wordCount < 30) continue;
 
     const agent = detectAgent(trimmed, config);
+    const applicability = detectApplicability(trimmed, source);
 
     if (wordCount > 900) {
-      const subChunks = splitAtParagraphs(trimmed, firstLine, agent, 900);
+      const subChunks = splitAtParagraphs(trimmed, firstLine, agent, applicability, 900);
       chunks.push(...subChunks);
     } else {
-      chunks.push({ title: firstLine, content: trimmed, agent });
+      chunks.push({ title: firstLine, content: trimmed, agent, applicability });
     }
   }
 
@@ -131,9 +152,18 @@ async function seedNormative(filePath: string, source: string, force: boolean): 
 
   if (!fs.existsSync(filePath)) return;
 
-  const pdfBuffer = fs.readFileSync(filePath);
-  const parsed = await pdfParse(pdfBuffer);
-  const cleanedText = parsed.text.replace(/\u0000/g, '');
+  const extension = path.extname(filePath).toLowerCase();
+  let cleanedText = '';
+
+  if (extension === '.md' || extension === '.txt') {
+    cleanedText = fs.readFileSync(filePath, 'utf-8');
+  } else {
+    const pdfBuffer = fs.readFileSync(filePath);
+    const parsed = await pdfParse(pdfBuffer);
+    cleanedText = parsed.text;
+  }
+
+  cleanedText = cleanedText.replace(/\u0000/g, '');
   const chunks = semanticChunk(cleanedText, source);
 
   let startOffset = 0;
@@ -161,9 +191,9 @@ async function seedNormative(filePath: string, source: string, force: boolean): 
       try {
         const vectorArray = await embeddingService.embed(chunk.content);
         await prisma.$executeRawUnsafe(
-          `INSERT INTO "NormativeChunk" ("source", "chapter", "content", "agent", "status", "embedding")
-           VALUES ($1, $2, $3, $4, 'in_vigoare', $5::vector)`,
-          source, chunk.title, chunk.content, chunk.agent, `[${vectorArray.join(',')}]`
+          `INSERT INTO "NormativeChunk" ("source", "chapter", "content", "agent", "status", "applicability", "embedding")
+           VALUES ($1, $2, $3, $4, 'in_vigoare', $5, $6::vector)`,
+          source, chunk.title, chunk.content, chunk.agent, chunk.applicability, `[${vectorArray.join(',')}]`
         );
         break;
       } catch (err: any) {

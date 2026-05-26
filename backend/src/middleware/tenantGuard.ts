@@ -42,6 +42,6 @@ export const tenantGuard = async (
   }
 
   // Atașăm proiectul verificat la request — controllere aval nu mai fac query duplicat
-  (req as any).project = project;
+  req.project = project;
   next();
 };

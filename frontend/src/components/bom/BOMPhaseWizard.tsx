@@ -1,0 +1,230 @@
+// frontend/src/components/bom/BOMPhaseWizard.tsx
+//
+// Container principal al wizard-ului BOM etapă-cu-etapă.
+// Layout: bara de progres verticală (stânga) + BOMPhaseCard (dreapta).
+
+import { useState, useCallback } from 'react';
+import { CheckCircle2, Lock, Circle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import type { BOMItem } from '../../hooks/useBOMData';
+import { useBOMPhaseWizard, PHASE_CONFIG, type BomPhaseKey } from '../../hooks/useBOMPhaseWizard';
+import { BOMPhaseCard } from './BOMPhaseCard';
+
+// ─────────────────────────────────────────────────────────────────
+// FORMAT RON compact
+// ─────────────────────────────────────────────────────────────────
+const ronCompact = (v: number) => {
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}k RON`;
+  return `${Math.round(v)} RON`;
+};
+
+// ─────────────────────────────────────────────────────────────────
+// PROPS
+// ─────────────────────────────────────────────────────────────────
+interface BOMPhaseWizardProps {
+  projectId: string;
+  bomItems: BOMItem[];
+  onMaterialReplaced: () => void;
+  onAllConfirmed?: () => void;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────────────────────────
+export const BOMPhaseWizard = ({
+  projectId,
+  bomItems,
+  onMaterialReplaced,
+  onAllConfirmed,
+}: BOMPhaseWizardProps) => {
+  const {
+    activePhase: dbActivePhase,
+    completedPhases,
+    phaseItems,
+    totalByPhase,
+    grandTotal,
+    allPhasesConfirmed,
+    confirmCurrentPhase,
+  } = useBOMPhaseWizard(projectId, bomItems);
+
+  // Faza vizuală locală — poate fi diferită de cea activă din DB
+  // (utilizatorul poate naviga înapoi la etape confirmate)
+  const [localActivePhase, setLocalActivePhase] = useState<BomPhaseKey>(dbActivePhase);
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  // Sincronizăm faza locală cu DB când se schimbă din exterior
+  // (la prima încărcare sau după confirmare)
+  const effectiveActivePhase = localActivePhase ?? dbActivePhase;
+  const currentPhaseIndex = PHASE_CONFIG.findIndex(p => p.key === effectiveActivePhase);
+  const currentPhaseConfig = PHASE_CONFIG[currentPhaseIndex];
+
+  const isCurrentPhaseConfirmed = completedPhases.includes(effectiveActivePhase);
+  const canGoBack = currentPhaseIndex > 0;
+  const canGoForward = currentPhaseIndex < PHASE_CONFIG.length - 1;
+
+  // ── Confirmare etapă ────────────────────────────────────────────
+  const handleConfirm = useCallback(async () => {
+    setIsConfirming(true);
+    try {
+      await confirmCurrentPhase();
+      // Dacă mai sunt etape, avansăm automat
+      if (canGoForward) {
+        setLocalActivePhase(PHASE_CONFIG[currentPhaseIndex + 1].key);
+      } else {
+        onAllConfirmed?.();
+      }
+    } finally {
+      setIsConfirming(false);
+    }
+  }, [confirmCurrentPhase, canGoForward, currentPhaseIndex, onAllConfirmed]);
+
+  const handleBack = useCallback(() => {
+    if (canGoBack) setLocalActivePhase(PHASE_CONFIG[currentPhaseIndex - 1].key);
+  }, [canGoBack, currentPhaseIndex]);
+
+  const handleForward = useCallback(() => {
+    if (canGoForward) setLocalActivePhase(PHASE_CONFIG[currentPhaseIndex + 1].key);
+  }, [canGoForward, currentPhaseIndex]);
+
+  const handlePhaseClick = useCallback((key: BomPhaseKey) => {
+    const isAccessible = completedPhases.includes(key) || key === dbActivePhase;
+    if (isAccessible) setLocalActivePhase(key);
+  }, [completedPhases, dbActivePhase]);
+
+  // ── Banner toate etapele confirmate ────────────────────────────
+  if (allPhasesConfirmed) {
+    return (
+      <div className="space-y-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl p-8 text-white text-center shadow-lg shadow-emerald-200"
+        >
+          <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-black mb-2">Deviz Finalizat! 🎉</h2>
+          <p className="text-emerald-100 text-sm max-w-md mx-auto">
+            Toate etapele au fost confirmate. Costul total estimat al materialelor este:
+          </p>
+          <p className="text-4xl font-black mt-4 mb-6">
+            {new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON', maximumFractionDigits: 0 }).format(grandTotal)}
+          </p>
+          <p className="text-xs text-emerald-200">
+            Prețuri estimate din catalogul Dedeman · Actualizate periodic prin scraping automatizat
+          </p>
+        </motion.div>
+
+        {/* Sumar pe etape */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {PHASE_CONFIG.map(phase => (
+            <div key={phase.key} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <span>{phase.icon}</span>
+                <span className="text-sm font-bold text-slate-700">{phase.label}</span>
+              </div>
+              <p className="text-lg font-black text-slate-900">{ronCompact(totalByPhase[phase.key])}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-[200px_1fr] gap-6 items-start">
+
+      {/* ── Bara de progres verticală ── */}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-4 sticky top-4">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 px-2">
+          Etape Construcție
+        </p>
+
+        <div className="space-y-1">
+          {PHASE_CONFIG.map((phase) => {
+            const isDone      = completedPhases.includes(phase.key);
+            const isActive    = phase.key === effectiveActivePhase;
+            const isAccessible = isDone || phase.key === dbActivePhase;
+            const isLocked    = !isAccessible;
+
+            return (
+              <button
+                key={phase.key}
+                onClick={() => handlePhaseClick(phase.key)}
+                disabled={isLocked}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all ${
+                  isActive
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : isDone
+                    ? 'hover:bg-emerald-50 text-emerald-700 cursor-pointer'
+                    : isLocked
+                    ? 'text-slate-300 cursor-not-allowed'
+                    : 'hover:bg-slate-50 text-slate-600 cursor-pointer'
+                }`}
+              >
+                {/* Iconiță stare */}
+                <div className="shrink-0">
+                  {isDone ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  ) : isLocked ? (
+                    <Lock className="w-3.5 h-3.5 text-slate-300" />
+                  ) : (
+                    <Circle className={`w-4 h-4 ${isActive ? 'text-buildorange' : 'text-slate-300'}`} />
+                  )}
+                </div>
+
+                {/* Label + cost */}
+                <div className="min-w-0">
+                  <p className={`text-xs font-bold truncate ${isActive ? 'text-white' : ''}`}>
+                    {phase.label}
+                  </p>
+                  {totalByPhase[phase.key] > 0 && (
+                    <p className={`text-[10px] font-mono ${isActive ? 'text-slate-300' : 'text-slate-400'}`}>
+                      {ronCompact(totalByPhase[phase.key])}
+                    </p>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Total general */}
+        <div className="mt-4 pt-4 border-t border-slate-100 px-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total General</p>
+          <p className="text-base font-black text-slate-900 mt-0.5">{ronCompact(grandTotal)}</p>
+          <p className="text-[10px] text-slate-400 mt-1">
+            {completedPhases.length}/{PHASE_CONFIG.length} etape confirmate
+          </p>
+        </div>
+      </div>
+
+      {/* ── Card etapă activă ── */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={effectiveActivePhase}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
+        >
+          {currentPhaseConfig && (
+            <BOMPhaseCard
+              phase={currentPhaseConfig}
+              items={phaseItems[effectiveActivePhase]}
+              projectId={projectId}
+              isConfirmed={isCurrentPhaseConfirmed}
+              canGoBack={canGoBack}
+              canGoForward={canGoForward}
+              onConfirm={handleConfirm}
+              onBack={handleBack}
+              onForward={handleForward}
+              onMaterialReplaced={onMaterialReplaced}
+              isConfirming={isConfirming}
+            />
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+};

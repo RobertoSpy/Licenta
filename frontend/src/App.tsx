@@ -11,6 +11,8 @@ import { Materials } from './pages/dashboard/Materials';
 import { Experts } from './pages/dashboard/Experts';
 import { ProjectDetail } from './pages/dashboard/ProjectDetail';
 import { ProjectEditor } from './pages/dashboard/ProjectEditor';
+import { ProjectBOM } from './pages/dashboard/ProjectBOM';
+import { ProjectTimeline } from './pages/dashboard/ProjectTimeline';
 import { useAuth } from './context/useAuth';
 
 function App() {
@@ -45,6 +47,8 @@ function App() {
         <Route path="experts" element={<Experts />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
         <Route path="projects/:id/editor" element={<ProjectEditor />} />
+        <Route path="projects/:id/bom" element={<ProjectBOM />} />
+        <Route path="projects/:id/timeline" element={<ProjectTimeline />} />
       </Route>
 
       {/* Orice altă rută ne-existentă (Fallback) */}

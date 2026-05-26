@@ -94,13 +94,13 @@ export const ProjectEditor: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [projectTitle, setProjectTitle] = useState('Proiect');
   const [projectData, setProjectData] = useState<Record<string, unknown> | null>(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(true);
   const [isSwitchingFloor, setIsSwitchingFloor] = useState(false);
 
   // Stare dialog label
   const [labelDialog, setLabelDialog] = useState<{ id: string; x: number; y: number } | null>(null);
 
-  const { elements, updateElement, markClean, undo, redo, deleteSelected, setTool, setZoom, initializeFromProject, activeFloor, switchFloor } = useEditorState();
+  const { elements, updateElement, markClean, isDirty, undo, redo, deleteSelected, setTool, setZoom, initializeFromProject, activeFloor, switchFloor } = useEditorState();
   const rooms = useRoomCalculator(elements);
   const doors = elements
     .filter((el) => el.type === 'door')
@@ -265,7 +265,13 @@ export const ProjectEditor: React.FC = () => {
     }
   }, [projectId, projectTitle]);
 
-
+  // Salvează planul curent (dacă e cazul) și merge mai departe la Deviz
+  const handleContinue = useCallback(async () => {
+    if (isDirty) {
+      await handleManualSave();
+    }
+    navigate(`/dashboard/projects/${projectId}/bom`);
+  }, [isDirty, handleManualSave, navigate, projectId]);
 
   // Dialog label cameră
   const handleRoomLabelRequest = (id: string, x: number, y: number) => {
@@ -347,12 +353,13 @@ export const ProjectEditor: React.FC = () => {
 
         {/* Buton Continuă — Faza 3 */}
         <button
-          onClick={() => navigate(`/dashboard/projects/${projectId}`)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-sm"
-          title="Mergi la pagina proiectului pentru a vedea devizul (Faza 3)"
+          onClick={handleContinue}
+          disabled={isSaving}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50"
+          title="Salvează planul și mergi la Devizul de Materiale (Faza 3)"
         >
-          Continuă
-          <ChevronRight className="w-3.5 h-3.5" />
+          {isSaving ? 'Se salvează...' : 'Continuă'}
+          {!isSaving && <ChevronRight className="w-3.5 h-3.5" />}
         </button>
       </div>
 

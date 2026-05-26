@@ -1,0 +1,63 @@
+[
+  {
+    "order": 1,
+    "name": "Fundație",
+    "description": "Săpătură, cofraje, armare, turnare beton, hidroizolație fundație",
+    "durationDays": 14,
+    "categories": ["Fundație"],
+    "requiredPreviousPhase": null,
+    "minimumIdle": 7,
+    "idleNote": "7 zile maturare beton înainte de a ridica pereții"
+  },
+  {
+    "order": 2,
+    "name": "Structură — Zidărie",
+    "description": "Ridicarea pereților exteriori și interiori din BCA / cărămidă, buiandrugi, stâlpișori",
+    "durationDays": 21,
+    "categories": ["Structură"],
+    "requiredPreviousPhase": "Fundație"
+  },
+  {
+    "order": 3,
+    "name": "Planșeu & Coroană",
+    "description": "Coroana de beton armat pe conturul clădirii, planșeul dintre etaje (dacă e P+1 sau mai mult)",
+    "durationDays": 10,
+    "categories": ["Planșeu"],
+    "requiredPreviousPhase": "Structură — Zidărie",
+    "minimumIdle": 14,
+    "idleNote": "14 zile maturare planșeu beton armat"
+  },
+  {
+    "order": 4,
+    "name": "Acoperiș — Șarpantă & Învelitoare",
+    "description": "Șarpantă lemn, folie anticondens, pazie, jgheaburi, învelitoare (țiglă/tablă)",
+    "durationDays": 14,
+    "categories": ["Acoperiș"],
+    "requiredPreviousPhase": "Planșeu & Coroană"
+  },
+  {
+    "order": 5,
+    "name": "Tâmplărie Exterioară",
+    "description": "Montaj ferestre PVC, ușă intrare principală, glafuri exterioare",
+    "durationDays": 5,
+    "categories": ["Tâmplărie"],
+    "requiredPreviousPhase": "Acoperiș — Șarpantă & Învelitoare",
+    "note": "Casa devine 'la roșu' după această etapă — se poate lucra pe orice vreme"
+  },
+  {
+    "order": 6,
+    "name": "Instalații & Finisaje Brute",
+    "description": "Instalații electrice (cablare), sanitare (țevi), termice, șapă, tencuieli, glet",
+    "durationDays": 30,
+    "categories": ["Finisaje Brute"],
+    "requiredPreviousPhase": "Tâmplărie Exterioară"
+  },
+  {
+    "order": 7,
+    "name": "Finisaje Fine",
+    "description": "Vopsele, gresie, faianță, parchet, uși interior, corpuri iluminat, sanitare montaj",
+    "durationDays": 30,
+    "categories": ["Finisaje Fine"],
+    "requiredPreviousPhase": "Instalații & Finisaje Brute"
+  }
+]

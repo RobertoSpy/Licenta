@@ -5,6 +5,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: number;
   };
+  project?: any;
 }
 //next este o functie care trimite cerea  mai departe la urmatorul pas din cod daca este totul bine
 export const protect = (req: AuthRequest, res: Response, next: NextFunction): void => {

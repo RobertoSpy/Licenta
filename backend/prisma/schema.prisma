@@ -78,6 +78,9 @@ model Project {
   energyKwhYear   Float?    // consum estimat kWh/mp/an
   bomGeneratedAt  DateTime? // ultima generare BOM
   constructionPhases ConstructionPhase[]
+  materialOverrides  ProjectMaterialOverride[]
+  bomPhaseProgress   BomPhaseProgress?
+  bomIntroCache      BomIntroCache?
 
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -99,18 +102,36 @@ model Material {
   description  String?  // scurtă descriere tehnică
   uValue       Float?   // coeficient transmitanță termică (W/m²K) pentru calcul energetic
   isDefault    Boolean  @default(false) // materialul implicit pentru categoria sa
+  inStock      Boolean  @default(true)
+  stockQuantity Float?
   
   alternatives Material[] @relation("MaterialAlternatives") // materiale alternative similare
   alternativeOf Material[] @relation("MaterialAlternatives")
 
   bomItems     ProjectBOM[]
   priceHistory PriceHistory[]
+  projectOverrides ProjectMaterialOverride[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@index([category])
   @@index([internalCode])
+}
+
+// 4. Overrides pentru proiect (Selectie manuala a alternativelor)
+model ProjectMaterialOverride {
+  id              Int      @id @default(autoincrement())
+  projectId       Int
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  formulaKey      String   // ex: "wall_exterior"
+  materialId      Int
+  material        Material @relation(fields: [materialId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([projectId, formulaKey])
+  @@index([projectId])
 }
 
 // Istoricul de preț — pentru grafice trend și alertă variație
@@ -171,11 +192,13 @@ model NormativeChunk {
   content   String // 800-1000 cuvinte per chunk
   agent     String @default("general")  // "geotehnic" | "seismic" | "legal" | "structural" | "materiale" | "deviz"
   status    String @default("in_vigoare") // "in_vigoare" | "in_revizuire" | "abrogat"
-  embedding Unsupported("vector(3072)")?
+  applicability String @default("mixed") // "residential" | "commercial" | "mixed"
+  embedding Unsupported("vector(768)")?
 
   @@index([source])
   @@index([agent])
   @@index([status])
+  @@index([applicability])
 }
 
 // === ISTORICUL CHAT-ULUI (Rezumate persistente per proiect/faza/ecran) ===
@@ -193,6 +216,34 @@ model ChatSummary {
 
   // Un singur rezumat activ per (proiect, faza, ecran)
   @@unique([projectId, phase, screen])
+  @@index([projectId])
+}
+
+// === BOM: progresul etapelor pentru chat ===
+model BomPhaseProgress {
+  id              Int      @id @default(autoincrement())
+  projectId       Int      @unique
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  activePhase     String   // 'fundatie' | 'structura' | 'zidarie' | 'acoperis' | 'instalatii' | 'finisaje'
+  completedPhases String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+// === BOM: cache pentru intro generat de AI ===
+model BomIntroCache {
+  id        Int      @id @default(autoincrement())
+  projectId Int      @unique
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  introText String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([projectId])
 }
 

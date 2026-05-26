@@ -1,4 +1,4 @@
-import { apiPrivate, getAccessToken } from './axios';
+import { apiPrivate, fetchWithAuth } from './axios';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -57,13 +57,10 @@ export const aiApi = {
     payload: StreamChatPayload,
     onChunk: (text: string) => void
   ): Promise<void> {
-    const token = getAccessToken();
-
-    const response = await fetch('/api/ai/chat', {
+    const response = await fetchWithAuth('/api/ai/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         message: payload.message,
@@ -188,13 +185,10 @@ Returnează DOAR rezumatul, fără introducere sau formulă de încheiere.
     violations: Array<{ label: string; usableSqm: number; minRequired?: number }>,
     onChunk: (text: string) => void
   ): Promise<void> {
-    const token = getAccessToken();
-
-    const response = await fetch('/api/editor/explain-conformity', {
+    const response = await fetchWithAuth('/api/editor/explain-conformity', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ violations }),
     });

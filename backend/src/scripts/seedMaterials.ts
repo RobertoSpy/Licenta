@@ -20,7 +20,7 @@ function generateInternalCode(name: string): string {
 }
 
 async function main() {
-  console.log('Începem fluxul de Scraping + AI Enrichment...');
+  console.log('Începem fluxul de Scraping + AI Semantic Mapping...');
   
   for (const url of TARGET_URLS) {
     console.log(`\n================================================`);
@@ -36,14 +36,13 @@ async function main() {
 
     for (const prod of rawProducts) {
       console.log(`\n🔹 Produs găsit: ${prod.name} (Preț: ${prod.pricePerUnit} RON)`);
-      const internalCode = generateInternalCode(prod.name);
 
-      // Verificăm dacă există deja pentru a nu face AI call degeaba pe lucruri neschimbate
-      const existing = await prisma.material.findUnique({ where: { internalCode } });
+      // Verificăm dacă există deja după URL pentru a nu face AI call degeaba
+      const existing = await prisma.material.findFirst({ where: { storeUrl: prod.storeUrl } });
       if (existing) {
-        console.log(`   Produsul există deja în DB. Se actualizează doar prețul...`);
+        console.log(`   Produsul există deja în DB (după URL). Se actualizează doar prețul...`);
         await prisma.material.update({
-          where: { internalCode },
+          where: { id: existing.id },
           data: { pricePerUnit: prod.pricePerUnit }
         });
         
@@ -57,8 +56,8 @@ async function main() {
         continue;
       }
 
-      // 2. AI Semantic Enrichment
-      console.log(`   Se rulează analiza AI Gemini pentru proprietăți...`);
+      // 2. AI Semantic Mapping (Entity Resolution)
+      console.log(`   Se rulează analiza AI Gemini pentru proprietăți și Semantic Mapping...`);
       const analysis = await materialAnalyzer.analyzeMaterial(prod.name, prod.pricePerUnit, prod.storeUrl);
       
       if (!analysis) {
@@ -66,14 +65,23 @@ async function main() {
         continue;
       }
 
-      console.log(`   AI Rezultat: Categorie [${analysis.category}], uValue [${analysis.uValue}]`);
-      console.log(`   Pro: ${analysis.pros}`);
-      console.log(`   Con: ${analysis.cons}`);
+      console.log(`   AI Rezultat: Code [${analysis.standardCode}], Cat [${analysis.category}], uValue [${analysis.uValue}]`);
 
-      // 3. Salvare în DB
-      const newMaterial = await prisma.material.create({
-        data: {
-          internalCode,
+      // 3. Salvare în DB (Upsert după standardCode)
+      // Folosim standardCode-ul generat de AI ca internalCode pentru a fi găsit de formulele BOM
+      const descriptionWithAI = `${analysis.description}\n\n✅ Avantaj: ${analysis.pros}\n⚠️ Dezavantaj: ${analysis.cons}\nAlternativă: ${analysis.genericAlternatives.join(', ')}`;
+
+      const savedMaterial = await prisma.material.upsert({
+        where: { internalCode: analysis.standardCode },
+        update: {
+          name: prod.name, // Suprascriem cu cel mai recent produs din această categorie
+          pricePerUnit: prod.pricePerUnit,
+          storeUrl: prod.storeUrl,
+          brand: analysis.brand || 'Necunoscut',
+          description: descriptionWithAI
+        },
+        create: {
+          internalCode: analysis.standardCode,
           name: prod.name,
           category: analysis.category,
           subcategory: analysis.subcategory || null,
@@ -81,33 +89,21 @@ async function main() {
           pricePerUnit: prod.pricePerUnit,
           brand: analysis.brand || 'Necunoscut',
           storeUrl: prod.storeUrl,
-          description: analysis.description,
+          description: descriptionWithAI,
           uValue: analysis.uValue,
           isDefault: true,
-          // Vom salva pros/cons direct în descriere pentru moment, 
-          // sau putem adăuga câmpuri separate în schema prisma mai târziu.
-          // Deocamdată le formatăm în description:
-          // (Dacă schema a fost deja adaptată, s-ar fi salvat direct, dar folosim descrierea ca proxy).
         }
       });
       
-      // Salvăm și în description detaliile AI
-      await prisma.material.update({
-        where: { id: newMaterial.id },
-        data: {
-          description: `${analysis.description}\n\n✅ Avantaj: ${analysis.pros}\n⚠️ Dezavantaj: ${analysis.cons}\nAlternativă: ${analysis.genericAlternatives.join(', ')}`
-        }
-      });
-
       await prisma.priceHistory.create({
         data: {
-          materialId: newMaterial.id,
+          materialId: savedMaterial.id,
           price: prod.pricePerUnit,
           source: 'dedeman-scraper'
         }
       });
       
-      console.log(`   ✅ Produs salvat cu succes în DB!`);
+      console.log(`   ✅ Produs mapat și salvat cu succes sub codul ${analysis.standardCode}!`);
     }
   }
 

@@ -1,13 +1,24 @@
 // backend/src/services/bomService.ts
 //
-// BOM = Bill of Materials — calculul listei de materiale pentru fundație/structură.
+// BOM = Bill of Materials — Context-Aware Rule Engine.
 //
-// ARHITECTURA CORECTĂ:
-//   • Deciziile deterministe (clasa betonului, adâncimea fundației) → CODUL ACESTA
-//   • Explicațiile tehnice (de ce C25/30, ce înseamnă XF2) → RAG (agentul structural)
-//   Cele două nu se amestecă: AI-ul nu decide clasa betonului, el explică regula.
+// ARHITECTURA:
+//   • contextMultiplierEngine.ts  → calculează multiplicatorii seismic + sol (determinist)
+//   • planMetricsExtractor.ts     → extrage metrici reale din PlanSnapshot
+//   • bom-formulas.json           → formulele parametrice (SSOT)
+//   • Acest fișier                → asamblare + evaluare + persistență DB
+//
+//   AI-ul NU decide clasa betonului sau multiplicatorii — el EXPLICĂ ce s-a calculat
+//   și poate sugera override-uri pe liniile marcate aiSuggestible=true.
 
 import { prisma } from '../lib/prisma';
+import { buildContextMultipliers, ProjectContextInput, ConcreteMaterialCode } from './contextMultiplierEngine';
+import { extractMetricsFromSnapshot } from '../lib/planMetricsExtractor';
+import { editorRepository } from '../repositories/editorRepository';
+import { bomRepository } from '../repositories/bomRepository';
+import { Prisma } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
 
 // ─────────────────────────────────────────────────────────────────
 // TIPURI
@@ -22,49 +33,104 @@ export interface FoundationSpec {
   note: string;
 }
 
+export interface ProjectMetrics {
+  foundationDepthM: number;
+  foundationWidthM: number;
+  floorsCount: number;
+  floorHeightM: number;
+  seismicZone: string;
+  perimeterM: number;
+  totalFloorAreaSqm: number;
+  interiorWallsM: number;
+  countDoors: number;
+  countExteriorDoors: number;
+  countInteriorDoors: number;
+  countWindows: number;
+  exteriorOpeningsSqm: number;
+}
+
 // ─────────────────────────────────────────────────────────────────
-// CALCULUL CLASEI DE BETON — DETERMINIST
-//
-// Logica: NE012-1-2022 + NP112-2014
-//   frostDepthCm > 90 → zonă cu îngheț sever (ex: Harghita, Suceava, Covasna)
-//                     → minim C25/30 cu expunere XF2 (cicluri îngheț-dezgheț)
-//   frostDepthCm ≤ 90 → îngheț normal → C20/25 cu expunere XC2 (carbonatare în sol)
-//
-// Surse:
-//   • NE012-1-2022 — Tab. 4.1: clase minime beton per clasă de expunere
-//   • EN 206-1 (prin NE012): XC2 = beton îngropat/permanent ud, XF2 = îngheț moderat cu degivrare
+// FUNCȚIE LEGACY — păstrată pentru compatibilitate cu agentOrchestrator
+// (care o folosește în buildRAGContext pentru a determina clasa betonului)
 // ─────────────────────────────────────────────────────────────────
 
 export function calcFoundationSpec(
   frostDepthCm: number | null | undefined,
   soilType?: string | null
 ): FoundationSpec {
-  const frost = frostDepthCm ?? 80; // default dacă nu e determinat încă
-
-  // Prag conform NE012-1-2022 + hartă climatică Romania: 90cm separă zone cu
-  // cicluri îngheț-dezgheț severe (Transilvania, Moldova de nord, Bucovina)
+  const frost = frostDepthCm ?? 80;
   const severeFrost = frost > 90;
-
   const concreteClass = severeFrost ? 'C25/30-XF2' : 'C20/25-XC2';
-  const minDepthCm    = Math.max(frost + 10, 80); // 10cm sub limita de îngheț, min 80cm
-
+  const minDepthCm = Math.max(frost + 10, 80);
   const note = severeFrost
-    ? `Adâncime îngheț ${frost}cm (>90cm) → zonă cu îngheț sever → NE012-1-2022 impune minim C25/30 clasa XF2 (rezistență la cicluri îngheț-dezgheț)`
-    : `Adâncime îngheț ${frost}cm → îngheț normal → NE012-1-2022 permite C20/25 clasa XC2 (beton îngropat în sol umed)`;
-
+    ? `Adâncime îngheț ${frost}cm (>90cm) → zonă cu îngheț sever → NE012-1-2022 impune minim C25/30 clasa XF2`
+    : `Adâncime îngheț ${frost}cm → îngheț normal → NE012-1-2022 permite C20/25 clasa XC2`;
   return { concreteClass, minDepthCm, note };
 }
 
 // ─────────────────────────────────────────────────────────────────
-// SERVICIU BOM — extindere pentru Faza 3
+// EVALUATOR DE FORMULE — injectează variabilele în formula din JSON
+// ─────────────────────────────────────────────────────────────────
+
+interface FormulaVariables {
+  perimeter_m: number;
+  foundation_width_m: number;
+  foundation_depth_m: number;
+  floor_height_m: number;
+  floors_count: number;
+  total_floor_area_sqm: number;
+  interior_walls_m: number;
+  exterior_openings_sqm: number;
+  count_doors: number;
+  count_exterior_doors: number;
+  count_interior_doors: number;
+  count_windows: number;
+  count_corners_and_intersections: number;
+  seismic_multiplier: number;
+  soil_concrete_multiplier: number;
+  base_rebar_kg_per_mc: number;
+}
+
+function evaluateFormula(formulaStr: string, vars: FormulaVariables): number {
+  // Substituire ordonată: nume mai lungi înainte (evităm suprascrierea parțială)
+  let expr = formulaStr
+    .replace(/soil_concrete_multiplier/g, vars.soil_concrete_multiplier.toString())
+    .replace(/base_rebar_kg_per_mc/g, vars.base_rebar_kg_per_mc.toString())
+    .replace(/seismic_multiplier/g, vars.seismic_multiplier.toString())
+    .replace(/count_corners_and_intersections/g, vars.count_corners_and_intersections.toString())
+    .replace(/exterior_openings_sqm/g, vars.exterior_openings_sqm.toString())
+    .replace(/count_exterior_doors/g, vars.count_exterior_doors.toString())
+    .replace(/count_interior_doors/g, vars.count_interior_doors.toString())
+    .replace(/total_floor_area_sqm/g, vars.total_floor_area_sqm.toString())
+    .replace(/foundation_width_m/g, vars.foundation_width_m.toString())
+    .replace(/foundation_depth_m/g, vars.foundation_depth_m.toString())
+    .replace(/interior_walls_m/g, vars.interior_walls_m.toString())
+    .replace(/count_windows/g, vars.count_windows.toString())
+    .replace(/floor_height_m/g, vars.floor_height_m.toString())
+    .replace(/floors_count/g, vars.floors_count.toString())
+    .replace(/count_doors/g, vars.count_doors.toString())
+    .replace(/perimeter_m/g, vars.perimeter_m.toString());
+
+  // Whitelist strictă: doar cifre, spații, operatori matematici și paranteze
+  if (!/^[\d\s+\-*/.()\[\]]+$/.test(expr)) {
+    throw new Error(`Formula nesigură după substituție: "${expr}" (originală: "${formulaStr}")`);
+  }
+
+  const result = Function('"use strict"; return (' + expr + ')')() as number;
+  if (!isFinite(result) || isNaN(result)) {
+    throw new Error(`Formula a produs valoare invalidă (${result}): "${formulaStr}"`);
+  }
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SERVICIU BOM
 // ─────────────────────────────────────────────────────────────────
 
 export const bomService = {
-  /**
-   * Calculează specificațiile fundației bazat pe datele de proiect.
-   * Rezultatul este determinist — nu implică AI.
-   * AI-ul (agentul structural) explică DE CE în RAG, pe baza chunksurilor din NE012-1-2022.
-   */
+
+  // ── FUNCȚII DE COMPATIBILITATE (folosite de agentOrchestrator) ──
+
   getFoundationSpec(
     frostDepthCm: number | null | undefined,
     soilType?: string | null
@@ -72,10 +138,6 @@ export const bomService = {
     return calcFoundationSpec(frostDepthCm, soilType);
   },
 
-  /**
-   * Formatează specificațiile fundației ca string pentru injectare în prompt AI.
-   * Folosit în buildRAGContext ca date deterministe.
-   */
   formatForPrompt(spec: FoundationSpec): string {
     return [
       `Clasa beton fundație: ${spec.concreteClass} (NE012-1-2022, Tab. 4.1)`,
@@ -83,4 +145,249 @@ export const bomService = {
       `Motivare: ${spec.note}`,
     ].join('\n');
   },
+
+  // ── CALCUL BOM PRINCIPAL ────────────────────────────────────────
+
+  async calculateBOM(projectId: number) {
+    // 1. Date proiect din DB
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) throw new Error(`Proiect negăsit (id=${projectId})`);
+
+    const floorsCount = Math.max(1, project.totalFloors || 1);
+
+    // 2. Multiplicatori contextuali (determinist)
+    const ctxInput: ProjectContextInput = {
+      seismicZone:  project.seismicZone,
+      soilType:     project.soilType,
+      frostDepthCm: project.frostDepthCm,
+      totalFloors:  floorsCount,
+    };
+    const ctx = buildContextMultipliers(ctxInput);
+
+    // 3. Extragere metrici din PlanSnapshot (cu fallback)
+    const snapshot = await editorRepository.getLatestSnapshot(projectId, 'parter');
+    const extraction = extractMetricsFromSnapshot(
+      snapshot?.planJSON ?? null,
+      floorsCount,
+      ctx.frost_depth_m,
+      ctx.foundation_width_m,
+    );
+
+    // 4. Recalculăm count_corners_and_intersections cu datele reale din snapshot
+    const ctxWithPlan = buildContextMultipliers(ctxInput, {
+      interiorWallsM:     extraction.metrics.interiorWallsM,
+      countWindows:       extraction.metrics.countWindows,
+      countExteriorDoors: extraction.metrics.countExteriorDoors,
+    });
+
+    // 5. Asamblare variabile complete pentru evaluator
+    const metrics = extraction.metrics;
+    const vars: FormulaVariables = {
+      perimeter_m:                    metrics.perimeterM,
+      foundation_width_m:             ctxWithPlan.foundation_width_m,
+      foundation_depth_m:             ctxWithPlan.frost_depth_m,
+      floor_height_m:                 metrics.floorHeightM,
+      floors_count:                   floorsCount,
+      total_floor_area_sqm:           metrics.totalFloorAreaSqm,
+      interior_walls_m:               metrics.interiorWallsM,
+      exterior_openings_sqm:          metrics.exteriorOpeningsSqm,
+      count_doors:                    metrics.countDoors,
+      count_exterior_doors:           metrics.countExteriorDoors,
+      count_interior_doors:           metrics.countInteriorDoors,
+      count_windows:                  metrics.countWindows,
+      count_corners_and_intersections: ctxWithPlan.count_corners_and_intersections,
+      seismic_multiplier:             ctxWithPlan.seismic_multiplier,
+      soil_concrete_multiplier:       ctxWithPlan.soil_concrete_multiplier,
+      base_rebar_kg_per_mc:           ctxWithPlan.base_rebar_kg_per_mc,
+    };
+
+    // 6. Log diagnostic
+    console.log(`[BOM] Proiect #${projectId} — ${project.seismicZone ?? 'ag?'} | sol: ${project.soilType ?? '?'} | îngheț: ${project.frostDepthCm ?? '?'}cm`);
+    console.log(`[BOM] seismic_mult=${ctxWithPlan.seismic_multiplier} | soil_mult=${ctxWithPlan.soil_concrete_multiplier} | beton=${ctxWithPlan.concreteClass}`);
+    console.log(`[BOM] ${extraction.fromSnapshot ? '✅ Metrici din snapshot' : '⚠️ Metrici estimate (fără snapshot)'}`);
+
+    // 7. Citim formulele
+    const formulasPath = path.join(__dirname, '../data/bom-formulas.json');
+    const formulasJson = JSON.parse(fs.readFileSync(formulasPath, 'utf8'));
+
+    // 8. Citim materialele și override-urile din DB
+    const materials = await prisma.material.findMany();
+    const overrides = await prisma.projectMaterialOverride.findMany({ where: { projectId } });
+
+    // 9. Evaluăm fiecare formulă
+    const bomItems: Prisma.ProjectBOMCreateManyInput[] = [];
+    let totalEstimatedCost = 0;
+
+    for (const [formulaKey, formula] of Object.entries<any>(formulasJson)) {
+      // Sărim meta-blocul
+      if (formulaKey === '_meta') continue;
+
+      try {
+        const rawQuantity = evaluateFormula(formula.formula, vars);
+        if (!isFinite(rawQuantity) || rawQuantity <= 0) {
+          // Cantitate 0 este normală (ex: etaje suplimentare când floors_count=1)
+          if (rawQuantity < 0) console.warn(`[BOM] Formula ${formulaKey} a produs cantitate negativă: ${rawQuantity}`);
+          continue;
+        }
+
+        const quantityWithWaste = rawQuantity * (1 + formula.wastePercent / 100);
+        const finalQty = Math.ceil(quantityWithWaste * 100) / 100;
+
+        // 10. Selectăm materialul:
+        //   Prioritate 1: override explicit din DB (utilizatorul/AI-ul a schimbat)
+        //   Prioritate 2: clasa de beton selectată automat de contextMultiplierEngine
+        //   Prioritate 3: defaultMaterialCode din formulă
+        let materialCodeToUse: string = formula.defaultMaterialCode;
+
+        // Clasa betonului auto-upgrade (Problema 3 din review)
+        const isConcreteFormula = [
+          'foundation_concrete',
+          'structure_pillars_concrete',
+          'structure_tie_beams_concrete',
+          'slab_concrete',
+        ].includes(formulaKey);
+
+        if (isConcreteFormula && ctxWithPlan.concreteCode !== 'STANDARD_BETON_C20_25') {
+          materialCodeToUse = ctxWithPlan.concreteCode;
+        }
+
+        // Override manual (are prioritate peste auto-upgrade)
+        const override = overrides.find(o => o.formulaKey === formulaKey);
+        if (override) {
+          const overrideMat = materials.find(m => m.id === override.materialId);
+          if (overrideMat) materialCodeToUse = overrideMat.internalCode;
+        }
+
+        // 11. Căutăm materialul în catalog
+        const material = materials.find(m => m.internalCode === materialCodeToUse);
+        if (!material) {
+          // Fallback explicit la C20/25 dacă C25/30 lipsește (Problema 3 din review)
+          if (materialCodeToUse === 'STANDARD_BETON_C25_30') {
+            const fallback = materials.find(m => m.internalCode === 'STANDARD_BETON_C20_25');
+            if (fallback) {
+              console.error(`[BOM] ❌ STANDARD_BETON_C25_30 lipsă în catalog → fallback C20/25 pentru ${formulaKey}. Rulați seedBaselineMaterials.`);
+              // Continuăm cu fallback-ul
+              const totalPrice = parseFloat((finalQty * fallback.pricePerUnit).toFixed(2));
+              totalEstimatedCost += totalPrice;
+              bomItems.push(buildBOMItem(projectId, fallback, formula, formulaKey, finalQty, rawQuantity, ctxWithPlan, '⚠️ FALLBACK C20/25 (C25/30 lipsă catalog)'));
+            } else {
+              console.error(`[BOM] ❌ Atât STANDARD_BETON_C25_30 cât și STANDARD_BETON_C20_25 lipsesc! Sărim ${formulaKey}.`);
+            }
+          } else {
+            console.warn(`[BOM] Material lipsă: "${materialCodeToUse}" pentru formula "${formulaKey}". Rulați seedBaselineMaterials.`);
+          }
+          continue;
+        }
+
+        const totalPrice = parseFloat((finalQty * material.pricePerUnit).toFixed(2));
+        totalEstimatedCost += totalPrice;
+        bomItems.push(buildBOMItem(projectId, material, formula, formulaKey, finalQty, rawQuantity, ctxWithPlan, ''));
+
+      } catch (err: any) {
+        console.error(`[BOM] Eroare evaluare "${formulaKey}":`, err.message);
+      }
+    }
+
+    // 12. Persistență DB în tranzacție atomică
+    await prisma.$transaction(async (tx) => {
+      await tx.projectBOM.deleteMany({ where: { projectId } });
+      if (bomItems.length > 0) {
+        await tx.projectBOM.createMany({ data: bomItems });
+      }
+      await tx.project.update({
+        where: { id: projectId },
+        data: {
+          estimatedCost:  totalEstimatedCost,
+          bomGeneratedAt: new Date(),
+        },
+      });
+    });
+
+    console.log(`[BOM] Finalizat: ${bomItems.length} linii, cost total estimat: ${totalEstimatedCost.toFixed(2)} RON`);
+    return bomRepository.findByProject(projectId);
+  },
+
+  // ── OVERRIDE MANUAL (AI Copilot sau utilizator) ─────────────────
+
+  async updateMaterialOverride(projectId: number, formulaKey: string, newMaterialCode: string) {
+    const material = await prisma.material.findUnique({
+      where: { internalCode: newMaterialCode },
+    });
+
+    if (!material) {
+      throw new Error(`Materialul cu codul "${newMaterialCode}" nu există în baza de date. Verificați catalogul.`);
+    }
+
+    await prisma.projectMaterialOverride.upsert({
+      where:  { projectId_formulaKey: { projectId, formulaKey } },
+      update: { materialId: material.id },
+      create: { projectId, formulaKey, materialId: material.id },
+    });
+
+    // Recalculăm devizul cu noul material
+    return this.calculateBOM(projectId);
+  },
+
+  // ── HELPER: returnează contextul BOM pentru AI (folosit de agentOrchestrator) ──
+
+  getBOMContextForAI(projectId: number, project: {
+    seismicZone?: string | null;
+    soilType?: string | null;
+    frostDepthCm?: number | null;
+    totalFloors?: number | null;
+  }): string {
+    const ctx = buildContextMultipliers({
+      seismicZone:  project.seismicZone,
+      soilType:     project.soilType,
+      frostDepthCm: project.frostDepthCm,
+      totalFloors:  project.totalFloors,
+    });
+
+    return [
+      '[MULTIPLICATORI BOM — CALCULAȚI DETERMINIST]',
+      `  seismic_multiplier: ${ctx.seismic_multiplier} (${ctx.seismic_note})`,
+      `  soil_concrete_multiplier: ${ctx.soil_concrete_multiplier} (${ctx.soil_note})`,
+      `  Clasa beton fundație aplicată automat: ${ctx.concreteClass} (${ctx.concrete_note})`,
+      `  foundation_width_m: ${ctx.foundation_width_m}m`,
+      `  frost_depth_m: ${ctx.frost_depth_m}m`,
+      '',
+      'Când discuți despre fundație sau armătură, citează acești coeficienți.',
+      'Nu recalcula aceste valori — sunt determinate normativ.',
+    ].join('\n');
+  },
 };
+
+// ─────────────────────────────────────────────────────────────────
+// HELPER PRIVAT — construiește un item BOM cu nota completă
+// ─────────────────────────────────────────────────────────────────
+
+function buildBOMItem(
+  projectId: number,
+  material: { id: number; pricePerUnit: number },
+  formula: { phase: string; wastePercent: number; note: string; unit?: string },
+  formulaKey: string,
+  finalQty: number,
+  rawQuantity: number,
+  ctx: ReturnType<typeof buildContextMultipliers>,
+  extraNote: string
+): Prisma.ProjectBOMCreateManyInput {
+  const totalPrice = parseFloat((finalQty * material.pricePerUnit).toFixed(2));
+  const noteparts = [
+    formula.note,
+    `Q_brut=${rawQuantity.toFixed(3)} ${formula.unit ?? ''} × (1+${formula.wastePercent}% rebut) = ${finalQty.toFixed(2)} ${formula.unit ?? ''}`,
+    ctx.seismic_multiplier !== 1.0 ? ctx.seismic_note : null,
+    ctx.soil_concrete_multiplier !== 1.0 ? ctx.soil_note : null,
+    extraNote || null,
+  ].filter(Boolean).join(' | ');
+
+  return {
+    projectId,
+    materialId: material.id,
+    phase:      formula.phase,
+    formulaKey,
+    quantity:   finalQty,
+    unitPrice:  material.pricePerUnit,
+    totalPrice,
+    note:       noteparts,
+  };
+}
