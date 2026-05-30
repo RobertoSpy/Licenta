@@ -3,6 +3,7 @@ import { agentOrchestrator, suggestRoomProgram } from '../services/ai/agentOrche
 import { chatSummaryRepository } from '../repositories/chatSummaryRepository';
 import { projectRepository } from '../repositories/projectRepository';
 import { GoogleGenAI } from '@google/genai';
+import { searchHybrid } from '../services/ai/ragService';
 
 // Lazy init — același pattern ca în orchestrator
 let aiInstance: GoogleGenAI | null = null;
@@ -97,7 +98,31 @@ export const aiController = {
 
       res.on('close', () => clearTimeout(timeoutId));
 
-      const prompt = `Ești Zidario AI, un expert în inginerie civilă și optimizare bugete construcții rezidențiale. Explică pe scurt de ce un client ar trebui să aleagă '${alt}' în loc de '${base}', referindu-te la normative tehnice (ex: CR 6-2013 pentru zidărie, NE012 etc.) și confort termic. Max 100 cuvinte. Fii direct și profesionist.`;
+      const question = `Explică diferențele tehnice între materialele: "${alt}" vs "${base}". Include doar aspecte din normative.`;
+      const structuralChunks = await searchHybrid(question, 'structural', 3, undefined, 'residential');
+      const energeticChunks = await searchHybrid(question, 'energetic', 2, undefined, 'residential');
+      const combinedChunks = [...structuralChunks, ...energeticChunks];
+
+      if (combinedChunks.length === 0) {
+        res.write(`data: ${JSON.stringify({ meta: { noSources: true } })}\n\n`);
+        res.write(`data: ${JSON.stringify({ text: '⚠️ Atenție: Nu există surse normative indexate pentru această comparație. Verifică manual normativele aplicabile sau consultă un inginer proiectant.' })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+
+      const ragContext = combinedChunks
+        .map(c => `§ ${c.source} — ${c.chapter}:\n${c.content}`)
+        .join('\n\n');
+
+      const prompt = `Ești Zidario AI, expert în inginerie civilă și normative de construcții.
+Folosește EXCLUSIV sursele de mai jos. Dacă nu e suficientă informația, răspunde cu "⚠️ Atenție".
+
+SURSE NORMATIVE (RAG):
+${ragContext}
+
+Cerință:
+Explică pe scurt de ce un client ar trebui să aleagă "${alt}" în loc de "${base}", referindu-te strict la SURSELE de mai sus. Max 100 cuvinte. Fii direct și profesionist.`;
 
       // Simulam un call de RAG sau folosim modelul Gemini direct cu fallback
       const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
@@ -108,7 +133,8 @@ export const aiController = {
         try {
           stream = await getAi().models.generateContentStream({
             model: modelName,
-            contents: prompt
+            contents: prompt,
+            config: { maxOutputTokens: 220, temperature: 0.2 }
           });
           break; // Succes, ieșim din buclă
         } catch (e: any) {
@@ -139,6 +165,92 @@ export const aiController = {
       res.end();
     } catch (e: any) {
       console.error('[aiController.explainMaterial] Eroare:', e);
+      res.write(`data: ${JSON.stringify({ text: '\n[Eroare la generarea explicației.]' })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
+  },
+
+  async explainMaterialById(req: Request, res: Response): Promise<void> {
+    try {
+      const materialId = parseInt(req.params.materialId as string, 10);
+      if (isNaN(materialId)) {
+        res.status(400).json({ error: 'ID material invalid' });
+        return;
+      }
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      const timeoutId = setTimeout(() => {
+        res.write(`data: ${JSON.stringify({ text: '\n[Eroare: Timeout 90s]' })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }, 90000);
+
+      res.on('close', () => clearTimeout(timeoutId));
+
+      const { prisma } = await import('../lib/prisma');
+      const material: any = await prisma.material.findUnique({
+        where: { id: materialId },
+        include: { chunks: true } as any
+      });
+
+      if (!material) {
+        res.write(`data: ${JSON.stringify({ text: 'Materialul nu a fost găsit în baza de date.' })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+
+      let specs = material.description || '';
+      if (material.chunks && material.chunks.length > 0) {
+        specs += '\n\n' + material.chunks.map((c: any) => c.content).join('\n');
+      }
+
+      const prompt = `Ești Zidario AI, un expert tehnic în materiale de construcții.
+Oferă o explicație scurtă și pur tehnică (max 80 cuvinte) pentru beneficiile utilizării materialului "${material.name}" într-un proiect de construcție rezidențială.
+Folosește următoarele date tehnice disponibile:
+${specs}
+
+Nu folosi un ton de marketing, ci unul strict ingineresc (izolație termică, rezistență, compresiune, fonoizolație, utilitate). Nu saluta.`;
+
+      const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      let stream: any = null;
+      let lastError: any = null;
+      
+      for (const modelName of FALLBACK_MODELS) {
+        try {
+          stream = await getAi().models.generateContentStream({
+            model: modelName,
+            contents: prompt
+          });
+          break;
+        } catch (e: any) {
+          lastError = e;
+          const is503 = e?.status === 503 || String(e?.message).includes('503') || String(e?.message).toLowerCase().includes('high demand');
+          if (is503) continue;
+          break;
+        }
+      }
+      
+      if (!stream) {
+        throw new Error('Modelele sunt indisponibile.');
+      }
+
+      for await (const chunk of stream) {
+        if (chunk.text) {
+          res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+        }
+      }
+
+      clearTimeout(timeoutId);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    } catch (e: any) {
+      console.error('[aiController.explainMaterialById] Eroare:', e);
       res.write(`data: ${JSON.stringify({ text: '\n[Eroare la generarea explicației.]' })}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();
@@ -348,12 +460,34 @@ export async function validateMaterialOverride(req: Request, res: Response): Pro
     res.on('close', () => clearTimeout(timeoutId));
 
     // Construim un prompt concis + normativ
+    const question = `Conformitate normativă pentru înlocuire material: "${originalMaterialName}" -> "${newMaterialName}" pentru etapa ${formulaKey}.`;
+    const structuralChunks = await searchHybrid(question, 'structural', 3, undefined, 'residential');
+    const energeticChunks = await searchHybrid(question, 'energetic', 2, undefined, 'residential');
+    const combinedChunks = [...structuralChunks, ...energeticChunks];
+
+    if (combinedChunks.length === 0) {
+      res.write(`data: ${JSON.stringify({ meta: { noSources: true } })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: '⚠️ Atenție: Nu există surse normative indexate pentru această înlocuire. Verificați manual normativele aplicabile.' })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
+    const ragContext = combinedChunks
+      .map(c => `§ ${c.source} — ${c.chapter}:\n${c.content}`)
+      .join('\n\n');
+
     const contextBlock = projectContext
       ? `\nContextul proiectului:\n${projectContext}\n`
       : '';
 
     const prompt = `Ești Zidario AI, expert în inginerie civilă și normative de construcții românești.
 ${contextBlock}
+Foloseste EXCLUSIV sursele de mai jos. Dacă nu e suficientă informația, răspunde cu "⚠️ Atenție".
+
+SURSE NORMATIVE (RAG):
+${ragContext}
+
 Utilizatorul vrea să înlocuiască materialul original cu unul alternativ în cadrul etapei "${formulaKey}":
 - Material original: "${originalMaterialName}"
 - Material alternativ propus: "${newMaterialName}"

@@ -1,14 +1,24 @@
-import React from 'react';
-
-type BomPhaseKey = 'fundatie' | 'structura' | 'zidarie' | 'acoperis' | 'instalatii' | 'finisaje';
+type BomPhaseKey =
+  | 'fundatie'
+  | 'structura'
+  | 'planseu'
+  | 'termoizolatie'
+  | 'acoperis'
+  | 'tamplarie'
+  | 'instalatii'
+  | 'finisaje'
+  | 'exterior';
 
 const STEPS: Array<{ key: BomPhaseKey; label: string }> = [
   { key: 'fundatie', label: 'Fundatie' },
   { key: 'structura', label: 'Structura' },
-  { key: 'zidarie', label: 'Zidarie' },
+  { key: 'planseu', label: 'Planseu' },
+  { key: 'termoizolatie', label: 'Termoizolatie' },
   { key: 'acoperis', label: 'Acoperis' },
+  { key: 'tamplarie', label: 'Tamplarie' },
   { key: 'instalatii', label: 'Instalatii' },
   { key: 'finisaje', label: 'Finisaje' },
+  { key: 'exterior', label: 'Exterior' },
 ];
 
 interface ConstructionStepTrackerProps {

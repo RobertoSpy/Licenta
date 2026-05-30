@@ -93,9 +93,11 @@ export const ProjectEditor: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [projectTitle, setProjectTitle] = useState('Proiect');
-  const [projectData, setProjectData] = useState<Record<string, unknown> | null>(null);
+  const [projectData, setProjectData] = useState<Record<string, unknown>>({});
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isSwitchingFloor, setIsSwitchingFloor] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [canGoNext, setCanGoNext] = useState(false);
 
   // Stare dialog label
   const [labelDialog, setLabelDialog] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -267,11 +269,12 @@ export const ProjectEditor: React.FC = () => {
 
   // Salvează planul curent (dacă e cazul) și merge mai departe la Deviz
   const handleContinue = useCallback(async () => {
+    if (!canGoNext) return;
     if (isDirty) {
       await handleManualSave();
     }
     navigate(`/dashboard/projects/${projectId}/bom`);
-  }, [isDirty, handleManualSave, navigate, projectId]);
+  }, [canGoNext, isDirty, handleManualSave, navigate, projectId]);
 
   // Dialog label cameră
   const handleRoomLabelRequest = (id: string, x: number, y: number) => {
@@ -354,9 +357,9 @@ export const ProjectEditor: React.FC = () => {
         {/* Buton Continuă — Faza 3 */}
         <button
           onClick={handleContinue}
-          disabled={isSaving}
+          disabled={isSaving || !canGoNext}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50"
-          title="Salvează planul și mergi la Devizul de Materiale (Faza 3)"
+          title={canGoNext ? "Salvează planul și mergi la Devizul de Materiale (Faza 3)" : "Trebuie să răspunzi la întrebarea din chat-ul Zidario pentru a continua."}
         >
           {isSaving ? 'Se salvează...' : 'Continuă'}
           {!isSaving && <ChevronRight className="w-3.5 h-3.5" />}
@@ -372,6 +375,7 @@ export const ProjectEditor: React.FC = () => {
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
         isSaving={isSaving}
         lastSaved={lastSaved}
+        unreadCount={unreadCount}
         versionHistory={
           <EditorVersionHistory
             projectId={projectId}
@@ -434,6 +438,8 @@ export const ProjectEditor: React.FC = () => {
           projectData={projectData}
           isOpen={isChatOpen}
           onToggle={() => setIsChatOpen(false)}
+          onUnreadChange={(count) => setUnreadCount(count)}
+          onCanGoNextChange={(can) => setCanGoNext(can)}
         />
 
         {/* Panel Proprietăți (dreapta) - doar dacă nu e chat-ul deschis */}

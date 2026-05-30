@@ -1,13 +1,14 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
 import { Maximize, Layers, Compass, TrendingUp, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { ProjectFormData } from './ProjectWizard';
-import { AIChatBubble } from '../ai/AIChatBubble';
+
 
 interface Props {
   data: ProjectFormData;
   updateData: (fields: Partial<ProjectFormData>) => void;
+  addSystemMessage?: (content: string) => void;
 }
 
 const MapBoundsController = ({ positions }: { positions: [number, number][] }) => {
@@ -37,43 +38,33 @@ const calculateAreaFromMeters = (points: { x: string, y: string }[]) => {
 
 const springConfig = { type: "spring" as const, stiffness: 300, damping: 20 };
 
-// Mesaj educativ predefinit — nu afișăm valorile introduse, EDUCĂM utilizatorul
-const TERRAIN_WELCOME_MESSAGE = `👋 Bun venit la analiza terenului! Înainte să completezi câmpurile, hai să înțelegem ce înseamnă fiecare:
 
-📐 **PANTA TERENULUI**
-Cum se calculează: (diferență de nivel ÷ distanță orizontală) × 100
-Exemplu: dacă terenul coboară **1 metru** pe o lungime de **10 metri** → panta este **10%**.
-Cum o măsori: cu o aplicație pe telefon (Clinometer), cu un furtun de nivel, sau cu un topograf autorizat.
-⚠️ Conform **P100-1/2013**: pantele peste **30%** necesită studiu geotehnic obligatoriu.
-
-🌍 **TIPUL DE SOL — Cum îl recunoști vizual**
-• **Argilos** — lipicios umed, se crapă uscat, nu absoarbe apa rapid. Cel mai răspândit în România.
-• **Nisipos** — granulos, curge printre degete, absoarbe apa instant.
-• **Pietros** — pietre și bolovani, drenaj bun, portanță mare.
-• **Stâncos** — rocă solidă la suprafață. Cel mai sigur, dar costisitor de excavat.
-📋 Conform **NP 112-2014**: tipul de sol determină adâncimea minimă a fundației.
-
-🧭 **ORIENTAREA FAȚĂ DE STRADĂ**
-Direcția cardinală spre care privește fațada principală.
-• **Sud / Sud-Est** — lumină naturală maximă, consum energetic redus iarna.
-• **Nord** — camerele din față vor fi mai reci și mai puțin luminate.
-
-📝 **NOTE ADIȚIONALE TEREN (Opțional)**
-Aici poți nota particularități esențiale observate pe teren care mă vor ajuta să evaluez riscurile și costurile de fundare:
-• Există apă la suprafață (pânză freatică ridicată)?
-• Terenul este mlăștinos sau de umplutură?
-• Există risc de alunecare de teren în zonă?
-
-Pune-mi orice întrebare! 🏗️`;
-
-export const Step2Terrain = ({ data, updateData }: Props) => {
+export const Step2Terrain = ({ data, updateData, addSystemMessage }: Props) => {
   const calculatedArea = useMemo(() => calculateAreaFromMeters(data.plotCoordinates), [data.plotCoordinates]);
+  const hasAskedTerrainQuestion = useRef(false);
 
   useEffect(() => {
     if (calculatedArea > 0 && data.plotAreaSqm !== calculatedArea) {
       updateData({ plotAreaSqm: calculatedArea });
     }
   }, [calculatedArea, data.plotAreaSqm, updateData]);
+
+  useEffect(() => {
+    if (addSystemMessage && !hasAskedTerrainQuestion.current) {
+      if (data.slopePercent > 0 || (data.soilType && data.soilType !== 'Nu știu')) {
+        hasAskedTerrainQuestion.current = true;
+        let msg = "";
+        if (data.slopePercent > 5) {
+          msg = `Văd că terenul tău are o pantă de **${data.slopePercent}%**. Știai că o pantă mai mare de 5% necesită de obicei un studiu geotehnic mai aprofundat și soluții de fundare în trepte sau ziduri de sprijin? \n\nAi înțeles cum îți poate afecta panta costul fundației, sau vrei să detaliez?`;
+        } else if (data.soilType && data.soilType !== 'Nu știu') {
+          msg = `Ai selectat tipul de sol **${data.soilType}**. Tipul solului este determinant pentru presiunea convențională pe care o poate suporta terenul. \n\nAi idee cum influențează natura solului (${data.soilType}) adâncimea și costul fundației tale, sau ai dori să-ți explic?`;
+        } else {
+          msg = `Ai configurat datele despre pantă și sol! Aceste detalii geotehnice dictează tipul de fundație necesar. \n\nEști confortabil cu aceste valori și înțelegi impactul lor asupra costurilor, sau ai vrea să îți detaliez?`;
+        }
+        addSystemMessage(msg);
+      }
+    }
+  }, [data.slopePercent, data.soilType, addSystemMessage]);
 
   const orientations = [
     { id: 'N', name: 'Nord' }, { id: 'NE', name: 'Nord-Est' }, 
@@ -246,12 +237,6 @@ export const Step2Terrain = ({ data, updateData }: Props) => {
           </div>
         </div>
       </motion.div>
-
-      <AIChatBubble 
-        contextData={data as unknown as Record<string, unknown>}
-        welcomeMessage={TERRAIN_WELCOME_MESSAGE}
-        defaultOpen={true}
-      />
     </div>
   );
 };

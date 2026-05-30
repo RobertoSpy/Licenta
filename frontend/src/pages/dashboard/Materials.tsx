@@ -7,7 +7,7 @@ interface Material {
   id: number;
   name: string;
   category: string;
-  price: number;
+  pricePerUnit?: number;
   unit: string;
   inStock?: boolean;
   stockQuantity?: number;
@@ -196,7 +196,7 @@ export const Materials = () => {
 
               <div className="flex items-end justify-between mt-auto pt-4 border-t border-slate-100">
                 <div>
-                  <span className="text-2xl font-black text-buildorange">{mat.price.toFixed(2)}</span>
+                  <span className="text-2xl font-black text-buildorange">{(mat.pricePerUnit ?? 0).toFixed(2)}</span>
                   <span className="text-slate-500 text-sm font-medium ml-1">lei / {mat.unit.toLowerCase()}</span>
                 </div>
               </div>

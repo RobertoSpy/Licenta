@@ -1,11 +1,12 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Building2, Palette, Info, Check, AlertCircle } from 'lucide-react';
 import type { ProjectFormData } from './ProjectWizard';
-import { AIChatBubble } from '../ai/AIChatBubble';
 
 interface Props {
   data: ProjectFormData;
   updateData: (fields: Partial<ProjectFormData>) => void;
+  addSystemMessage?: (message: string) => void;
 }
 
 const containerVariants = {
@@ -44,43 +45,23 @@ const styles = [
   { id: 'Industrial', name: 'Industrial / Loft', desc: 'Mix de cărămidă, metal și beton aparent. Aspect brut.', color: 'slate' }
 ];
 
-// Mesaj predefinit educativ pentru tipurile de case
-const HOUSE_TYPE_WELCOME_MESSAGE = `🏠 Bun venit la alegerea viziunii arhitecturale! Hai să îți explic fiecare stil ca să alegi ce ți se potrivește:
-
-🔲 **MINIMALIST / MODERN**
-Linii drepte, ferestre mari de podea până la tavan, acoperiș plat sau cu pantă mică.
-Avantaje: costuri constructive mai mici, întreținere ușoară, aspect curat.
-Exemple vizuale: archdaily.com/tag/minimalist-house
-Conform **RGU**: acoperișul terasă poate oferi un regim de înălțime mai favorabil în unele localități.
-
-🏛️ **CLASIC ROMÂNESC**
-Simetrie, ornamente, acoperiș înalt cu 4 ape, coarne la streașină.
-Integrat în peisajul tradițional românesc, agreat în zonele rurale.
-⚠️ Atenție: în zone protejate istorice, **Legea 422/2001** impune restricții stilistice obligatorii.
-
-🌊 **MEDITERANEAN**
-Terase largi, arce de cerc, culori calde (ocru, teracotă), vegetație integrantă.
-Necesită **izolație termică extinsă** (cf. **C107/2005**) — nu este optimizat pentru climatul rece din zonele montane sau Moldova.
-Exemple: houzz.com/photos/mediterranean-exterior
-
-⚙️ **INDUSTRIAL / LOFT**
-Beton aparent, metal, cărămidă expusă, tavane înalte, deschideri mari.
-Necesită **calcul structural** obligatoriu pentru grinzi pe deschideri mari — inginer structurist autorizat.
-Cost mai mare la execuție față de stilurile clasice.
-
----
-📋 **REGIM DE ÎNĂLȚIME — Ce trebuie să știi:**
-• **Subsol**: nu contează ca etaj locuit (cf. **RGU art.32**), dar adaugă **15-25%** la costul fundației. Recomandat pentru zone cu pantă sau nivel freatic adânc.
-• **Mansardă locuibilă**: contează ca **½ etaj** în calculul POT/CUT cf. **Legea 350/2001**. Valorifică spațiul podului fără a construi un etaj complet.
-• **Etaj complet**: cost mai mare, dar suprafață maximă cu același amprentă la sol.
-
-Ai întrebări despre oricare din opțiuni? 🏗️`;
-
-export const Step4HouseType = ({ data, updateData }: Props) => {
+export const Step4HouseType = ({ data, updateData, addSystemMessage }: Props) => {
   const maxFloors = data.maxAllowedFloors || 2;
+  const hasTriggeredQuestion = React.useRef(false);
+
+  React.useEffect(() => {
+    if (data.houseStyle && addSystemMessage && !hasTriggeredQuestion.current) {
+       hasTriggeredQuestion.current = true;
+       import('../../data/tutorialContent').then(({ SCREEN_TUTORIALS }) => {
+          if (SCREEN_TUTORIALS.step4.questionMessage) {
+             addSystemMessage(SCREEN_TUTORIALS.step4.questionMessage);
+          }
+       });
+    }
+  }, [data.houseStyle, data.upperFloorsCount, data.hasBasement, addSystemMessage]);
 
   const toggleBasement = () => updateData({ hasBasement: !data.hasBasement });
-  const toggleMansard = () => updateData({ hasMansard: !data.hasMansard });
+
   const setUpperFloors = (count: number) => {
     if (count + 1 > maxFloors) return;
     updateData({ upperFloorsCount: count });
@@ -198,8 +179,6 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
               </div>
             </div>
 
-
-
             {/* Summary Alert */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex gap-3">
               <Info className="w-5 h-5 text-slate-400 shrink-0" />
@@ -212,12 +191,6 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
         </section>
 
       </div>
-
-      {/* AI Assistant cu mesaj predefinit despre tipurile de case */}
-      <AIChatBubble 
-        contextData={data as unknown as Record<string, unknown>}
-        welcomeMessage={HOUSE_TYPE_WELCOME_MESSAGE}
-      />
     </motion.div>
   );
 };

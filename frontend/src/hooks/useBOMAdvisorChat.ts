@@ -7,66 +7,56 @@
 //   - Suportă mesaj de bun venit inițial (autoGreet)
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { fetchWithAuth, apiPrivate } from '../api/axios';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
   isStreaming?: boolean;
+  isSystemInjection?: boolean;
+  requiresAnswer?: boolean;
 }
 
-type BomPhaseKey = 'fundatie' | 'structura' | 'zidarie' | 'acoperis' | 'instalatii' | 'finisaje';
+export type BomPhaseKey =
+  | 'fundatie'
+  | 'structura'
+  | 'planseu'
+  | 'termoizolatie'
+  | 'acoperis'
+  | 'tamplarie'
+  | 'instalatii'
+  | 'finisaje'
+  | 'exterior';
 
 export function useBOMAdvisorChat(projectId: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activePhase, setActivePhase] = useState<BomPhaseKey>('fundatie');
   const [completedPhases, setCompletedPhases] = useState<BomPhaseKey[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+
+  const addSystemMessage = useCallback((content: string, requiresAnswer = true) => {
+    setMessages(prev => {
+      if (prev.some(m => m.text === content)) return prev;
+      return [...prev, { role: 'assistant', text: content, isSystemInjection: true, requiresAnswer }];
+    });
+    setUnreadCount(prev => prev + 1);
+  }, []);
+
+  const markAsRead = useCallback(() => {
+    setUnreadCount(0);
+  }, []);
 
   useEffect(() => {
     if (!projectId) return;
 
     let isMounted = true;
 
-    const loadIntro = async () => {
-      try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/bom/${projectId}/intro`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            },
-          }
-        );
-
-        if (!response.ok) throw new Error('Intro failed');
-        const data = await response.json();
-
-        if (isMounted) {
-          setMessages([{ role: 'assistant', text: data.text || 'Salut! Cu ce te pot ajuta?' }]);
-        }
-      } catch {
-        if (isMounted) {
-          setMessages([{ role: 'assistant', text: 'Salut! Cu ce te pot ajuta?' }]);
-        }
-      }
-    };
-
     const loadPhaseState = async () => {
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/bom/${projectId}/phase-state`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            },
-          }
-        );
-
-        if (!response.ok) return;
-        const data = await response.json();
+        const response = await apiPrivate.get(`/bom/${projectId}/phase-state`);
+        const data = response.data;
         if (data?.activePhase && isMounted) {
           setActivePhase(data.activePhase as BomPhaseKey);
         }
@@ -78,7 +68,6 @@ export function useBOMAdvisorChat(projectId: string) {
       }
     };
 
-    loadIntro();
     loadPhaseState();
 
     return () => {
@@ -101,13 +90,12 @@ export function useBOMAdvisorChat(projectId: string) {
     abortRef.current = controller;
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/bom/${projectId}/chat`,
+      const response = await fetchWithAuth(
+        `/api/bom/${projectId}/chat`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
           signal: controller.signal,
           body: JSON.stringify({
@@ -199,18 +187,8 @@ export function useBOMAdvisorChat(projectId: string) {
 
   const confirmPhase = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/bom/${projectId}/phase-state/confirm`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      );
-
-      if (!response.ok) return;
-      const data = await response.json();
+      const response = await apiPrivate.post(`/bom/${projectId}/phase-state/confirm`);
+      const data = response.data;
       if (data?.activePhase) setActivePhase(data.activePhase as BomPhaseKey);
       if (Array.isArray(data?.completedPhases)) {
         setCompletedPhases(data.completedPhases as BomPhaseKey[]);
@@ -220,5 +198,16 @@ export function useBOMAdvisorChat(projectId: string) {
     }
   }, [projectId]);
 
-  return { messages, isLoading, sendMessage, clearHistory, activePhase, completedPhases, confirmPhase };
+  return {
+    messages,
+    isLoading,
+    sendMessage,
+    clearHistory,
+    activePhase,
+    completedPhases,
+    confirmPhase,
+    addSystemMessage,
+    unreadCount,
+    markAsRead
+  };
 }

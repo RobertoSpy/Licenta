@@ -33,6 +33,8 @@ export interface ProjectContextInput {
   soilType?: string | null;        // ex: 'Argilos', 'Nisipos', 'Stâncos', 'Pietros'
   frostDepthCm?: number | null;    // ex: 100 — din Faza 1, NP112-2014 Anexa B
   totalFloors?: number | null;     // ex: 2 — numărul de niveluri supraterane
+  houseStyle?: string | null;      // ex: 'Modern', 'Industrial'
+  energyClass?: string | null;     // ex: 'A'
 }
 
 /** Materialul betonului selectat determinist din ag + frost. Tipuri sigure, nu string liber. */
@@ -41,45 +43,40 @@ export type ConcreteClass = 'C20/25-XC2' | 'C25/30-XF2';
 
 export interface ContextMultipliers {
   // ── Multiplicator armătură seismică ────────────────────────────
-  /** Factor aplicat pe cantitățile de fier din fundație și stâlpișori.
-   *  Derivat din clasa de ductilitate DCM/DCH (P100-1/2013 Cap.8). */
   seismic_multiplier: number;
 
   // ── Multiplicator beton fundație ───────────────────────────────
-  /** Factor aplicat pe volumul de beton al fundației.
-   *  Sol slab (argilă/loess) → talpă mai lată → mai mult beton (NP112-2014 Tab.4.1). */
   soil_concrete_multiplier: number;
 
   // ── Lățimea tălpii fundației ────────────────────────────────────
-  /** Lățimea calculată a tălpii continue de fundație, în metri.
-   *  Baza: 0.50m per 1 etaj + corecție sol (NP112-2014 Cap.4). */
   foundation_width_m: number;
 
   // ── Cantitate armătură de referință ────────────────────────────
-  /** kg armătură la 1 mc beton fundație, înainte de multiplicatorul seismic.
-   *  Valoare de bază: 15 kg/mc (Conform NE012-1:2022 dozaj minim fundații). */
   base_rebar_kg_per_mc: number;
 
   // ── Adâncimea fundației ─────────────────────────────────────────
-  /** Adâncimea de fundare în metri (10cm sub limita de îngheț, min 0.80m).
-   *  Conform NP112-2014 Art.5.3. */
   frost_depth_m: number;
 
   // ── Clasa de beton selectată determinist ───────────────────────
-  /** Codul materialului din catalog DB — niciodată string liber. */
-  concreteCode: ConcreteMaterialCode;
-  /** Clasa tehnică de beton conform NE012-1:2022 Tab.E.1. */
-  concreteClass: ConcreteClass;
+  concreteCode: ConcreteMaterialCode | 'STANDARD_BETON_C30_37';
+  concreteClass: ConcreteClass | 'C30/37-XF4';
+
+  // ── Selecții Inteligente Materiale (AI defaults) ───────────────
+  exteriorWallCode: string;
+  interiorWallCode: string;
+  insulationExteriorCode: string;
+  insulationRoofCode: string;
+  windowsCode: string;
+  rebarCode: string;
 
   // ── Stâlpișori zidărie confinată ───────────────────────────────
-  /** Numărul estimat de stâlpișori de beton (ZC per CR6-2013 Art.7.4).
-   *  Formula: colțuri_ext + intersecții(~4.5m) + goluri_mari (uși + ferestre ext.). */
   count_corners_and_intersections: number;
 
   // ── Note pentru transparență (incluse în câmpul note al BOM) ───
   seismic_note: string;
   soil_note: string;
   concrete_note: string;
+  materials_note: string;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -87,14 +84,9 @@ export interface ContextMultipliers {
 // ─────────────────────────────────────────────────────────────────
 
 interface SeismicRule {
-  /** Prag minim ag pentru această regulă. */
   agMin: number;
-  /** Clasa de ductilitate conform P100-1/2013. */
   ductilityClass: 'DCL' | 'DCM' | 'DCH';
-  /** Multiplicator estimat pentru cantitățile de armătură.
-   *  Sursa: NE012-1:2022 Tab.5.2 ρmin per clasă + devize reale. */
   multiplier: number;
-  /** Sursă normativă exactă pentru transparență în BOM. */
   _normSource: string;
 }
 
@@ -142,11 +134,8 @@ const SEISMIC_RULES: SeismicRule[] = [
 // ─────────────────────────────────────────────────────────────────
 
 interface SoilRule {
-  /** Regex aplicat pe soilType (case-insensitive). */
   pattern: RegExp;
-  /** Factor lățime talpă fundație (1.0 = 50cm bază, 1.3 = 65cm etc.). */
   concreteMult: number;
-  /** Sursă normativă. */
   _normSource: string;
   label: string;
 }
@@ -188,7 +177,6 @@ const SOIL_RULES: SoilRule[] = [
 // FUNCȚII HELPER
 // ─────────────────────────────────────────────────────────────────
 
-/** Parsează '0.35g' → 0.35. Returnează 0 dacă input invalid. */
 function parseAg(seismicZone?: string | null): number {
   if (!seismicZone) return 0;
   const match = seismicZone.match(/(\d+\.?\d*)\s*g/i);
@@ -196,11 +184,10 @@ function parseAg(seismicZone?: string | null): number {
 }
 
 function getSeismicRule(ag: number): SeismicRule {
-  // Sortate descrescător — primul care trece de prag câștigă
   for (const rule of SEISMIC_RULES) {
     if (ag >= rule.agMin) return rule;
   }
-  return SEISMIC_RULES[SEISMIC_RULES.length - 1]; // DCL fallback
+  return SEISMIC_RULES[SEISMIC_RULES.length - 1]; 
 }
 
 function getSoilRule(soilType?: string | null): SoilRule {
@@ -209,7 +196,6 @@ function getSoilRule(soilType?: string | null): SoilRule {
       if (rule.pattern.test(soilType)) return rule;
     }
   }
-  // Default: sol mediu (nisip compact) — cel mai frecvent în România periurban
   return {
     pattern: /.*/,
     concreteMult: 1.05,
@@ -218,22 +204,26 @@ function getSoilRule(soilType?: string | null): SoilRule {
   };
 }
 
-/** Lățimea fundației în metri: baza 0.50m + 0.10m per etaj + corecție sol.
- *  Conform NP112-2014 Cap.4 + practică inginerească. */
 function calcFoundationWidth(floors: number, soilMult: number): number {
-  const baseWidthM = 0.50 + (floors - 1) * 0.10; // 0.50m parter, +10cm per etaj
+  const baseWidthM = 0.50 + (floors - 1) * 0.10; 
   const raw = baseWidthM * soilMult;
-  // Rotunjim la 5cm (precizia cofrelor standard)
   return Math.round(raw * 20) / 20;
 }
 
-/** Clasa betonului: ag ≥ 0.30g SAU adâncime îngheț > 90cm → C25/30-XF2.
- *  NE012-1:2022 Tab.E.1 + NP112-2014 Art.5.3. */
-function calcConcreteClass(ag: number, frostDepthCm: number): { code: ConcreteMaterialCode; class: ConcreteClass; note: string } {
-  const needsUpgrade = ag >= 0.30 || frostDepthCm > 90;
+function calcConcreteClass(ag: number, frostDepthCm: number, soilType?: string | null): { code: string; class: string; note: string } {
+  const isWeakSoil = soilType && /argi|nisip|lut/i.test(soilType);
+  if (ag >= 0.30 && isWeakSoil) {
+     return {
+      code: 'STANDARD_BETON_C30_37',
+      class: 'C30/37-XF4',
+      note: `C30/37 aplicat automat: zonă seismică severă (${ag}g) + sol slab (${soilType})`,
+     };
+  }
+
+  const needsUpgrade = ag >= 0.25 || frostDepthCm > 90;
   if (needsUpgrade) {
     const reasons: string[] = [];
-    if (ag >= 0.30) reasons.push(`ag=${ag}g ≥ 0.30g (zonă DCH)`);
+    if (ag >= 0.25) reasons.push(`ag=${ag}g ≥ 0.25g`);
     if (frostDepthCm > 90) reasons.push(`îngheț ${frostDepthCm}cm > 90cm (XF2)`);
     return {
       code: 'STANDARD_BETON_C25_30',
@@ -244,7 +234,7 @@ function calcConcreteClass(ag: number, frostDepthCm: number): { code: ConcreteMa
   return {
     code: 'STANDARD_BETON_C20_25',
     class: 'C20/25-XC2',
-    note: `C20/25-XC2: ag=${ag}g <0.30g și îngheț ${frostDepthCm}cm ≤90cm — NE012-1:2022 Tab.E.1 (expunere XC2)`,
+    note: `C20/25-XC2: ag=${ag}g <0.25g și îngheț ${frostDepthCm}cm ≤90cm — NE012-1:2022 Tab.E.1`,
   };
 }
 
@@ -252,15 +242,6 @@ function calcConcreteClass(ag: number, frostDepthCm: number): { code: ConcreteMa
 // FUNCȚIA PRINCIPALĂ — EXPORT
 // ─────────────────────────────────────────────────────────────────
 
-/**
- * Calculează toți multiplicatorii contextuali pentru un proiect dat.
- *
- * @param input - Date din Faza 1 a proiectului (seismicZone, soilType, frostDepthCm, totalFloors)
- * @param planMetrics - (opțional) metrici extrase din PlanSnapshot pentru calcul stâlpișori exact
- *
- * Returnează un obiect imutabil cu toți coeficienții + notele normative asociate.
- * Nu are efecte secundare, nu face apeluri la DB sau externe.
- */
 export function buildContextMultipliers(
   input: ProjectContextInput,
   planMetrics?: {
@@ -270,40 +251,70 @@ export function buildContextMultipliers(
   }
 ): ContextMultipliers {
   const ag = parseAg(input.seismicZone);
-  const frostDepthCm = input.frostDepthCm ?? 80; // default 80cm (zona temperată fără date)
+  const frostDepthCm = input.frostDepthCm ?? 80; 
   const floors = Math.max(1, input.totalFloors ?? 1);
 
-  // 1. Reguli seismice
   const seismicRule = getSeismicRule(ag);
-
-  // 2. Reguli sol
   const soilRule = getSoilRule(input.soilType);
-
-  // 3. Lățimea fundației (combină etaje + sol)
   const foundationWidthM = calcFoundationWidth(floors, soilRule.concreteMult);
-
-  // 4. Clasa betonului
-  const concreteInfo = calcConcreteClass(ag, frostDepthCm);
-
-  // 5. Adâncimea fundației: 10cm sub limita de îngheț, min 80cm (NP112-2014 Art.5.3)
+  const concreteInfo = calcConcreteClass(ag, frostDepthCm, input.soilType);
   const frostDepthM = Math.max((frostDepthCm + 10) / 100, 0.80);
 
-  // 6. Stâlpișori de zidărie confinată (CR6-2013 Art.7.4)
-  //    – 4 colțuri exterioare (casă dreptunghiulară de bază)
-  //    – 1 stâlpișor la fiecare ~4.5m de perete interior structurat (max dist. CR6)
-  //    – 1 stâlpișor per gol mare (fereastră + ușă exterior > 1.2m lățime) — reglementat CR6-2013 Art.7.4.3
-  const interiorWallsM = planMetrics?.interiorWallsM ?? 20 * floors; // fallback estimare
+  const interiorWallsM = planMetrics?.interiorWallsM ?? 20 * floors; 
   const countWindows = planMetrics?.countWindows ?? 6 * floors;
   const countExtDoors = planMetrics?.countExteriorDoors ?? 1;
 
   const count_corners_and_intersections = Math.round(
-    4                                          // colțuri exterioare fixe (formă dreptunghiulară)
-    + Math.floor(interiorWallsM / 4.5)         // intersecții pereți interiori la max 4.5m (CR6-2013 Art.7.4.2)
-    + countWindows                             // stâlpișori la goluri ferestre (>1.2m lățime tipic)
-    + countExtDoors                            // stâlpișori la uși exterioare
+    4 
+    + Math.floor(interiorWallsM / 4.5) 
+    + countWindows 
+    + countExtDoors 
   );
 
-  // 7. Notele finale pentru câmpul 'note' din BOM
+  // LOGICA INTELIGENTĂ MATERIALE
+  let exteriorWallCode = 'STANDARD_BCA_25';
+  let interiorWallCode = 'STANDARD_BCA_12';
+  let insulationExteriorCode = 'polistiren-eps-10cm';
+  let insulationRoofCode = 'vata-minerala-15cm';
+  let windowsCode = 'STANDARD_FEREASTRA_PVC';
+  let rebarCode = 'STANDARD_FIER_12';
+
+  const isColdClimate = frostDepthCm > 90;
+  const isHighSeismic = ag >= 0.25;
+  const isWeakSoil = input.soilType && /argi|lut|loess|praf|turb|umpl/i.test(input.soilType);
+  const isStableSoil = input.soilType && /nisip|pietri|bolovan|balast|stanc|roc/i.test(input.soilType);
+
+  // ZIDĂRIE EXTERIOARĂ
+  if (ag >= 0.30) {
+    exteriorWallCode = 'CARAMIDA_POROTHERM_38'; // ag mare -> cărămidă groasă
+    rebarCode = 'STANDARD_FIER_14'; // extra ductilitate
+  } else if (ag >= 0.25) {
+    exteriorWallCode = 'CARAMIDA_POROTHERM_30';
+  } else if (ag <= 0.20 && isStableSoil) {
+    exteriorWallCode = 'STANDARD_BCA_25';
+  } else if (isColdClimate) {
+    exteriorWallCode = 'BCA_YTONG_30';
+  } else if (isWeakSoil) {
+    exteriorWallCode = 'CARAMIDA_POROTHERM_30';
+  }
+
+  // FERESTRE
+  const style = (input.houseStyle || '').toLowerCase();
+  if (style === 'modern' || style === 'industrial') {
+    windowsCode = 'FEREASTRA_ALUMINIU';
+  } else if (input.energyClass === 'A') {
+    windowsCode = 'FEREASTRA_PVC_3K';
+  } else if (isColdClimate) {
+    windowsCode = 'FEREASTRA_PVC_3K';
+  }
+
+  // TERMOIZOLAȚIE ACOPERIȘ
+  if (isColdClimate) {
+    insulationRoofCode = 'VATA_MINERALA_20';
+  }
+
+  const materials_note = `Selecții inteligente: PereteExt=${exteriorWallCode}, IzolExt=${insulationExteriorCode}, IzolAcoperis=${insulationRoofCode}, Tâmplărie=${windowsCode}, Armătură=${rebarCode}.`;
+
   const seismic_note =
     ag > 0
       ? `seismic_mult=${seismicRule.multiplier} (ag=${ag}g, ${seismicRule.ductilityClass} — ${seismicRule._normSource})`
@@ -316,13 +327,22 @@ export function buildContextMultipliers(
     seismic_multiplier:       seismicRule.multiplier,
     soil_concrete_multiplier: soilRule.concreteMult,
     foundation_width_m:       foundationWidthM,
-    base_rebar_kg_per_mc:     15, // kg/mc — NE012-1:2022 dozaj minim, înmulțit de seismic_multiplier în formulă
+    base_rebar_kg_per_mc:     15, 
     frost_depth_m:            frostDepthM,
-    concreteCode:             concreteInfo.code,
-    concreteClass:            concreteInfo.class,
+    concreteCode:             concreteInfo.code as any,
+    concreteClass:            concreteInfo.class as any,
     count_corners_and_intersections,
+    
+    exteriorWallCode,
+    interiorWallCode,
+    insulationExteriorCode,
+    insulationRoofCode,
+    windowsCode,
+    rebarCode,
+
     seismic_note,
     soil_note,
     concrete_note: concreteInfo.note,
+    materials_note,
   };
 }

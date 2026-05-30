@@ -7,6 +7,7 @@ import type { ProjectFormData } from './ProjectWizard';
 interface Props {
   data: ProjectFormData;
   updateData: (fields: Partial<ProjectFormData>) => void;
+  addSystemMessage?: (message: string) => void;
 }
 
 const containerVariants = {
@@ -40,7 +41,7 @@ const itemVariants = {
   }
 };
 
-export const Step3Regulations = ({ data, updateData }: Props) => {
+export const Step3Regulations = ({ data, updateData, addSystemMessage }: Props) => {
   const [isPredicting, setIsPredicting] = useState(true);
   const [aiExplanation, setAiExplanation] = useState("");
   const aiExplanationRef = useRef("");
@@ -71,19 +72,20 @@ export const Step3Regulations = ({ data, updateData }: Props) => {
           'Authorization': `Bearer ${token}`
         },
 body: JSON.stringify({
-  message: `Explică reglementările tehnice pentru terenul meu 
+  message: `Oferă un rezumat detaliat și explicativ pentru reglementările tehnice ale terenului meu 
     din ${data.locality || data.county || 'România'}, 
     județul ${data.county}. 
-    Zona seismică este ${data.seismicZone} conform P100-1/2013 
-    și adâncimea de îngheț este ${data.frostDepthCm}cm 
-    conform NP112-2014. 
+    Zona seismică este ${data.seismicZone} 
+    și adâncimea de îngheț este de ${data.frostDepthCm}cm. 
     Explică de ce sunt importante aceste valori pentru fundație 
     și câte etaje pot construi tehnic.
     Menționează obligatoriu că limita tehnică națională este 
     P+${data.maxAllowedFloors} dar că trebuie să obțin 
     Certificatul de Urbanism de la Primăria ${data.locality} 
     pentru a afla restricțiile locale exacte prin PUG, 
-    deoarece acestea pot fi mai stricte decât limita națională.`,
+    deoarece acestea pot fi mai stricte decât limita națională.
+    IMPORTANT: Acesta trebuie să fie doar un rezumat informativ și detaliat. NU îmi pune nicio întrebare la final și nu mă invita la dialog. Nu folosi expresii de genul "poți să-mi spui" sau "ce părere ai".
+    CRITIC: Bazează-te STRICT pe contextul furnizat și pe extrasele din baza ta de date vectorizată (RAG) pentru a identifica și aplica normativele tehnice naționale corecte. Nu inventa reguli, nu face presupuneri și menține un ton profesional de expert inginer structurist.`,
   contextString: `
     Județ: ${data.county}
     Localitate: ${data.locality}
@@ -123,6 +125,15 @@ body: JSON.stringify({
         }
       }
       updateData({ zoningRestrictions: aiExplanationRef.current });
+      
+      // Inject the blocking question after AI finishes explaining
+      if (addSystemMessage) {
+        import('../../data/tutorialContent').then(({ SCREEN_TUTORIALS }) => {
+           if (SCREEN_TUTORIALS.step3.questionMessage) {
+              addSystemMessage(SCREEN_TUTORIALS.step3.questionMessage);
+           }
+        });
+      }
     } catch {
       setAiExplanation("Eroare la generarea explicației AI. Te rugăm să verifici conexiunea.");
     } finally {

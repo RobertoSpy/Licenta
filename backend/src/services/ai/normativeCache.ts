@@ -39,17 +39,15 @@ export const normativeCache = {
       // CR1-1-4/2012 — Zone de vânt per județ (qb în kPa)
       const windZones = readJson('wind-zones.json');
 
-      // P91-INCERC — Costuri orientative construcție rezidențială (lei/mc)
-      const buildCosts = readJson('build-costs.json');
-
-      cache =
+      const cacheContent =
         `=== NORMATIVE STATICE CAG (date numerice exacte, referință fixă) ===\n\n` +
         `[P100-1/2013 — Zone Seismice per Județ]\n${seismicTable}\n\n` +
         `[NP112-2014 — Adâncime Îngheț per Județ]\n${frostTable}\n\n` +
         `[P100-1/2013 + NP112-2014 — Etaje Maxime per Zonă Seismică și Tip Sol]\n${floorRules}\n\n` +
         `[CR1-1-3/2012 — Zone Zăpadă per Județ (sk0 kN/m²)]\n${snowZones}\n\n` +
-        `[CR1-1-4/2012 — Zone Vânt per Județ (qb kPa)]\n${windZones}\n\n` +
-        `[P91-INCERC — Costuri Orientative Construcție Rezidențială (lei/mc)]\n${buildCosts}\n\n`;
+        `[CR1-1-4/2012 — Zone Vânt per Județ (qb kPa)]\n${windZones}\n\n`;
+
+      cache = cacheContent;
 
       return cache;
     } catch (e: any) {

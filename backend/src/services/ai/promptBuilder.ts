@@ -24,6 +24,13 @@ export async function buildRAGContext(
 
   const contextParts = await Promise.all(
     agents.map(async agent => {
+      if (agent === 'materiale') {
+        const { ragService } = await import('./ragService');
+        const materialChunks = await ragService.searchRelevantMaterialChunks(question, limitPerAgent);
+        if (materialChunks.includes('Nu am găsit')) return null;
+        return `[AGENT MATERIALE]\n${materialChunks}`;
+      }
+
       const purpose = (project.buildingPurpose as BuildingPurpose) ?? 'residential';
       const agentSources = AGENT_SOURCES_BY_PURPOSE[purpose]?.[agent] || [];
 

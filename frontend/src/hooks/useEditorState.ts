@@ -17,7 +17,7 @@ export const GRID_SIZE_PX = 20; // 1 celulă = 1m real
 export const pxToMeters = (px: number): number => parseFloat((px / PIXELS_PER_METER).toFixed(3));
 export const metersToPx = (m: number): number => Math.round(m * PIXELS_PER_METER);
 
-export type ToolType = 'select' | 'room' | 'wall' | 'door' | 'window' | 'staircase';
+export type ToolType = 'select' | 'room' | 'wall' | 'door' | 'window' | 'staircase' | 'terasa';
 
 export interface CanvasElement {
   id: string;
@@ -112,11 +112,36 @@ interface EditorStore {
 const MAX_UNDO = 50;
 
 const DEFAULT_ROOMS: ConfiguratorRoom[] = [
-  { id: 'r-1', label: 'Living', ratioValue: 3 },
-  { id: 'r-2', label: 'Bucătărie', ratioValue: 2 },
-  { id: 'r-3', label: 'Dormitor 1', ratioValue: 2 },
-  { id: 'r-4', label: 'Baie', ratioValue: 1.5 },
-  { id: 'r-5', label: 'Hol', ratioValue: 1.2 },
+  {
+    id: 'r-1', label: 'Living', ratioValue: 3, zone: 'zi',
+    naturalLight: true, orientation: ['S', 'SE'],
+    hasDoorTo: ['Hol', 'Bucătărie'],
+    isCirculation: false,
+  },
+  {
+    id: 'r-2', label: 'Bucătărie', ratioValue: 2, zone: 'zi',
+    naturalLight: true, orientation: ['E', 'N'],
+    hasDoorTo: ['Hol'],
+    isCirculation: false,
+  },
+  {
+    id: 'r-3', label: 'Dormitor 1', ratioValue: 2, zone: 'noapte',
+    naturalLight: true, orientation: ['S', 'E'],
+    hasDoorTo: ['Hol'],
+    isCirculation: false,
+  },
+  {
+    id: 'r-4', label: 'Baie', ratioValue: 1.5, zone: 'noapte',
+    naturalLight: false,
+    hasDoorTo: ['Hol'],
+    isCirculation: false,
+  },
+  {
+    id: 'r-5', label: 'Hol', ratioValue: 1.2, zone: 'distributie',
+    naturalLight: false,
+    hasDoorTo: [],
+    isCirculation: true,
+  },
 ];
 
 const INITIAL_SHAPE: 'rectangle' | 'l_shape' | 'u_shape' | 't_shape' = 'rectangle';
@@ -229,7 +254,11 @@ export const useEditorState = create<EditorStore>((set, get) => ({
       selectedId: get().selectedId === id ? null : get().selectedId,
       isDirty: true,
     });
-    get().regenerateLayout();
+
+    // FIX: Nu mai apelăm regenerateLayout() la ștergerea unei camere.
+    // Regenerarea înlocuiește TOATE elementele (pereți, uși, ferestre) cu un plan nou-gol,
+    // distrugând planul generat de AI sau editat manual.
+    // Utilizatorul poate apăsa manual "Regenerează" din panel dacă vrea recalcul.
   },
 
   deleteSelected: () => {
@@ -474,27 +503,30 @@ export const useEditorState = create<EditorStore>((set, get) => ({
 
     get().pushToUndo();
 
-    const newOpening = {
-      id: `man-${Date.now()}`,
+    const opening: CanvasElement = {
+      id: uuidv4(),
       type,
-      x: Math.round(x),
-      y: Math.round(y),
-      width: w,
-      height: h,
-      rotation: 0,
-      label: type === 'window' ? 'Geam Manual' : 'Ușă Manuală'
+      x: newCenterX - w / 2, 
+      y: newCenterY - h / 2, 
+      width: w, 
+      height: h, 
+      rotation: 0
     };
 
-    set({ addedOpenings: [...addedOpenings, newOpening] });
-    get().regenerateLayout();
+    const newAdded = [...addedOpenings, opening];
+    set({ 
+      addedOpenings: newAdded,
+      elements: [...elements, opening],
+      isDirty: true
+    });
   },
 
   setActiveRooms: (rooms) => {
     get().pushToUndo();
-    // Convertim SuggestedRoom[] → ConfiguratorRoom[] (adăugăm id unic)
     const newRooms: ConfiguratorRoom[] = rooms.map((r: any, i: number) => ({
       id: `ai-${Date.now()}-${i}`,
       label: r.label,
+      zone: r.zone ?? 'zi',
       ratioValue: r.weightRatio,
       minSqm: r.minSqm,
       maxSqm: r.maxSqm,

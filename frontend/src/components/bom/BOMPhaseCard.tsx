@@ -30,6 +30,7 @@ interface BOMPhaseCardProps {
   onForward: () => void;
   onMaterialReplaced: () => void;
   isConfirming?: boolean;
+  canGoNext?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -47,6 +48,7 @@ export const BOMPhaseCard = ({
   onForward,
   onMaterialReplaced,
   isConfirming = false,
+  canGoNext = false,
 }: BOMPhaseCardProps) => {
   const [selectedItem, setSelectedItem] = useState<BOMItem | null>(null);
 
@@ -96,24 +98,36 @@ export const BOMPhaseCard = ({
           ) : (
             <div className="space-y-3">
               {items.map((item) => {
-                // Extragem nota curată (primul propoziție din nota lungă BOM)
-                const shortNote = item.note?.split('|')[0]?.trim() ?? '';
+                // Extragem nota tehnică vs explicația educațională
+                const noteParts = item.note?.split('||EXPLAIN||') ?? [];
+                const techNote = noteParts[0]?.trim() ?? '';
+                const plainExplanation = noteParts[1]?.trim() ?? null;
+                
+                // Dacă nu avem explicație dedicată, încercăm să folosim prima frază din nota tehnică ca fallback
+                const fallbackNote = techNote.split('|')[0]?.trim() ?? '';
 
                 return (
                   <div
                     key={item.id}
-                    className={`group flex items-start justify-between gap-4 p-4 rounded-2xl border transition-all ${
+                    className={`group flex flex-col gap-2 p-4 rounded-2xl border transition-all ${
                       isConfirmed
                         ? 'border-slate-100 bg-slate-50/50'
                         : 'border-slate-100 hover:border-buildorange/30 hover:bg-orange-50/20'
                     }`}
                   >
-                    {/* Info material */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-slate-900 text-sm leading-snug">{item.material.name}</p>
-                      {shortNote && (
-                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">{shortNote}</p>
-                      )}
+                    <div className="flex items-start justify-between gap-4">
+                      {/* Info material */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-900 text-sm leading-snug">{item.material.name}</p>
+                        
+                        {plainExplanation ? (
+                          <div className="mt-1.5 flex items-start gap-1.5 text-slate-600 bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
+                            <span className="text-[13px]">💡</span>
+                            <p className="text-[13px] leading-relaxed italic">{plainExplanation}</p>
+                          </div>
+                        ) : fallbackNote ? (
+                          <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">{fallbackNote}</p>
+                        ) : null}
                       {/* Calcul vizual */}
                       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                         <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
@@ -139,6 +153,7 @@ export const BOMPhaseCard = ({
                         🔄 Schimbă
                       </button>
                     )}
+                    </div>
                   </div>
                 );
               })}
@@ -187,7 +202,8 @@ export const BOMPhaseCard = ({
                 /* Etapa neconfirmată — buton Confirmă */
                 <button
                   onClick={onConfirm}
-                  disabled={isConfirming}
+                  disabled={isConfirming || !canGoNext}
+                  title={canGoNext ? "Confirmă etapa curentă" : "Răspunde la mesajul asistentului Zidario pentru a putea continua"}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-buildorange hover:bg-orange-500 text-white text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-orange-200"
                 >
                   {isConfirming ? (

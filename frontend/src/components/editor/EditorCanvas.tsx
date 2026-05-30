@@ -6,7 +6,7 @@ import { useEditorState, type ToolType, pxToMeters } from '../../hooks/useEditor
 interface Props {
   width: number;
   height: number;
-  stageRef: React.RefObject<Konva.Stage>;
+  stageRef: React.RefObject<Konva.Stage | null>;
   onRoomLabelRequest: (id: string, x: number, y: number) => void;
 }
 
@@ -48,6 +48,7 @@ const OPENING_COLORS: Record<string, { fill: string; stroke: string }> = {
   staircase: { fill: '#faf5ff', stroke: '#7c3aed' },
   select:    { fill: 'transparent', stroke: 'transparent' },
   room:      { fill: '#fafafa', stroke: '#d1d5db' },
+  terasa:    { fill: '#ecfccb', stroke: '#84cc16' },
 } satisfies Record<ToolType, { fill: string; stroke: string }>;
 
 export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
@@ -136,10 +137,10 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
     const nodeH = node.height();
 
     let closestRoomId: string | null = null;
-    let maxIntersectionArea = 0;
+    let maxOverlapRatio = 0;
 
     for (const el of elements) {
-      if (el.type === 'room' && el.id !== id) {
+      if ((el.type === 'room' || el.type === 'terasa') && el.id !== id) {
         // Calculate intersection bounds
         const overlapX = Math.max(nodeX, el.x);
         const overlapY = Math.max(nodeY, el.y);
@@ -148,16 +149,19 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
 
         if (overlapW > 0 && overlapH > 0) {
           const area = overlapW * overlapH;
-          if (area > maxIntersectionArea) {
-            maxIntersectionArea = area;
+          // Use ratio of overlap to smaller room — scale-independent
+          const smallerArea = Math.min(nodeW * nodeH, el.width * el.height);
+          const ratio = smallerArea > 0 ? area / smallerArea : 0;
+          if (ratio > maxOverlapRatio) {
+            maxOverlapRatio = ratio;
             closestRoomId = el.id;
           }
         }
       }
     }
 
-    // Require a minimum intersection area to prevent accidental grazing swaps
-    if (closestRoomId && maxIntersectionArea > 400) {
+    // Require at least 10% overlap of the smaller room to trigger swap
+    if (closestRoomId && maxOverlapRatio > 0.1) {
       swapRooms(id, closestRoomId);
     } else {
       // ── Snap back: restore original position AND force Konva redraw ──
@@ -177,7 +181,7 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
 
     for (const el of elements) {
       if (el.id === id) continue;
-      if (el.type !== 'room' && el.type !== 'wall') continue;
+      if (el.type !== 'room' && el.type !== 'wall' && el.type !== 'terasa') continue;
 
       // Vertical snapping (X axis)
       if (Math.abs(x - (el.x + el.width)) < snapThreshold) x = el.x + el.width; // Snap left edge to right edge
@@ -213,8 +217,21 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
         {elements.map((el) => {
           const isSelected = selectedId === el.id;
 
-          if (el.type === 'room') {
-            const { fill, stroke, labelColor } = getRoomColors(el.label ?? '', isSelected);
+          if (el.type === 'room' || el.type === 'terasa') {
+            const isTerasa = el.type === 'terasa';
+            let fill, stroke, labelColor;
+
+            if (isTerasa) {
+              fill = isSelected ? '#d9f99d' : '#ecfccb';
+              stroke = isSelected ? '#ef4444' : '#84cc16';
+              labelColor = '#3f6212';
+            } else {
+              const colors = getRoomColors(el.label ?? '', isSelected);
+              fill = colors.fill;
+              stroke = colors.stroke;
+              labelColor = colors.labelColor;
+            }
+
             return (
               <Group
                 key={el.id}
@@ -234,8 +251,9 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
                   fill={fill}
                   stroke={isSelected ? '#ef4444' : stroke}
                   strokeWidth={isSelected ? 2.5 : 1.5}
-                  cornerRadius={6}
-                  shadowEnabled={true}
+                  dash={isTerasa ? [6, 4] : undefined}
+                  cornerRadius={isTerasa ? 0 : 6}
+                  shadowEnabled={!isTerasa}
                   shadowColor="rgba(15,23,42,0.06)"
                   shadowBlur={isSelected ? 20 : 8}
                   shadowOffsetY={isSelected ? 2 : 1}
@@ -243,8 +261,20 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
 
                 {/* Room label + area */}
                 <Group x={0} y={el.height / 2 - 14} listening={false}>
+                  {isTerasa && (
+                    <Text
+                      text="Terasă — nu se include în Sup. Utilă"
+                      y={-14}
+                      width={el.width}
+                      fontSize={8}
+                      fontFamily="Inter, system-ui, sans-serif"
+                      fill={labelColor}
+                      opacity={0.8}
+                      align="center"
+                    />
+                  )}
                   <Text
-                    text={el.label ?? 'Cameră'}
+                    text={el.label ?? (isTerasa ? 'Terasă' : 'Cameră')}
                     width={el.width}
                     fontSize={Math.max(10, Math.min(13, el.width / 9))}
                     fontStyle="bold"
@@ -268,6 +298,7 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
           }
 
           if (el.type === 'wall') {
+            const isVirtual = el.metadata?.isVirtualBoundary === true;
             return (
               <Rect
                 key={el.id}
@@ -276,17 +307,26 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
                 y={el.y}
                 width={el.width}
                 height={el.height}
-                fill={OPENING_COLORS.wall.fill}
-                stroke={OPENING_COLORS.wall.stroke}
-                strokeWidth={1}
-                listening={false}
+                fill={isVirtual ? 'transparent' : OPENING_COLORS.wall.fill}
+                stroke={isSelected ? '#ef4444' : (isVirtual ? '#cbd5e1' : OPENING_COLORS.wall.stroke)}
+                strokeWidth={isSelected ? 2 : (isVirtual ? 1 : 1)}
+                dash={isVirtual ? [4, 4] : undefined}
+                listening={true}
+                onClick={() => selectElement(el.id)}
+                onTap={() => selectElement(el.id)}
               />
             );
           }
 
           if (el.type === 'door') {
-            const isVertical = el.width < el.height;
+            // FIX — Problema 2: Reuşa este elementul principal vizibil (80cm largă sau înaltă),
+            // nu grosimea peretelui. Afişăm un dreptunghi mai mare cu arca de rotire.
+            const isVertical = el.height > el.width; // door is in a vertical wall
             const colors = OPENING_COLORS.door;
+
+            // The door leaf: always at DOOR width (90cm = 18px) on the "open" dimension
+            const doorLeafSizePx = Math.round(0.9 * 20); // 18px = 90cm
+
             return (
               <Group
                 key={el.id}
@@ -297,6 +337,7 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
                 onClick={() => selectElement(el.id)}
                 onTap={() => selectElement(el.id)}
               >
+                {/* Door frame — the thin wall-thickness rect */}
                 <Rect
                   width={el.width}
                   height={el.height}
@@ -305,17 +346,51 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
                   strokeWidth={isSelected ? 2.5 : 1.5}
                   cornerRadius={1}
                 />
-                {/* Swing arc */}
-                <Line
-                  points={
-                    isVertical
-                      ? [0, 0, el.height, el.height, el.height, 0]
-                      : [0, el.height, el.width, el.height, el.width, 0]
-                  }
-                  stroke={colors.stroke}
-                  strokeWidth={1}
-                  dash={[3, 3]}
-                />
+                {/* Door leaf swing arc — drawn perpendicular to wall */}
+                {isVertical ? (
+                  // Vertical wall: door opens left-right
+                  <>
+                    <Rect
+                      x={-doorLeafSizePx + el.width / 2}
+                      y={0}
+                      width={doorLeafSizePx}
+                      height={el.height}
+                      fill={isSelected ? '#fef9c3' : '#fffbeb'}
+                      stroke={colors.stroke}
+                      strokeWidth={1.5}
+                      cornerRadius={1}
+                    />
+                    {/* Arc indicator */}
+                    <Line
+                      points={[el.width / 2, 0, el.width / 2 - doorLeafSizePx, el.height, el.width / 2, el.height]}
+                      stroke={colors.stroke}
+                      strokeWidth={1}
+                      dash={[4, 3]}
+                      opacity={0.6}
+                    />
+                  </>
+                ) : (
+                  // Horizontal wall: door opens up-down
+                  <>
+                    <Rect
+                      x={0}
+                      y={-doorLeafSizePx + el.height / 2}
+                      width={el.width}
+                      height={doorLeafSizePx}
+                      fill={isSelected ? '#fef9c3' : '#fffbeb'}
+                      stroke={colors.stroke}
+                      strokeWidth={1.5}
+                      cornerRadius={1}
+                    />
+                    <Line
+                      points={[0, el.height / 2, el.width, el.height / 2 - doorLeafSizePx, el.width, el.height / 2]}
+                      stroke={colors.stroke}
+                      strokeWidth={1}
+                      dash={[4, 3]}
+                      opacity={0.6}
+                    />
+                  </>
+                )}
               </Group>
             );
           }

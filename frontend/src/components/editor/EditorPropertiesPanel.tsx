@@ -23,7 +23,7 @@ const RATIO_PRESETS = [
 ];
 
 export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms = [] }) => {
-  const { elements, selectedId, deleteElement, activeRooms, updateRoomRatio, addManualOpening } = useEditorState();
+  const { elements, selectedId, deleteElement, activeRooms, updateRoomRatio, addManualOpening, updateElement } = useEditorState();
 
   const selected = elements.find((el) => el.id === selectedId);
 
@@ -92,17 +92,47 @@ export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms 
     <div className="w-60 bg-white border-l border-slate-200 flex flex-col h-full shrink-0 shadow-sm">
       {/* Header */}
       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-        <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Proprietăți</h3>
+        <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+          Proprietăți {selected.type === 'wall' ? 'Perete' : ''}
+        </h3>
         <button
           onClick={() => deleteElement(selected.id)}
           className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-          title="Șterge Camera"
+          title={`Șterge ${selected.type === 'wall' ? 'Peretele' : 'Camera'}`}
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        
+        {/* Wall specific properties */}
+        {selected.type === 'wall' && (
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+              Tip Perete
+            </label>
+            <label className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:border-sky-300 transition-all">
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded border-slate-300 text-sky-500 focus:ring-sky-500"
+                checked={selected.metadata?.isVirtualBoundary === true}
+                onChange={(e) => {
+                  const isVirtual = e.target.checked;
+                  updateElement(selected.id, {
+                    metadata: { ...selected.metadata, isVirtualBoundary: isVirtual }
+                  });
+                }}
+              />
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-slate-700">Gol de Trecere (Open Space)</span>
+                <span className="text-[10px] text-slate-500 leading-snug mt-0.5">
+                  Transformă peretele fizic într-o linie imaginară care doar delimitează zonele funcționale (ex: Living / Bucătărie).
+                </span>
+              </div>
+            </label>
+          </div>
+        )}
         
         {/* Denumire */}
         {selected.type === 'room' && (

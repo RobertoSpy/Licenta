@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { type ConformityRoom, type ConformityRuleIssue } from '../../hooks/useConformityCheck';
 import { aiApi } from '../../api/aiApi';
-import { AlertTriangle, XCircle, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, XCircle, X } from 'lucide-react';
 
 interface Props {
   violations: ConformityRoom[];

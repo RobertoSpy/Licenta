@@ -27,6 +27,11 @@ export const addMaterialFromUrl = async (req: Request, res: Response): Promise<v
 
     const scraped = await scraperService.scrapeProductPage(url);
 
+    if (!scraped) {
+      res.status(400).json({ success: false, error: 'Scraping eșuat. Verifică URL-ul sau poate exista un blocaj (Cloudflare).' });
+      return;
+    }
+
     if (scraped.price === 0 && !scraped.inStock) {
       res.status(400).json({ success: false, error: 'Nu am putut extrage datele. Verificați URL-ul sau încercați mai târziu.' });
       return;
@@ -43,7 +48,8 @@ export const addMaterialFromUrl = async (req: Request, res: Response): Promise<v
         storeUrl: url,
         description: scraped.description,
         inStock: scraped.inStock,
-        stockQuantity: scraped.stockQuantity
+        stockQuantity: scraped.stockQuantity,
+        ...(scraped.imageUrl && { imageUrl: scraped.imageUrl }),
       }
     });
 

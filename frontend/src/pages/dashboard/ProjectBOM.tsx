@@ -22,8 +22,9 @@ export const ProjectBOM = () => {
   const { bomItems, isLoading, error, refetch } = useBOMData(id!);
 
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [canGoNext, setCanGoNext] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('wizard');
-  const [allConfirmed, setAllConfirmed] = useState(false);
 
   if (isLoading) {
     return (
@@ -118,9 +119,14 @@ export const ProjectBOM = () => {
               {/* AI Advisor Button */}
               <button
                 onClick={() => setIsChatOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-all shadow-sm"
+                className="relative flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-all shadow-sm group"
               >
-                <Bot className="w-4 h-4 text-buildorange" />
+                {unreadCount > 0 && !isChatOpen && (
+                  <div className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-md animate-pulse">
+                    {unreadCount}
+                  </div>
+                )}
+                <Bot className="w-4 h-4 text-buildorange group-hover:scale-110 transition-transform" />
                 Zidario AI
               </button>
             </div>
@@ -145,7 +151,7 @@ export const ProjectBOM = () => {
                 projectId={id!}
                 bomItems={bomItems}
                 onMaterialReplaced={refetch}
-                onAllConfirmed={() => setAllConfirmed(true)}
+                canGoNext={canGoNext}
               />
             ) : (
               <BOMTable items={bomItems} onMaterialReplaced={refetch} />
@@ -159,6 +165,8 @@ export const ProjectBOM = () => {
         projectId={id!}
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
+        onUnreadChange={(count) => setUnreadCount(count)}
+        onCanGoNextChange={(can) => setCanGoNext(can)}
       />
     </>
   );

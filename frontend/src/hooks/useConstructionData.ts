@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiPrivate } from '../api/axios';
 
 export interface ConstructionPhase {
   id: number;
@@ -20,22 +21,11 @@ export function useConstructionData(projectId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/construction/${projectId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Eroare la preluarea etapelor');
-      }
-
-      const data = await response.json();
-      setPhases(data);
+      const response = await apiPrivate.get(`/construction/${projectId}`);
+      setPhases(response.data);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'A apărut o eroare necunoscută.');
+      setError(err.response?.data?.error || err.message || 'A apărut o eroare necunoscută.');
     } finally {
       setIsLoading(false);
     }
@@ -43,15 +33,8 @@ export function useConstructionData(projectId: string) {
 
   const markCompleted = async (phaseOrder: number) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/construction/${projectId}/phase/${phaseOrder}/complete`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!response.ok) throw new Error('Nu s-a putut marca etapa');
-      
-      const updatedPhase = await response.json();
+      const response = await apiPrivate.patch(`/construction/${projectId}/phase/${phaseOrder}/complete`);
+      const updatedPhase = response.data;
       setPhases(prev => prev.map(p => p.phaseOrder === updatedPhase.phaseOrder ? updatedPhase : p));
     } catch (err) {
       console.error(err);

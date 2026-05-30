@@ -9,34 +9,46 @@ import { GoogleGenAI } from '@google/genai';
 const BOM_PHASE_ORDER: BomPhaseKey[] = [
   'fundatie',
   'structura',
-  'zidarie',
+  'planseu',
+  'termoizolatie',
   'acoperis',
+  'tamplarie',
   'instalatii',
-  'finisaje'
+  'finisaje',
+  'exterior'
 ];
 
 const BOM_PHASE_KEYWORDS: Record<BomPhaseKey, RegExp> = {
   fundatie: /fundati|fundare|radier|talpa|elevati|cota zero|soclu|izolare la sol/i,
-  structura: /structur|stalp|stâlp|grinda|grindă|planseu|planșeu|armatura|armătur|beton armat/i,
-  zidarie: /zidarie|zidărie|caramida|cărămid|bca|blocuri/i,
+  structura: /structur|stalp|stâlp|grinda|grindă|armatura|armătur|beton armat|zidarie|zidărie|caramida|cărămid|bca|blocuri/i,
+  planseu: /planseu|planșeu|placa|placă|coroana|centura/i,
+  termoizolatie: /termoizol|izolat|izolați|polistiren|vata|vată|etics|hidroizol|bariera vapori/i,
   acoperis: /acoperis|acoperiș|sarpanta|șarpant|invelitoare|învelitoare|tabla|țiglă/i,
-  instalatii: /instalati|instalați|electri|sanitar|termic|ventil|clima/i,
-  finisaje: /finisaj|tencuial|vopsea|pardoseala|gresie|faianta|faianță|parchet|tamplarie|tâmplărie/i,
+  tamplarie: /tamplarie|tâmplărie|fereastr|geam|usa|ușă|glaf/i,
+  instalatii: /instalati|instalați|electri|sanitar|termic|ventil|clima|teava|țeavă|cablu|priza|priză/i,
+  finisaje: /finisaj|tencuial|vopsea|pardoseala|gresie|faianta|faianță|parchet|glet|lavabil/i,
+  exterior: /amenajar|exterior|trotuar|pavaj|curte|gard|bordur/i,
 };
 
 const BOM_PHASE_LABELS: Record<BomPhaseKey, string> = {
   fundatie: 'Fundație',
   structura: 'Structură',
-  zidarie: 'Zidărie',
+  planseu: 'Planșeu & Coroană',
+  termoizolatie: 'Termoizolație & Hidroizolație',
   acoperis: 'Acoperiș',
+  tamplarie: 'Tâmplărie',
   instalatii: 'Instalații',
   finisaje: 'Finisaje',
+  exterior: 'Amenajări Exterioare',
 };
 
 
 const CONFIRMATION_PATTERNS = /\b(da|ok|bine|perfect|clar|inteleg|înțeleg|am inteles|am înțeles|sigur|confirm)\b/i;
 
 const INTRO_CACHE_MAX_AGE_DAYS = 30;
+const LEGACY_PHASE_ALIASES: Record<string, BomPhaseKey> = {
+  zidarie: 'structura',
+};
 
 // Lazy init — același pattern ca în aiController
 let aiInstance: GoogleGenAI | null = null;
@@ -61,15 +73,22 @@ function isConfirmationMessage(message: string): boolean {
   return CONFIRMATION_PATTERNS.test(message.trim());
 }
 
+function normalizePhaseKey(value?: string | null): BomPhaseKey | null {
+  if (!value) return null;
+  const key = value.toLowerCase().trim();
+  if (BOM_PHASE_ORDER.includes(key as BomPhaseKey)) return key as BomPhaseKey;
+  return LEGACY_PHASE_ALIASES[key] ?? null;
+}
+
 async function loadPhaseState(projectId: number): Promise<BomPhaseState> {
   const record = await bomPhaseProgressRepository.getByProject(projectId);
   if (!record) return { activePhase: 'fundatie', completedPhases: [] };
 
-  const activePhase = BOM_PHASE_ORDER.includes(record.activePhase as BomPhaseKey)
-    ? (record.activePhase as BomPhaseKey)
-    : 'fundatie';
+  const activePhase = normalizePhaseKey(record.activePhase) ?? 'fundatie';
   const completedPhases = Array.isArray(record.completedPhases)
-    ? record.completedPhases.filter((p): p is BomPhaseKey => BOM_PHASE_ORDER.includes(p as BomPhaseKey))
+    ? record.completedPhases
+        .map((p) => normalizePhaseKey(String(p)))
+        .filter((p): p is BomPhaseKey => Boolean(p))
     : [];
 
   return { activePhase, completedPhases };
@@ -80,7 +99,7 @@ async function savePhaseState(projectId: number, state: BomPhaseState): Promise<
 }
 
 async function classifyPhaseWithAI(message: string): Promise<BomPhaseKey | null> {
-  const prompt = `Clasifică mesajul în una dintre fazele: fundatie, structura, zidarie, acoperis, instalatii, finisaje.
+  const prompt = `Clasifică mesajul în una dintre fazele: fundatie, structura, planseu, termoizolatie, acoperis, tamplarie, instalatii, finisaje, exterior.
 Răspunde strict JSON: {"phase":"fundatie"} sau {"phase":"none"}.
 Mesaj: "${message}"`;
 
@@ -116,7 +135,7 @@ function formatIntroFallback(project: {
   ].filter(Boolean);
 
   const context = parts.length > 0 ? `Am vazut ca ${parts.join(', ')}.` : 'Am vazut datele de baza ale proiectului tau.';
-  return `${context} Vom parcurge impreuna cele 6 etape ale constructiei, incepand cu fundatia. Vrei sa incepem cu fundatia?`;
+  return `${context} Vom parcurge impreuna cele 9 etape ale constructiei, incepand cu fundatia. Vrei sa incepem cu fundatia?`;
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -145,7 +164,7 @@ export const generateBOM = async (req: Request, res: Response): Promise<void> =>
     res.json(bomItems);
   } catch (error: any) {
     console.error('[BOMController] Eroare la generarea BOM-ului:', error);
-    res.status(500).json({ error: error.message || 'Eroare la generarea BOM-ului' });
+    res.status(500).json({ error: `Eroare Backend BOM: ${error?.message || String(error)}`, stack: error?.stack });
   }
 };
 
@@ -225,7 +244,7 @@ Nu folosi liste.
 Date proiect:
 ${contextLines}
 
-Etape construcție: Fundație, Structură, Zidărie, Acoperiș, Instalații, Finisaje.`;
+Etape construcție: Fundație, Structură, Planșeu & Coroană, Termoizolație & Hidroizolație, Acoperiș, Tâmplărie, Instalații, Finisaje, Amenajări Exterioare.`;
 
     let introText = '';
 
@@ -357,9 +376,20 @@ export const bomAdvisorChat = async (req: Request, res: Response): Promise<void>
       project.totalFloorAreaSqm ? `Suprafață planșee: ${project.totalFloorAreaSqm} mp`    : null,
     ].filter(Boolean);
 
+    const bomItems = await prisma.projectBOM.findMany({
+      where: { projectId },
+      include: { material: true }
+    });
+
+    const bomText = bomItems.map(item => {
+      const noteParts = item.note?.split('||EXPLAIN||') || [];
+      const explanation = noteParts.length > 1 ? noteParts[1].trim() : '';
+      return `- Faza: ${item.phase} | Material: ${item.material?.name} | Cantitate: ${item.quantity} ${item.material?.unit} ${explanation ? '| Motivare: ' + explanation : ''}`;
+    }).join('\n');
+
     const contextString = contextLines.length > 0
-      ? `Date proiect:\n${contextLines.join('\n')}`
-      : 'Date proiect indisponibile.';
+      ? `Date proiect:\n${contextLines.join('\n')}\n\nMATERIALE CALCULATE (Deviz):\n${bomText}`
+      : `Date proiect indisponibile.\n\nMATERIALE CALCULATE (Deviz):\n${bomText}`;
 
     // SSE headers
     res.setHeader('Content-Type', 'text/event-stream');

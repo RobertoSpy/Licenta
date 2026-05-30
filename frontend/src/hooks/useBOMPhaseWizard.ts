@@ -12,7 +12,16 @@ import { useBOMAdvisorChat } from './useBOMAdvisorChat';
 // TIPURI
 // ─────────────────────────────────────────────────────────────────
 
-export type BomPhaseKey = 'fundatie' | 'structura' | 'zidarie' | 'acoperis' | 'instalatii' | 'finisaje';
+export type BomPhaseKey =
+  | 'fundatie'
+  | 'structura'
+  | 'planseu'
+  | 'termoizolatie'
+  | 'acoperis'
+  | 'tamplarie'
+  | 'instalatii'
+  | 'finisaje'
+  | 'exterior';
 
 export interface BomPhaseConfig {
   key: BomPhaseKey;
@@ -37,37 +46,58 @@ export const PHASE_CONFIG: BomPhaseConfig[] = [
   {
     key: 'structura',
     label: 'Structură',
-    labelRo: 'Etapa 2 — Structură (Stâlpișori & Centuri)',
+    labelRo: 'Etapa 2 — Structură (Zidărie & Armături)',
     icon: '🧱',
     emptyNote: 'Nu s-au calculat materiale de structură.',
   },
   {
-    key: 'zidarie',
-    label: 'Zidărie',
-    labelRo: 'Etapa 3 — Zidărie (Pereți Exteriori & Interiori)',
-    icon: '🏠',
-    emptyNote: 'Nu s-au calculat materiale de zidărie.',
+    key: 'planseu',
+    label: 'Planșeu',
+    labelRo: 'Etapa 3 — Planșeu & Coroană',
+    icon: '🧩',
+    emptyNote: 'Nu s-au calculat materiale de planșeu (se aplică doar pentru P+1 sau mai mult).',
+  },
+  {
+    key: 'termoizolatie',
+    label: 'Termoizolație',
+    labelRo: 'Etapa 4 — Termoizolație & Hidroizolație',
+    icon: '🧊',
+    emptyNote: 'Nu s-au calculat materiale de termoizolație.',
   },
   {
     key: 'acoperis',
     label: 'Acoperiș',
-    labelRo: 'Etapa 4 — Acoperiș (Șarpantă & Învelitoare)',
+    labelRo: 'Etapa 5 — Acoperiș (Șarpantă & Învelitoare)',
     icon: '🏚️',
     emptyNote: 'Nu s-au calculat materiale de acoperiș.',
   },
   {
+    key: 'tamplarie',
+    label: 'Tâmplărie',
+    labelRo: 'Etapa 6 — Tâmplărie (Ferestre & Uși)',
+    icon: '🪟',
+    emptyNote: 'Nu s-au calculat materiale de tâmplărie.',
+  },
+  {
     key: 'instalatii',
     label: 'Instalații',
-    labelRo: 'Etapa 5 — Instalații',
+    labelRo: 'Etapa 7 — Instalații',
     icon: '🔧',
     emptyNote: 'Materialele pentru instalații electrice, sanitare și termice se stabilesc împreună cu antreprenorul specializat pe baza unui proiect de instalații separat.',
   },
   {
     key: 'finisaje',
     label: 'Finisaje',
-    labelRo: 'Etapa 6 — Finisaje (Brute & Tâmplărie)',
+    labelRo: 'Etapa 8 — Finisaje (Brute & Fine)',
     icon: '🎨',
     emptyNote: 'Nu s-au calculat materiale de finisaje.',
+  },
+  {
+    key: 'exterior',
+    label: 'Exterior',
+    labelRo: 'Etapa 9 — Amenajări Exterioare',
+    icon: '🌿',
+    emptyNote: 'Nu s-au calculat materiale pentru amenajări exterioare.',
   },
 ];
 
@@ -82,13 +112,25 @@ const PHASE_LABEL_MAP: Record<string, BomPhaseKey> = {
   // Mapare câmp `phase` (din BOMItem.phase) → BomPhaseKey
   'Fundație':       'fundatie',
   'Structură':      'structura',
-  'Planșeu':        'structura',   // planșeul e parte din etapa Structură
-  'Zidărie':        'zidarie',
+  'Structură — Zidărie': 'structura',
+  'Zidărie':        'structura',
+  'Planșeu':        'planseu',
+  'Planșeu & Coroană': 'planseu',
+  'Termoizolație':  'termoizolatie',
+  'Termoizolație & Hidroizolație': 'termoizolatie',
   'Acoperiș':       'acoperis',
-  'Instalații':     'instalatii',
-  'Finisaje Brute': 'finisaje',
-  'Finisaje Fine':  'finisaje',
-  'Tâmplărie':      'finisaje',
+  'Acoperiș — Șarpantă & Învelitoare': 'acoperis',
+  'Tâmplărie':      'tamplarie',
+  'Tâmplărie Exterioară': 'tamplarie',
+  'Instalații':          'instalatii',
+  'Instalații Electrice': 'instalatii',
+  'Instalații Sanitare':  'instalatii',
+  'Instalații & Finisaje Brute': 'instalatii',
+  'Finisaje Brute':  'finisaje',
+  'Finisaje Fine':   'finisaje',
+  'Finisaje':        'finisaje',
+  'Exterior':        'exterior',
+  'Amenajări Exterioare': 'exterior',
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -108,10 +150,13 @@ export function useBOMPhaseWizard(projectId: string, bomItems: BOMItem[]) {
     const grouped: Record<BomPhaseKey, BOMItem[]> = {
       fundatie:   [],
       structura:  [],
-      zidarie:    [],
+      planseu:    [],
+      termoizolatie: [],
       acoperis:   [],
+      tamplarie:  [],
       instalatii: [],
       finisaje:   [],
+      exterior:   [],
     };
 
     for (const item of bomItems) {
@@ -131,8 +176,15 @@ export function useBOMPhaseWizard(projectId: string, bomItems: BOMItem[]) {
   // Totalul per fază
   const totalByPhase = useMemo(() => {
     const totals: Record<BomPhaseKey, number> = {
-      fundatie: 0, structura: 0, zidarie: 0,
-      acoperis: 0, instalatii: 0, finisaje: 0,
+      fundatie: 0,
+      structura: 0,
+      planseu: 0,
+      termoizolatie: 0,
+      acoperis: 0,
+      tamplarie: 0,
+      instalatii: 0,
+      finisaje: 0,
+      exterior: 0,
     };
     for (const key of Object.keys(totals) as BomPhaseKey[]) {
       totals[key] = phaseItems[key].reduce((s, i) => s + i.totalPrice, 0);
@@ -155,7 +207,7 @@ export function useBOMPhaseWizard(projectId: string, bomItems: BOMItem[]) {
     for (const phase of PHASE_CONFIG) {
       if (!completedPhases.includes(phase.key)) return phase.key;
     }
-    return 'finisaje'; // toate confirmate — rămânem pe ultima
+    return 'exterior'; // toate confirmate — rămânem pe ultima
   }, [dbActivePhase, completedPhases]);
 
   // Toate etapele confirmate?

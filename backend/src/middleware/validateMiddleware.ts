@@ -64,9 +64,11 @@ export const summarizeSchema = z.object({
 
 export const suggestRoomsSchema = z.object({
   projectId: z.union([z.string(), z.number()]),
-  projectData: z.any().optional(),
+  familySize: z.number().min(1).max(20),
+  budgetCategory: z.enum(['economic', 'mediu', 'premium']),
   houseAreaSqm: z.number().min(10),
-  totalFloors: z.number().min(1),
+  totalFloors: z.number().min(1).optional().default(1),
+  projectData: z.any().optional(),
   screenContext: z.any().optional(),
 }).strip();
 
@@ -75,9 +77,12 @@ export const suggestRoomsSchema = z.object({
 // ==========================================
 export const createSnapshotSchema = z.object({
   projectId: z.union([z.string(), z.number()]),
-  floorKey: z.string(),
-  elements: z.array(z.any()),
-  title: z.string().optional(),
+  floor: z.string(),
+  planJSON: z.object({
+    elements: z.array(z.any()),
+    savedAt: z.number().optional()
+  }),
+  label: z.string().optional(),
   isManual: z.boolean().optional(),
 }).strip();
 

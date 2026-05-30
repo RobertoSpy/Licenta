@@ -7,8 +7,9 @@
 //   1. Sidebar fix (isInline=false) — glisează din dreapta, suprapus
 //   2. Panou inline (isInline=true) — afișat direct sub header, în pagina BOM
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useBOMAdvisorChat } from '../../hooks/useBOMAdvisorChat';
+import { useScreenTutor } from '../../hooks/useScreenTutor';
 import { ConstructionStepTracker } from './ConstructionStepTracker';
 import { X, Send, Bot, RotateCcw } from 'lucide-react';
 
@@ -60,12 +61,63 @@ interface BOMAdvisorChatProps {
   projectId: string;
   isOpen: boolean;
   onClose: () => void;
+  onUnreadChange?: (count: number) => void;
+  onCanGoNextChange?: (canGoNext: boolean) => void;
 }
 
-export const BOMAdvisorChat = ({ projectId, isOpen, onClose }: BOMAdvisorChatProps) => {
-  const { messages, isLoading, sendMessage, clearHistory, activePhase, completedPhases, confirmPhase } = useBOMAdvisorChat(projectId);
+export const BOMAdvisorChat = ({ projectId, isOpen, onClose, onUnreadChange, onCanGoNextChange }: BOMAdvisorChatProps) => {
+  const { messages, isLoading, sendMessage, clearHistory, activePhase, completedPhases, confirmPhase, addSystemMessage, unreadCount, markAsRead } = useBOMAdvisorChat(projectId);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const canGoNext = React.useMemo(() => {
+    if (messages.length === 0) return false;
+    let lastSystemIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].isSystemInjection && messages[i].requiresAnswer) {
+        lastSystemIndex = i;
+        break;
+      }
+    }
+    return lastSystemIndex === -1 || messages.findIndex((m, idx) => idx > lastSystemIndex && m.role === 'user') !== -1;
+  }, [messages]);
+
+  useEffect(() => {
+    if (onCanGoNextChange) {
+      onCanGoNextChange(canGoNext);
+    }
+  }, [canGoNext, onCanGoNextChange]);
+
+  const hasTriggeredQuestion = useRef(false);
+  useEffect(() => {
+    if (!hasTriggeredQuestion.current && activePhase) {
+       hasTriggeredQuestion.current = true;
+       setTimeout(() => {
+         import('../../data/tutorialContent').then(({ SCREEN_TUTORIALS }) => {
+            if (SCREEN_TUTORIALS.bom.questionMessage) {
+               addSystemMessage(SCREEN_TUTORIALS.bom.questionMessage);
+            }
+         });
+       }, 2000);
+    }
+  }, [activePhase, addSystemMessage]);
+
+  useScreenTutor({
+    screenId: 'bom',
+    addSystemMessage
+  });
+
+  useEffect(() => {
+    if (onUnreadChange) {
+      onUnreadChange(unreadCount);
+    }
+  }, [unreadCount, onUnreadChange]);
+
+  useEffect(() => {
+    if (isOpen) {
+      markAsRead();
+    }
+  }, [isOpen, markAsRead]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -88,7 +140,7 @@ export const BOMAdvisorChat = ({ projectId, isOpen, onClose }: BOMAdvisorChatPro
   const quickQuestions = [
     'Ce tip de fundație îmi recomandați pentru solul meu?',
     'Ce clasă de beton este necesară?',
-    'Ce tip de zidărie e potrivit pentru zona mea?',
+    'Ce soluții de termoizolație recomandați pentru zona mea?',
     'Explicați cerințele seismice pentru structura mea.',
     'Ce materiale de acoperiș recomandați?',
   ];

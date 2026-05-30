@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useZidarioChat } from '../../hooks/useZidarioChat';
 import { useEditorState } from '../../hooks/useEditorState';
 import { useRoomCalculator } from '../../hooks/useRoomCalculator';
+import { useScreenTutor } from '../../hooks/useScreenTutor';
 import { Brain, X, Send } from 'lucide-react';
 
 interface Props {
@@ -10,9 +11,11 @@ interface Props {
   projectData: Record<string, unknown>; // Datele din Faza 1
   isOpen: boolean;
   onToggle: () => void;
+  onUnreadChange?: (count: number) => void;
+  onCanGoNextChange?: (canGoNext: boolean) => void;
 }
 
-export const EditorChatSidebar: React.FC<Props> = ({ projectId, projectData, isOpen, onToggle }) => {
+export const EditorChatSidebar: React.FC<Props> = ({ projectId, projectData, isOpen, onToggle, onUnreadChange, onCanGoNextChange }) => {
   const { elements } = useEditorState();
   const rooms = useRoomCalculator(elements);
   const [input, setInput] = useState('');
@@ -29,7 +32,57 @@ export const EditorChatSidebar: React.FC<Props> = ({ projectId, projectData, isO
     }
   };
 
-  const { messages, isStreaming, sendMessage } = useZidarioChat('editor', projectId, projectContext);
+  const { messages, isStreaming, sendMessage, addSystemMessage, unreadCount, markAsRead } = useZidarioChat('editor', projectId, projectContext);
+
+  useScreenTutor({
+    screenId: 'editor2d',
+    addSystemMessage
+  });
+
+  useEffect(() => {
+    if (onUnreadChange) {
+      onUnreadChange(unreadCount);
+    }
+  }, [unreadCount, onUnreadChange]);
+
+  const canGoNext = React.useMemo(() => {
+    if (messages.length === 0) return false;
+    let lastSystemIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].isSystemInjection && messages[i].requiresAnswer) {
+        lastSystemIndex = i;
+        break;
+      }
+    }
+    return lastSystemIndex === -1 || messages.findIndex((m, idx) => idx > lastSystemIndex && m.role === 'user') !== -1;
+  }, [messages]);
+
+  useEffect(() => {
+    if (onCanGoNextChange) {
+      onCanGoNextChange(canGoNext);
+    }
+  }, [canGoNext, onCanGoNextChange]);
+
+  const hasTriggeredQuestion = useRef(false);
+  useEffect(() => {
+    // Inject question after a short delay to simulate "after loading"
+    if (!hasTriggeredQuestion.current && elements.length > 0) {
+       hasTriggeredQuestion.current = true;
+       setTimeout(() => {
+         import('../../data/tutorialContent').then(({ SCREEN_TUTORIALS }) => {
+            if (SCREEN_TUTORIALS.editor2d.questionMessage) {
+               addSystemMessage(SCREEN_TUTORIALS.editor2d.questionMessage);
+            }
+         });
+       }, 2000);
+    }
+  }, [elements.length, addSystemMessage]);
+
+  useEffect(() => {
+    if (isOpen) {
+      markAsRead();
+    }
+  }, [isOpen, markAsRead]);
 
   // Auto-scroll
   useEffect(() => {
@@ -89,29 +142,6 @@ export const EditorChatSidebar: React.FC<Props> = ({ projectId, projectData, isO
 
           {/* Chat History */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 relative">
-            {messages.length === 0 && (
-              <div className="flex justify-start">
-                <div className="max-w-[90%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed shadow-sm bg-white border border-slate-200 text-slate-700 rounded-bl-sm space-y-3">
-                  <div className="flex items-center gap-2 text-slate-800 font-bold">
-                    <Brain className="w-4 h-4 text-amber-500" />
-                    <span>Salutare! Sunt Copilotul tău Zidario. 🏠</span>
-                  </div>
-                  <p>Iată ce poți face în acest **Editor de Plan 2D (Mod Configurator)**:</p>
-                  <ul className="list-disc pl-4 space-y-1.5 text-xs text-slate-600">
-                    <li><strong>Schimbă forma casei</strong> (Dreptunghi, L, U, T) din panoul din stânga.</li>
-                    <li><strong>Redimensionează lățimea și lungimea</strong> introducând valori exacte în metri.</li>
-                    <li><strong>Bifează/debifează camere</strong> (ex. adaugă sau elimină WC, dormitoare, debarale).</li>
-                    <li><strong>Rearanjează pozițiile camerelor</strong> trăgând (drag-and-drop) o cameră peste alta pentru a le schimba poziția.</li>
-                    <li><strong>Ajustează dimensiunea unei camere</strong> apăsând pe ea și alegând o pondere de mărime (de la "Foarte Mică" la "Foarte Mare").</li>
-                    <li><strong>Adaugă/șterge uși și ferestre</strong> manual selectându-le pe ecran sau folosind butoanele din proprietăți.</li>
-                  </ul>
-                  <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 font-medium">
-                    Pune-mi orice întrebare tehnică sau de design, iar eu îți voi răspunde pe baza reglementărilor din Legea 114/1996!
-                  </p>
-                </div>
-              </div>
-            )}
-
             {messages.map((m, i) => {
               // Ascundem rezumatele tehnice de sistem dacă apar
               if (m.role === 'assistant' && m.content.includes('[Context proiect din conversații anterioare]')) return null;

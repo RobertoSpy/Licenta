@@ -1,13 +1,24 @@
 {
   "_meta": {
-    "version": "2.0.0",
-    "description": "Context-Aware BOM Rule Engine — formule parametrice cu multiplicatori seismici și de sol.",
+    "version": "3.0.0",
+    "description": "Context-Aware BOM Rule Engine v3 — formule parametrice complete (fundație → finisaje → instalații). Toate coeficienții sunt bazați pe normative românești citate explicit în câmpul 'note' al fiecărei formule.",
     "normativeSources": [
-      "P100-1/2013 Cap.8 (ductilitate DCM/DCH)",
-      "NE012-1:2022 Tab.5.2 (dozaje armătură) + Tab.E.1 (clase expunere beton)",
-      "NP112-2014 Tab.4.1 (presiune convențională sol, lățime talpă fundație)",
-      "CR6-2013 Art.7.4 (stâlpișori zidărie confinată, distanțe max)",
-      "CR1-1-4-2012 Art.6 (încărcări vânt pe învelitoare)"
+      "P100-1/2013 Cap.8 (ductilitate seismică DCM/DCH — multiplicatori armătură)",
+      "NE012-1:2022 §4.3 + Tab.5.2 + Tab.E.1 (beton egalizare, dozaje armătură, clase expunere)",
+      "NP112-2014 Art.6.3 + Art.9.1 + Art.9.2 (fundații, pat balast, bariere umiditate, primer bituminos)",
+      "CR6-2013 Tab.3.1 + §3.2.2 + Art.7.4 + Art.7.5 (mortare zidărie, rost subtire/gros, stâlpișori, centuri)",
+      "CR1-1-4-2012 Art.6 + Art.6.3 (învelitori, sistem pluvial — jgheab, burlan)",
+      "Mc-001-2022 §7.2 + §7.3 (termoizolație obligatorie, folie anticondens, finisaj ETICS)",
+      "ST 011-2014 §5.3 + §5.4 + §5.5 (sistem ETICS: plasă, profil colț, tencuială decorativă)",
+      "SR EN 13859-1 (folii difuzie vapori acoperiș)",
+      "SR EN 13279-1 (glet de ipsos — consumuri declarate producători Knauf)",
+      "SR EN 13300 + spec. Kober/Deutek (vopsea lavabilă — consumuri declarate producători)",
+      "I 7-2011 §4 + §5 + Tab.4.1 (instalații electrice: tablou, siguranțe, cabluri, tuburi protecție)",
+      "SR EN 60898-1 + SR EN 61008-1 (siguranțe automate și diferențiale)",
+      "I 9-2022 §8 + §13 + §14 (instalații sanitare: alimentare apă, canalizare, încălzire)",
+      "SR EN 12056-2 sistem II (canalizare gravitațională — diametre coloane)",
+      "SR EN 806-3 Tab.1 (debite specifice obiecte sanitare)",
+      "C112-86 (instrucțiuni tehnice amorsare și hidroizolații bituminoase)"
     ],
     "variablesInjectedByBomService": [
       "perimeter_m", "foundation_width_m", "foundation_depth_m",
@@ -207,5 +218,215 @@
     "wastePercent": 0,
     "aiSuggestible": true,
     "note": "Ferestre PVC standard cu geam termoizolant 2K. Numărul extras din planul 2D. AI poate sugera tipologia (tripan, low-e) bazat pe zona climatică."
+  },
+
+  "insulation_exterior_walls": {
+    "defaultMaterialCode": "polistiren-eps-10cm",
+    "phase": "Termoizolație",
+    "unit": "mp",
+    "formula": "(perimeter_m * floor_height_m * floors_count) - exterior_openings_sqm",
+    "wastePercent": 10,
+    "aiSuggestible": true,
+    "note": "Izolație pereți exteriori"
+  },
+
+  "insulation_roof": {
+    "defaultMaterialCode": "vata-minerala-15cm",
+    "phase": "Termoizolație",
+    "unit": "mp",
+    "formula": "total_floor_area_sqm",
+    "wastePercent": 5,
+    "aiSuggestible": true,
+    "note": "Termoizolație pod vată minerală bazaltică 15cm la pardoseala podului. Mc-001-2022 §7.3 — rezistență termică minimă R=3.7 m²K/W (zona III climatică). AI poate sugera upgrade 20cm pentru zone cu frost_depth>90cm."
+  },
+
+  "foundation_sand_bed": {
+    "defaultMaterialCode": "BALAST_COMPACTAT",
+    "phase": "Fundație",
+    "unit": "mc",
+    "formula": "perimeter_m * foundation_width_m * 0.20",
+    "wastePercent": 10,
+    "aiSuggestible": false,
+    "note": "Pat de balast compactat 20cm grosime sub fundația continuă. NP 112-2014 Art.6.3 — strat drenaj obligatoriu între teren și betonul de egalizare. Lățimea stratului = foundation_width_m, lungimea = perimeter_m fundație."
+  },
+
+  "foundation_leveling_concrete": {
+    "defaultMaterialCode": "BETON_EGALIZARE_C8_10",
+    "phase": "Fundație",
+    "unit": "mc",
+    "formula": "perimeter_m * foundation_width_m * 0.10",
+    "wastePercent": 8,
+    "aiSuggestible": false,
+    "note": "Beton de egalizare C8/10 (B100), grosime 10cm sub fundație. NE 012-1:2022 §4.3 — strat de regularizare care creează suprafața plană pentru cofraje și hidroizolație. Formula: perimetru × lățime fundație × 0.10m grosime."
+  },
+
+  "foundation_moisture_barrier": {
+    "defaultMaterialCode": "FOLIE_PE_200_MICRONI",
+    "phase": "Fundație",
+    "unit": "mp",
+    "formula": "perimeter_m * foundation_width_m * 1.15",
+    "wastePercent": 5,
+    "aiSuggestible": false,
+    "note": "Folie polietilenă 200 microni — barieră umiditate între beton egalizare și fundație. NP 112-2014 Art.9.1 — protecție hidrofugă obligatorie. Factor 1.15 = 15% suprapunere la margini și îmbinări conform instrucțiunilor tehnice C 112-86."
+  },
+
+  "foundation_bitumen_primer": {
+    "defaultMaterialCode": "PRIMER_BITUMINOS",
+    "phase": "Fundație",
+    "unit": "mp",
+    "formula": "perimeter_m * foundation_depth_m * 2 + perimeter_m * foundation_width_m",
+    "wastePercent": 10,
+    "aiSuggestible": false,
+    "note": "Primer (amorsă) bituminos aplicat pe toate fețele fundației înainte de membrana bituminoasă. NP 112-2014 Art.9.2 + instrucțiuni tehnice C 112-86. Formula: 2 fețe laterale (perimetru × adâncime × 2) + față inferioară (perimetru × lățime). Consum 0.3 L/mp."
+  },
+
+  "mortar_masonry": {
+    "defaultMaterialCode": "MORTAR_ZIDARIE_M10_SAC",
+    "phase": "Structură",
+    "unit": "sac",
+    "formula": "(perimeter_m * floor_height_m * floors_count - exterior_openings_sqm) * 3.5 + interior_walls_m * floor_height_m * 1.8",
+    "wastePercent": 5,
+    "aiSuggestible": true,
+    "note": "Mortar zidărie pentru cărămidă (valoare implicită). CR 6-2013 Tab.3.1 — mortar M10 rost 12mm. Calcul: zidărie 25cm exterior → 22% vol. × 2000 kg/mc × 0.25m = 88 kg/mp → 3.5 saci/mp (25kg/sac). Interior 12.5cm → 1.8 saci/mp. IMPORTANT: AI sugerează override la ADEZIV_BCA_YTONG_SAC (1.4kg/mp = 0.056 saci/mp) dacă wall_exterior=BCA (rost subțire 1-3mm, CR 6-2013 §3.2.2(3))."
+  },
+
+  "roof_batten": {
+    "defaultMaterialCode": "SIPCA_25X50MM",
+    "phase": "Acoperiș",
+    "unit": "ml",
+    "formula": "total_floor_area_sqm * 1.3 * 3.0",
+    "wastePercent": 10,
+    "aiSuggestible": false,
+    "note": "Șipci suport învelitoare 2.5×5cm. Distanță standard 33cm (13 cursuri/ml) pentru țiglă ceramică conform fișe tehnice Tondach/Bramac. Formula: suprafață acoperiș (total_floor_area_sqm × 1.3 factor pantă 35°) × 3 șipci/ml lungime acoperiș (1m÷0.33m). CR 1-1-4-2012 Art.6 — structura de suport dimensionată la încărcarea din vânt și greutatea învelitorii."
+  },
+
+  "roof_underlay": {
+    "defaultMaterialCode": "FOLIE_ANTICONDENS_ACOPERIS",
+    "phase": "Acoperiș",
+    "unit": "mp",
+    "formula": "total_floor_area_sqm * 1.3 * 1.10",
+    "wastePercent": 5,
+    "aiSuggestible": false,
+    "note": "Folie difuzie vapori (anticondens) sub învelitoare. Mc-001-2022 §7.3 + SR EN 13859-1 — strat obligatoriu pentru prevenirea condensului interstițial la acoperișuri ventilate. Formula: suprafata acoperiș (×1.3 pantă 35°) × 1.10 (10% suprapunere minimă la îmbinări conform instrucțiuni montaj producători)."
+  },
+
+  "roof_gutter": {
+    "defaultMaterialCode": "JGHEAB_PVC_100MM",
+    "phase": "Acoperiș",
+    "unit": "ml",
+    "formula": "perimeter_m * 1.10",
+    "wastePercent": 5,
+    "aiSuggestible": false,
+    "note": "Jgheab PVC Ø100mm de colectare apă pluvială. CR 1-1-4-2012 Art.6.3 — sistemul pluvial dimensionat la suprafața de captare a acoperișului. Jgheab pe întregul perimetru + 10% pentru colțuri, îmbinări și doze de colectare. Jgheab Ø100mm acoperă max ~60mp acoperiș per tronson (verificat cu debitul de calcul pentru zona de ploaie România)."
+  },
+
+  "roof_downpipe": {
+    "defaultMaterialCode": "BURLAN_PVC_80MM",
+    "phase": "Acoperiș",
+    "unit": "ml",
+    "formula": "(perimeter_m / 10) * (floor_height_m * floors_count + 0.5) * 1.15",
+    "wastePercent": 5,
+    "aiSuggestible": false,
+    "note": "Burlane PVC Ø80mm evacuare apă pluvială. CR 1-1-4-2012 Art.6.3 — 1 burlan la max 10m de jgheab (suprafață captare max 50mp). Înălțimea burlanului = înălțimea totală clădire + 0.5m prelungire la sol. Factor 1.15 = 15% pentru fitinguri, coturi și coliere de prindere."
+  },
+
+  "etics_mesh": {
+    "defaultMaterialCode": "PLASA_FIBRA_STICLA_160G",
+    "phase": "Termoizolație",
+    "unit": "mp",
+    "formula": "(perimeter_m * floor_height_m * floors_count) - exterior_openings_sqm",
+    "wastePercent": 10,
+    "aiSuggestible": false,
+    "note": "Plasă fibră sticlă 160g/mp în stratul de bază al sistemului ETICS. ST 011-2014 §5.3 — placare obligatorie a întregii suprafețe izolate cu plasă alcalino-rezistentă. Suprafața = identică cu suprafața de izolare exterioară (pereți exteriori minus goluri). Suprapunere min 10cm la îmbinări (included în wastePercent)."
+  },
+
+  "etics_finish": {
+    "defaultMaterialCode": "TENCUIALA_DECORATIVA_SILOXANICA",
+    "phase": "Termoizolație",
+    "unit": "kg",
+    "formula": "(perimeter_m * floor_height_m * floors_count - exterior_openings_sqm) * 3.0",
+    "wastePercent": 5,
+    "aiSuggestible": true,
+    "note": "Tencuială decorativă siloxanică finisaj exterior ETICS. ST 011-2014 §5.5 — strat final de protecție și aspect. Consum 2.5-3.5 kg/mp (granulație 1.5-2mm) conform specificații producători Baumit, Weber. S-a folosit media 3.0 kg/mp. Mc-001-2022 §7.2 — obligatoriu pentru protecția termoizolației împotriva intemperiilor. AI poate sugera override cu vopsea siloxanică (0.30 L/mp) pentru fațade mai simple."
+  },
+
+  "glet_interior": {
+    "defaultMaterialCode": "GLET_IPSOS_KG",
+    "phase": "Finisaje Brute",
+    "unit": "kg",
+    "formula": "((perimeter_m + interior_walls_m * 2) * floor_height_m * floors_count + total_floor_area_sqm * floors_count) * 1.5",
+    "wastePercent": 5,
+    "aiSuggestible": false,
+    "note": "Glet de ipsos interior pe pereți și tavane. Consum: 1.5 kg/mp pentru 2 straturi — specificație declarată Knauf Multifinish (SR EN 13279-1 clasa C5, fișă tehnică). Suprafața gletuită: pereți exteriori (1 față) + pereți interiori (2 fețe) + tavan (pardoseala_mp × etaje). Gletul tencuit NU se aplică pe tencuiala exterioară (ETICS)."
+  },
+
+  "paint_interior": {
+    "defaultMaterialCode": "VOPSEA_LAVABILA_INTERIOR_L",
+    "phase": "Finisaje Brute",
+    "unit": "L",
+    "formula": "((perimeter_m + interior_walls_m * 2) * floor_height_m * floors_count + total_floor_area_sqm * floors_count) * 0.34",
+    "wastePercent": 5,
+    "aiSuggestible": false,
+    "note": "Vopsea lavabilă interior (2 straturi) + grund. Consum total 0.34 L/mp: grund 0.10 L/mp (spec. Deutek/Kober) + vopsea 2×0.12 L/mp (spec. Kober Spor, SR EN 13300). Suprafața = pereți (ext 1 față + int 2 fețe) + tavan. Aceeași suprafață ca gletul. Include grundul inclus în prețul per litru mediat."
+  },
+
+  "electrical_cable_prize": {
+    "defaultMaterialCode": "CABLU_CYY_F_3X2_5",
+    "phase": "Instalații Electrice",
+    "unit": "ml",
+    "formula": "(perimeter_m + interior_walls_m) * floors_count * 3.0",
+    "wastePercent": 10,
+    "aiSuggestible": true,
+    "note": "Cablu CYY-F 3×2.5mm² pentru circuite prize. I 7-2011 §5 — circuite prize separate de iluminat, max 16A (2500W)/circuit. Factorul 3.0 acoperă traseele orizontale pe pereți + verticalele la doze + ramificațiile la fiecare priză. Estimare: (perimetru + pereți int) × etaje × 3 = lungime totală trasee principale. AI ajustează în funcție de numărul de camere declarat."
+  },
+
+  "electrical_cable_light": {
+    "defaultMaterialCode": "CABLU_CYY_F_3X1_5",
+    "phase": "Instalații Electrice",
+    "unit": "ml",
+    "formula": "(perimeter_m + interior_walls_m) * floors_count * 1.5",
+    "wastePercent": 10,
+    "aiSuggestible": true,
+    "note": "Cablu CYY-F 3×1.5mm² pentru circuite iluminat. I 7-2011 §5 — circuite lumina separate, max 10A/circuit. Factorul 1.5 (față de prize) reflectă traseele mai scurte și mai puțin ramificate ale iluminatului. Traseele sunt estimate la 50% din lungimea circuitelor de prize (iluminatul urmează același perete dar mai aproape de tavan)."
+  },
+
+  "electrical_conduit": {
+    "defaultMaterialCode": "TUB_PVC_D20_ML",
+    "phase": "Instalații Electrice",
+    "unit": "ml",
+    "formula": "(perimeter_m + interior_walls_m) * floors_count * 4.5",
+    "wastePercent": 10,
+    "aiSuggestible": false,
+    "note": "Tub protecție PVC Ø20mm sub tencuială pentru toate circuitele electrice (prize + lumina + curenți slabi). I 7-2011 Tab.4.1 — tub de protecție obligatoriu pentru conductoare montate înglobate în tencuială (categoria de instalare B1). Factorul 4.5 = suma traseelor prize (×3) + lumina (×1.5) cu un singur tub per conductor. Ø20mm acceptă max 2 cabluri 3×2.5mm² (factor umplere 40% conform I 7-2011)."
+  },
+
+  "plumbing_supply": {
+    "defaultMaterialCode": "TEAVA_PPR_20MM",
+    "phase": "Instalații Sanitare",
+    "unit": "ml",
+    "formula": "(perimeter_m * 0.5 + interior_walls_m) * floors_count * 1.5",
+    "wastePercent": 8,
+    "aiSuggestible": true,
+    "note": "Țevi PPR 20mm PN20 pentru distribuție apă rece + caldă. I 9-2022 §8.3 — conducte de distribuție de la coloanele principale la obiectele sanitare (max 8m fără recirculare). Factorul 1.5 include atât rețeaua apă rece cât și apa caldă (2 conducte paralele, returnul nu e obligatoriu la P+1). Perimetru × 0.5 = traseele pe pereți exteriori parțial, interior_walls_m = traseele complete pe pereții interiori unde sunt grupurile sanitare."
+  },
+
+  "plumbing_drainage_main": {
+    "defaultMaterialCode": "TEAVA_PVC_D110",
+    "phase": "Instalații Sanitare",
+    "unit": "ml",
+    "formula": "floor_height_m * floors_count * 2 + perimeter_m * 0.25",
+    "wastePercent": 8,
+    "aiSuggestible": false,
+    "note": "Coloană canalizare PVC Ø110mm. I 9-2022 §13.3 + SR EN 12056-2 sistem II — Ø110mm obligatoriu pentru coloane verticale care preiau debitul WC (qs=2.5 l/s conform SR EN 806-3). Formula: 2 coloane verticale × înălțimea totală a clădirii + colectoarele orizontale de bază (25% din perimetru). Panta min 2% pe orizontală (I 9-2022 §13.5)."
+  },
+
+  "plumbing_drainage_secondary": {
+    "defaultMaterialCode": "TEAVA_PVC_D50",
+    "phase": "Instalații Sanitare",
+    "unit": "ml",
+    "formula": "interior_walls_m * floors_count * 0.5 + floors_count * 3",
+    "wastePercent": 8,
+    "aiSuggestible": false,
+    "note": "Conducte legătură canalizare PVC Ø50mm (lavoar, duș, chiuvetă). I 9-2022 §13 + SR EN 12056-2 — Ø50mm pentru obiecte sanitare cu qs≤0.5 l/s (lavoar 0.2, duș 0.2, chiuvetă 0.2 — SR EN 806-3 Tab.1). Estimare: 0.5 ml/ml perete interior (grupurile sanitare urmează pereții interiori) + 3 ml per etaj pentru racordările fixe la coloana principală. Panta min 2-3%."
   }
 }

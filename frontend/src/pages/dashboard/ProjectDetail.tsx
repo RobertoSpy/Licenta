@@ -7,7 +7,6 @@ import {
   Clock, ChevronLeft, Edit2, Trash2, AlertTriangle, Building2
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { AIChatBubble } from '../../components/ai/AIChatBubble';
 
 interface Project {
   id: number;
@@ -342,21 +341,6 @@ export const ProjectDetail = () => {
         </motion.div>
       )}
 
-      {/* Asistentul AI Zidario — montat cu contextul complet al proiectului curent */}
-      <AIChatBubble
-        contextData={{
-          county: project.county,
-          locality: project.locality,
-          seismicZone: project.seismicZone,
-          frostDepthCm: project.frostDepthCm,
-          plotAreaSqm: project.plotAreaSqm,
-          soilType: project.soilType,
-          slopePercent: project.slopePercent,
-          maxAllowedFloors: project.maxAllowedFloors,
-          houseStyle: project.houseStyle,
-          totalFloors: project.totalFloors,
-        }}
-      />
     </motion.div>
   );
 };

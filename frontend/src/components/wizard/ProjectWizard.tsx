@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Maximize2, Home, CheckCircle2, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -9,6 +9,9 @@ import { Step3Regulations } from './Step3Regulations';
 import { Step4HouseType } from './Step4HouseType';
 import { apiPrivate } from '../../api/axios';
 import { useProjectGuard } from '../../hooks/useProjectGuard';
+import { useZidarioChat } from '../../hooks/useZidarioChat';
+import { useScreenTutor } from '../../hooks/useScreenTutor';
+import { AIChatBubble } from '../ai/AIChatBubble';
 
 export interface ProjectFormData {
   title: string;
@@ -80,6 +83,44 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
   
   const { projectId, isLoading, restoredData, restoredStep, clearProject } = useProjectGuard();
 
+  // Chat Global pentru Wizard
+  const { messages, isStreaming, sendMessage: originalSendMessage, addSystemMessage, unreadCount, markAsRead } = useZidarioChat('wizard', projectId || 0, formData as unknown as Record<string, unknown>);
+
+  // Tutor Educațional
+  useScreenTutor({
+    screenId: `step${currentStep}`,
+    addSystemMessage
+  });
+
+  const sendMessage = async (text: string) => {
+    await originalSendMessage(text);
+  };
+
+  const canGoNext = useMemo(() => {
+    if (messages.length === 0) return false;
+
+    // Must have at least one user message after the last system injection THAT REQUIRES AN ANSWER
+    let lastSystemIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].isSystemInjection && messages[i].requiresAnswer) {
+        lastSystemIndex = i;
+        break;
+      }
+    }
+    
+    const hasUserReplyAfter = lastSystemIndex === -1 || messages.findIndex((m, idx) => idx > lastSystemIndex && m.role === 'user') !== -1;
+    
+    if (!hasUserReplyAfter) return false;
+
+    if (currentStep === 1) {
+      return formData.lat !== null && formData.lng !== null && !!formData.seismicZone;
+    }
+    if (currentStep === 3) {
+      return !!formData.zoningRestrictions;
+    }
+    return true;
+  }, [messages, currentStep, formData.lat, formData.lng, formData.seismicZone, formData.zoningRestrictions]);
+
   useEffect(() => {
     if (restoredData) setFormData(prev => ({ ...prev, ...restoredData }));
     if (restoredStep) setCurrentStep(restoredStep);
@@ -146,6 +187,7 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
   }
 
   return (
+    <>
     <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[85vh] md:h-[800px] w-full max-w-5xl mx-auto">
       {/* Header & Stepper */}
       <div className="bg-slate-50 border-b border-slate-200 p-6 md:px-10">
@@ -197,10 +239,10 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
             transition={{ duration: 0.3 }}
             className="h-full"
           >
-            {currentStep === 1 && <Step1Location data={formData} updateData={updateFormData} />}
-            {currentStep === 2 && <Step2Terrain data={formData} updateData={updateFormData} />}
-            {currentStep === 3 && <Step3Regulations data={formData} updateData={updateFormData} />}
-            {currentStep === 4 && <Step4HouseType data={formData} updateData={updateFormData} />}
+            {currentStep === 1 && <Step1Location data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
+            {currentStep === 2 && <Step2Terrain data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
+            {currentStep === 3 && <Step3Regulations data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
+            {currentStep === 4 && <Step4HouseType data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -217,16 +259,25 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
         </Button>
 
         {currentStep < 4 ? (
-          <Button onClick={handleNext} className="gap-2 px-8">
+          <Button onClick={handleNext} disabled={!canGoNext} className="gap-2 px-8">
             Următorul Pas <ChevronRight className="w-5 h-5" />
           </Button>
         ) : (
-          <Button onClick={handleFinish} disabled={isSaving} className="gap-2 px-8 bg-buildnavy hover:bg-slate-800 text-white">
+          <Button onClick={handleFinish} disabled={isSaving || !canGoNext} className="gap-2 px-8 bg-buildnavy hover:bg-slate-800 text-white">
             {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
             {isSaving ? 'Se salvează...' : 'Finalizează și Creează Proiect'}
           </Button>
         )}
       </div>
     </div>
+    
+    <AIChatBubble 
+      messages={messages}
+      isStreaming={isStreaming}
+      onSendMessage={sendMessage}
+      unreadCount={unreadCount}
+      onMarkAsRead={markAsRead}
+    />
+    </>
   );
 };

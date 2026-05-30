@@ -13,6 +13,9 @@ router.post('/chat', protect, validateRequest(chatSchema), aiController.chatStre
 // GET /api/ai/explain-material?base=x&alt=y
 router.get('/explain-material', protect, aiController.explainMaterial);
 
+// GET /api/ai/explain-material/:materialId
+router.get('/explain-material/:materialId', protect, aiController.explainMaterialById);
+
 // POST /api/ai/summarize — Rezumare conversație (non-streaming)
 router.post('/summarize', protect, validateRequest(summarizeSchema), aiController.summarizeConversation);
 

@@ -87,6 +87,27 @@ export async function searchHybrid(
   return finalResults;
 }
 
+export async function searchMaterialsHybrid(
+  question: string,
+  limit: number = 3
+): Promise<any[]> {
+  const questionVectorArray = await embeddingService.embed(question);
+  const vectorStr = `[${questionVectorArray.join(',')}]`;
+
+  const denseSql = `
+    SELECT mc.id, mc.content, mc.source, m.name as "materialName", m."internalCode",
+           1 - (mc.embedding <=> $1::vector) as similarity
+    FROM "MaterialChunk" mc
+    JOIN "Material" m ON m.id = mc."materialId"
+    WHERE 1 - (mc.embedding <=> $1::vector) > 0.40
+    ORDER BY similarity DESC
+    LIMIT $2
+  `;
+
+  const results = await prisma.$queryRawUnsafe<any[]>(denseSql, vectorStr, limit);
+  return results;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // EXPORT OBJECT — interfața legacy pentru compatibilitate cu
 // orice caller care importă `ragService.searchRelevantChunks`
@@ -115,4 +136,22 @@ export const ragService = {
       return 'Serviciul RAG întâmpină probleme de conectivitate.';
     }
   },
+
+  /**
+   * Căutare pentru expertul în materiale (RAG materiale).
+   */
+  async searchRelevantMaterialChunks(question: string, limit: number = 3): Promise<string> {
+    try {
+      const chunks = await searchMaterialsHybrid(question, limit);
+      if (!chunks || chunks.length === 0) return 'Nu am găsit specificații tehnice relevante în baza de date.';
+      let contextStr = 'Fișe tehnice materiale:\n';
+      chunks.forEach(r => {
+        contextStr += `\n[Material: ${r.materialName} | Sursa: ${r.source}]\n${r.content}\n`;
+      });
+      return contextStr;
+    } catch (error) {
+      console.error('[ragService] Eroare la searchMaterialsHybrid:', error);
+      return 'Serviciul RAG pentru materiale întâmpină probleme.';
+    }
+  }
 };

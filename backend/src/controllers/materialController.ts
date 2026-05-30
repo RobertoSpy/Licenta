@@ -5,7 +5,11 @@ import { prisma } from '../lib/prisma';
 export const getAllMaterials = async (req: Request, res: Response): Promise<void> => {
   try {
     const materials = await materialRepository.findAll();
-    res.json(materials);
+    const payload = materials.map((material) => ({
+      ...material,
+      price: material.pricePerUnit,
+    }));
+    res.json(payload);
   } catch (error) {
     console.error('[MaterialController] Eroare la preluarea materialelor:', error);
     res.status(500).json({ error: 'Eroare la preluarea materialelor' });

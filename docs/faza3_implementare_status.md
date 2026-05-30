@@ -3,14 +3,16 @@
 Acest document reflectă progresul implementării Fazei 3 din proiectul Zidario, bazat pe planul inițial.
 
 ## 1. Catalog Materiale & AI Entity Resolution (Finalizat ✅)
-- **Scraping Dinamic**: S-a renunțat la JSON static în favoarea unui script hibrid (`seedMaterials.ts`) care extrage produse de pe Dedeman (sau alte surse viitoare).
+- **Scraping Dinamic**: S-a renunțat la JSON static în favoarea unui script hibrid (`seedMaterials.ts`) care extrage produse de pe Dedeman (sau alte surse viitoare). Baza de date relațională înlătură orice noțiune de "mockup".
+- **Arhitectură Decuplată**: Sistemul este pregătit pentru scalabilitate — scriptul de seed poate fi oricând înlocuit cu un apel API B2B (ex. Dedeman/Leroy Merlin) pentru a trage zeci de mii de produse live, fără a modifica logica motorului BOM sau a AI-ului.
 - **Semantic Mapping (AI)**: Produsele reale sunt trecute printr-un prompt Gemini (`materialAnalyzer.ts`) cu reguli stricte (Schema Validation). AI-ul acționează ca un Data Engineer, mapând produsul real pe o taxonomie fixă de coduri standard din sistem (ex: `STANDARD_BCA_25`, `STANDARD_BETON_C20_25`).
 - **DB Schema**: Modelele `Material` și `PriceHistory` au fost actualizate și migrate în Prisma.
 
 ## 2. BOM Engine — Calcul Deviz (Finalizat ✅)
+- **Eliminarea Estimarilor Statice**: S-a șters complet vechiul sistem bazat pe indici macro (`build-costs.json`), iar aplicația se bazează acum exclusiv pe calculul determinist Faza 3 cu prețuri reale.
 - **Taxonomie**: Formulele de calcul au fost trecute într-un JSON standardizat (`bom-formulas.json`), fiecare vizând un cod fix asigurat de AI (ex: `STANDARD_LEMN_STRUCTURA`).
 - **BOM Repository**: Funcții CRUD pentru `ProjectBOM` care permit recalcularea sau ștergerea ușoară la schimbări.
-- **BOM Service**: Funcția `calculateBOM` injectează formulele extrase din fișier cu datele planului 2D (`ProjectMetrics`) evaluându-le matematic pentru a produce necesarul de materiale, adăugând un coeficient de pierderi (waste).
+- **BOM Service**: Funcția `calculateBOM` injectează formulele extrase din fișier cu datele planului 2D (`ProjectMetrics`) evaluându-le matematic pentru a produce necesarul de materiale, adăugând un coeficient de pierderi (waste). Calculul este interactiv — dacă utilizatorul modifică planul în Faza 2, devizul se recalculează automat.
 - **Rute API**: Rute sub `/api/bom` create și protejate.
 
 ## 3. Etapele Construcției (Finalizat ✅)
@@ -18,7 +20,8 @@ Acest document reflectă progresul implementării Fazei 3 din proiectul Zidario,
 - **Service & Repositories**: Crearea etapelor automat și actualizarea stării de "finalizat" (`markPhaseCompleted`).
 - **Rute API**: Rute sub `/api/construction` expuse și atașate la index.
 
-## 3.1 BOM Advisor — Progres Etape + Confirmare (Finalizat ✅)
+## 3.1 BOM Advisor — Progres Etape, Confirmare & Recomandări Normative (Finalizat ✅)
+- **Consultanță Normativă (AI ca Arhitect)**: Agenții RAG (ex: `materiale`, `deviz`) nu folosesc surse PDF pentru a evita halucinarea prețurilor vechi. În schimb, AI-ul folosește normative de specialitate (ex. MC001 pentru NZEB, NE012 pentru îngheț) ca să extragă cerințe legale și să recomande materialul optim din baza de date live, justificând decizia legislativ.
 - **Model dedicat**: Persistență pentru progresul etapelor BOM în `BomPhaseProgress` (fără reutilizarea `ChatSummary`).
 - **Tracker UI**: Step tracker vizual în header-ul chat-ului BOM, cu etapă activă și etape completate.
 - **Confirmare etapă**: Buton explicit "Confirmă etapa" + suport pentru mesajul "confirm".
@@ -37,4 +40,4 @@ Acest document reflectă progresul implementării Fazei 3 din proiectul Zidario,
 - [ ] **Export PDF Deviz Final**: O funcție care generează devizul complet, planul și etapele într-un PDF descărcabil (ex: Puppeteer).
 - [ ] **Cron Job de Prețuri**: Crearea unui cron pentru `priceService` (săptămânal) pentru a actualiza automat prețul materialelor pe Dedeman/Leroy Merlin.
 
-_Ultima actualizare: Mai 2026 (23)_
+_Ultima actualizare: Mai 2026 (30)_

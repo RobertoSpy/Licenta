@@ -4,6 +4,8 @@ import { aiApi } from '../api/aiApi';
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  isSystemInjection?: boolean;
+  requiresAnswer?: boolean;
 }
 
 /** Numărul maxim de mesaje înainte de a declanșa rezumarea automată */
@@ -52,12 +54,28 @@ export function useZidarioChat(
 ) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   /**
    * summaryRef — Rezumatul acumulat al conversației (din DB + sesiune curentă).
    * Nu e în state ca să nu cauzeze re-render inutil.
    */
   const summaryRef = useRef<string | null>(null);
+
+  const addSystemMessage = useCallback((content: string, requiresAnswer = true) => {
+    setMessages(prev => {
+      // Don't add if the exact same message is already the last one (prevents strict mode double injection)
+      if (prev.some(m => m.content === content)) {
+        return prev;
+      }
+      return [...prev, { role: 'assistant', content, isSystemInjection: true, requiresAnswer }];
+    });
+    setUnreadCount(prev => prev + 1);
+  }, []);
+
+  const markAsRead = useCallback(() => {
+    setUnreadCount(0);
+  }, []);
   const phase = SCREEN_PHASE[screen] ?? 'faza1';
 
   // ── Încărcare context la mount ─────────────────────────────────────────────
@@ -90,6 +108,31 @@ export function useZidarioChat(
       console.warn('[useZidarioChat] Eroare la încărcarea rezumatelor:', err)
     );
   }, [projectId, screen, phase]);
+
+  // ── Restaurare și salvare mesaje din sessionStorage ────────────────────────
+  useEffect(() => {
+    if (!projectId || !screen) return;
+    const cacheKey = `zidario_chat_${projectId}_${screen}`;
+    const stored = sessionStorage.getItem(cacheKey);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      } catch (e) {
+        console.warn('Failed to parse cached chat messages', e);
+      }
+    }
+  }, [projectId, screen]);
+
+  useEffect(() => {
+    if (!projectId || !screen) return;
+    const cacheKey = `zidario_chat_${projectId}_${screen}`;
+    if (messages.length > 0) {
+      sessionStorage.setItem(cacheKey, JSON.stringify(messages));
+    }
+  }, [messages, projectId, screen]);
 
   // ── Constructorul de istoric ──────────────────────────────────────────────
   const buildHistory = useCallback((): ChatMessage[] => {
@@ -208,5 +251,13 @@ export function useZidarioChat(
     summaryRef.current = null;
   }, []);
 
-  return { messages, isStreaming, sendMessage, resetChat };
+  return {
+    messages,
+    isStreaming,
+    sendMessage,
+    resetChat,
+    addSystemMessage,
+    unreadCount,
+    markAsRead
+  };
 }

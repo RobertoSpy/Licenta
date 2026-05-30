@@ -48,7 +48,7 @@ export const BOMSummary = ({ items }: BOMSummaryProps) => {
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(value: number) => new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON' }).format(value)} />
+            <Tooltip formatter={(value: any) => new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON' }).format(Number(value))} />
             <Legend verticalAlign="bottom" height={36} />
           </PieChart>
         </ResponsiveContainer>

@@ -30,7 +30,7 @@
 La finalul Fazei 3, utilizatorul poate:
 
 1. **Genera automat devizul complet** de materiale și manoperă pe baza planului din Faza 2
-2. **Vedea construcția organizată pe 7 etape** (Fundație → Finisaje Fine) cu materialele și costul fiecărei etape
+2. **Vedea construcția organizată pe 9 etape** (Fundație → Amenajări Exterioare) cu materialele și costul fiecărei etape
 3. **Alege variante de materiale** (ex: BCA Ytong vs. cărămidă tradițională vs. beton celular) cu comparație automată cost + performance + clasă energetică
 4. **Optimiza bugetul** cu ajutorul AI-ului: alternative mai ieftine fără compromisuri de siguranță
 5. **Vedea prețurile actuale** ale materialelor (actualizate săptămânal din Leroy Merlin, Dedeman)
@@ -91,7 +91,7 @@ frontend/src/
 │   └── BOMExportButton.tsx    🆕 NEW — buton export PDF cu loading state
 │
 ├── components/construction/
-│   ├── ConstructionTimeline.tsx 🆕 NEW — timeline vertical cu 7 etape
+│   ├── ConstructionTimeline.tsx 🆕 NEW — timeline vertical cu 9 etape
 │   ├── PhaseChecklist.tsx     🆕 NEW — checklist materiale per etapă
 │   └── BudgetOptimizer.tsx    🆕 NEW — widget AI optimizare cu SSE streaming
 │
@@ -153,7 +153,7 @@ model ProjectBOM {
   materialId  Int
   material    Material @relation(fields: [materialId], references: [id])
 
-  phase       String   // "Fundație" | "Structură" | "Planșeu" | "Acoperiș" | "Tâmplărie" | "Finisaje Brute" | "Finisaje Fine"
+  phase       String   // "Fundație" | "Structură" | "Planșeu" | "Termoizolație" | "Acoperiș" | "Tâmplărie" | "Instalații" | "Finisaje Brute" | "Finisaje Fine" | "Amenajări Exterioare"
   formulaKey  String   // "wall_exterior_bca_25cm" — referință la formula folosită
   quantity    Float    // cantitatea calculată (după waste factor)
   unitPrice   Float    // prețul snapshot la momentul calculului
@@ -171,8 +171,8 @@ model ConstructionPhase {
   projectId   Int
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  phaseOrder  Int      // 1-7 (ordinea cronologică)
-  name        String   // "Fundație", "Structură", "Acoperiș" etc.
+  phaseOrder  Int      // 1-9 (ordinea cronologică)
+  name        String   // "Fundație", "Structură", "Planșeu", "Termoizolație" etc.
   description String?  // scurtă descriere a lucrărilor
   durationDays Int?    // estimare durata în zile (din construction-phases.json)
   isCompleted Boolean  @default(false) // utilizatorul poate bifa etapele completate
@@ -611,7 +611,7 @@ async function calculateBOM(projectId: number): Promise<ProjectBOM[]> {
   },
   {
     "order": 2,
-    "name": "Structură — Zidărie",
+    "name": "Structură",
     "description": "Ridicarea pereților exteriori și interiori din BCA / cărămidă, buiandrugi, stâlpișori",
     "durationDays": 21,
     "categories": ["Structură"],
@@ -623,13 +623,13 @@ async function calculateBOM(projectId: number): Promise<ProjectBOM[]> {
     "description": "Coroana de beton armat pe conturul clădirii, planșeul dintre etaje (dacă e P+1 sau mai mult)",
     "durationDays": 10,
     "categories": ["Planșeu"],
-    "requiredPreviousPhase": "Structură — Zidărie",
+    "requiredPreviousPhase": "Structură",
     "minimumIdle": 14,
     "idleNote": "14 zile maturare planșeu beton armat"
   },
   {
     "order": 4,
-    "name": "Acoperiș — Șarpantă & Învelitoare",
+    "name": "Acoperiș",
     "description": "Șarpantă lemn, folie anticondens, pazie, jgheaburi, învelitoare (țiglă/tablă)",
     "durationDays": 14,
     "categories": ["Acoperiș"],
@@ -637,28 +637,28 @@ async function calculateBOM(projectId: number): Promise<ProjectBOM[]> {
   },
   {
     "order": 5,
-    "name": "Tâmplărie Exterioară",
+    "name": "Tâmplărie",
     "description": "Montaj ferestre PVC, ușă intrare principală, glafuri exterioare",
     "durationDays": 5,
     "categories": ["Tâmplărie"],
-    "requiredPreviousPhase": "Acoperiș — Șarpantă & Învelitoare",
+    "requiredPreviousPhase": "Acoperiș",
     "note": "Casa devine 'la roșu' după această etapă — se poate lucra pe orice vreme"
   },
   {
     "order": 6,
-    "name": "Instalații & Finisaje Brute",
+    "name": "Instalații",
     "description": "Instalații electrice (cablare), sanitare (țevi), termice, șapă, tencuieli, glet",
     "durationDays": 30,
     "categories": ["Finisaje Brute"],
-    "requiredPreviousPhase": "Tâmplărie Exterioară"
+    "requiredPreviousPhase": "Tâmplărie"
   },
   {
     "order": 7,
-    "name": "Finisaje Fine",
+    "name": "Finisaje",
     "description": "Vopsele, gresie, faianță, parchet, uși interior, corpuri iluminat, sanitare montaj",
     "durationDays": 30,
     "categories": ["Finisaje Fine"],
-    "requiredPreviousPhase": "Instalații & Finisaje Brute"
+    "requiredPreviousPhase": "Instalații"
   }
 ]
 ```
@@ -675,7 +675,7 @@ Etapa 4: Acoperiș ━━━━━━━━━━━━━━ 14 zile           
 Etapa 5: Tâmplărie ━━━━━ 5 zile                                   🔒 Blocat
                    ★ CASA LA ROȘU (milestone)
 Etapa 6: Instalații & Brute ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 30z   🔒 Blocat
-Etapa 7: Finisaje Fine ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 30z    🔒 Blocat
+Etapa 7: Finisaje ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 30z    🔒 Blocat
 
 TOTAL ESTIMAT: ~141 zile + 21 zile așteptare = ~162 zile (~5.5 luni)
 ```
@@ -974,7 +974,7 @@ Pagina ultimă — Disclaimer & Date Contact
 │ ▶ ETAPA 4: ACOPERIȘ                      │   ─────────────────────── │
 │ ▶ ETAPA 5: TÂMPLĂRIE                     │   Fără TVA:  113,000 RON │
 │ ▶ ETAPA 6: FINISAJE BRUTE                │   TVA 19%:    21,470 RON │
-│ ▶ ETAPA 7: FINISAJE FINE                 │   TOTAL:     134,470 RON │
+│ ▶ ETAPA 7: FINISAJE                      │   TOTAL:     134,470 RON │
 │                                           │                          │
 │ 🤖 Zidario: "Poți economisi ~9,200 RON   │   [Regenerează deviz]    │
 │ dacă alegi BCA Aeroc în loc de Ytong     │   [Optimizare buget AI]  │

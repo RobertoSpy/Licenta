@@ -13,6 +13,7 @@ proj4.defs("EPSG:31700", "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=50000
 interface Props {
   data: ProjectFormData;
   updateData: (fields: Partial<ProjectFormData>) => void;
+  addSystemMessage?: (content: string) => void;
 }
 
 // Nominatim API result shape
@@ -45,7 +46,7 @@ const MapCenterController = ({ center }: { center: [number, number] }) => {
   return null;
 };
 
-export const Step1Location = ({ data, updateData }: Props) => {
+export const Step1Location = ({ data, updateData, addSystemMessage }: Props) => {
   const [errorMsg, setErrorMsg] = useState('');
   const [isPredicting, setIsPredicting] = useState(false);
   const [inputMode, setInputMode] = useState<'stereo70' | 'manual'>('stereo70');
@@ -55,6 +56,9 @@ export const Step1Location = ({ data, updateData }: Props) => {
   const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Ref pentru a preveni mesajele repetate
+  const hasAskedLocationQuestion = useRef(false);
 
   // Efect: De fiecare dată când utilizatorul editează tabelul X/Y, încercăm să generăm poligonul GPS
   useEffect(() => {
@@ -160,6 +164,14 @@ export const Step1Location = ({ data, updateData }: Props) => {
             seismicZone: result.data.seismicZone,
             frostDepthCm: result.data.frostDepthCm
           });
+          
+          if (addSystemMessage && !hasAskedLocationQuestion.current) {
+            hasAskedLocationQuestion.current = true;
+            addSystemMessage(`Am extras datele tehnice pentru terenul tău din **${result.data.county || 'România'}**! 
+Zona seismică conform normativului P100-1 este **${result.data.seismicZone || '0.20g'}**, iar adâncimea de îngheț este de **${result.data.frostDepthCm || 90}cm**.
+
+Înainte de a merge mai departe, poți să-mi spui, pe înțelesul tău, de ce crezi că valoarea zonei seismice (${result.data.seismicZone || '0.20g'}) este importantă pentru felul în care vom proiecta fundația și structura casei tale? Ai înțeles cum te impactează aceste valori?`);
+          }
         }
       } catch (err) {
         console.error("Eroare la analiza locației:", err);

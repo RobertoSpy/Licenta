@@ -230,13 +230,15 @@ Returnează DOAR rezumatul, fără introducere sau formulă de încheiere.
     projectId: number,
     familySize: number,
     budgetCategory: BudgetCategory,
-    houseAreaSqm: number
+    houseAreaSqm: number,
+    totalFloors: number
   ): Promise<RoomSuggestion> {
     const response = await apiPrivate.post('/ai/suggest-rooms', {
       projectId,
       familySize,
       budgetCategory,
       houseAreaSqm,
+      totalFloors,
     });
     return response.data as RoomSuggestion;
   },

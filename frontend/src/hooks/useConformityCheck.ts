@@ -61,9 +61,12 @@ function normLabel(label: string): string {
     .replace(/[^a-z0-9]/g, '');
 }
 
-function isDayRoom(label: string): boolean {
+function isHabitableRoom(label: string): boolean {
   const n = normLabel(label);
-  return n.includes('living') || n.includes('sufragerie') || n.includes('dormitor') || n.includes('camera');
+  if (n.includes('tehnic') || n.includes('debara') || n.includes('camara') || n.includes('baie') || n.includes('wc') || n.includes('hol') || n.includes('coridor')) {
+    return false;
+  }
+  return n.includes('living') || n.includes('sufragerie') || n.includes('dormitor') || n.includes('birou') || n.includes('bucatarie') || n.includes('camera');
 }
 
 // ─── Geometric opening rules (100% local, no backend) ────────────
@@ -133,9 +136,9 @@ function computeOpeningIssues(
     }
   }
 
-  // RULE 3 — NO_WINDOW: day room (living/dormitor) without any adjacent window
+  // RULE 3 — NO_WINDOW: habitable room without any adjacent window
   for (const room of rooms) {
-    if (!isDayRoom(room.label)) continue;
+    if (!isHabitableRoom(room.label ?? '')) continue;
 
     const roomEl = elements.find(el => el.id === room.id);
     if (!roomEl) continue;

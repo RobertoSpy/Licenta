@@ -1,6 +1,15 @@
 import { prisma } from '../lib/prisma';
 
-export type BomPhaseKey = 'fundatie' | 'structura' | 'zidarie' | 'acoperis' | 'instalatii' | 'finisaje';
+export type BomPhaseKey =
+  | 'fundatie'
+  | 'structura'
+  | 'planseu'
+  | 'termoizolatie'
+  | 'acoperis'
+  | 'tamplarie'
+  | 'instalatii'
+  | 'finisaje'
+  | 'exterior';
 
 export type BomPhaseState = {
   activePhase: BomPhaseKey;

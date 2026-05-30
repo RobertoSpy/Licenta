@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { type ConformityRoom } from '../../hooks/useConformityCheck';
 import { useEditorState } from '../../hooks/useEditorState';
-import { CheckCircle2, AlertTriangle, XCircle, Home, Compass, Settings, CheckSquare, SquareDot, Sparkles } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, Home, Compass, Settings, CheckSquare, SquareDot, Sparkles, RefreshCw } from 'lucide-react';
 import { AiRoomSuggestModal } from './AiRoomSuggestModal';
 
 interface Props {
@@ -40,7 +40,8 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
     selectElement,
     selectedId,
     isAiModalOpen,
-    setAiModalOpen
+    setAiModalOpen,
+    regenerateLayout,
   } = useEditorState();
 
   const totalUsable = rooms.reduce((sum, r) => sum + r.usableSqm, 0);
@@ -254,6 +255,21 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
               );
             })}
           </div>
+        </div>
+
+        {/* Section 5: Regenerate button */}
+        <div className="pt-3 border-t border-slate-100">
+          <button
+            onClick={regenerateLayout}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all"
+            title="Regenerează planul complet din camerele active de mai sus. Atenție: schimbările manuale vor fi pierdute."
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Regenerează Plan
+          </button>
+          <p className="text-[10px] text-slate-400 text-center mt-1.5">
+            Recalculează pozițiile tuturor camerelor
+          </p>
         </div>
 
       </div>

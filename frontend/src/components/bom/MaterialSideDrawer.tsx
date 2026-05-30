@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { BOMItem } from '../../hooks/useBOMData';
+import { fetchWithAuth, apiPrivate } from '../../api/axios';
 
 interface MaterialSideDrawerProps {
   isOpen: boolean;
@@ -28,11 +29,13 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
   const [aiExplanation, setAiExplanation] = useState<string>('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [activeAltCode, setActiveAltCode] = useState<string | null>(null);
+  const [aiNoSources, setAiNoSources] = useState(false);
 
   // AI Validate Override state — per alternativă
   const [validateText, setValidateText] = useState<Record<string, string>>({});
   const [validateLoading, setValidateLoading] = useState<Record<string, boolean>>({});
   const [validateDone, setValidateDone] = useState<Record<string, boolean>>({});
+  const [validateNoSources, setValidateNoSources] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (isOpen && currentItem) {
@@ -57,13 +60,8 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
         setLoading(false);
         return;
       }
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/materials/${internalCode}/alternatives`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setAlternatives(data);
-      }
+      const response = await apiPrivate.get(`/materials/${internalCode}/alternatives`);
+      setAlternatives(response.data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -75,21 +73,12 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
     if (!currentItem) return;
     setReplacingCode(alt.internalCode);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/bom/${projectId}/material`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          formulaKey: currentItem.formulaKey,
-          newMaterialCode: alt.internalCode
-        })
+      await apiPrivate.patch(`/bom/${projectId}/material`, {
+        formulaKey: currentItem.formulaKey,
+        newMaterialCode: alt.internalCode
       });
-      if (response.ok) {
-        onMaterialReplaced();
-        onClose();
-      }
+      onMaterialReplaced();
+      onClose();
     } catch (e) {
       console.error(e);
     } finally {
@@ -102,16 +91,13 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
     setAiExplanation('');
     setActiveAltCode(alt.internalCode);
     setIsAiLoading(true);
+    setAiNoSources(false);
 
     try {
       const baseName = currentItem.material.name;
-      const url = `${import.meta.env.VITE_API_URL}/api/ai/explain-material?base=${encodeURIComponent(baseName)}&alt=${encodeURIComponent(alt.name)}`;
+      const url = `/api/ai/explain-material?base=${encodeURIComponent(baseName)}&alt=${encodeURIComponent(alt.name)}`;
       
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await fetchWithAuth(url);
 
       if (!response.body) throw new Error("No body");
       const reader = response.body.getReader();
@@ -132,6 +118,9 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
             }
             try {
               const parsed = JSON.parse(dataStr);
+              if (parsed?.meta?.noSources) {
+                setAiNoSources(true);
+              }
               if (parsed.text) {
                 setAiExplanation(prev => prev + parsed.text);
               }
@@ -153,13 +142,13 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
     setValidateText(prev => ({ ...prev, [code]: '' }));
     setValidateLoading(prev => ({ ...prev, [code]: true }));
     setValidateDone(prev => ({ ...prev, [code]: false }));
+    setValidateNoSources(prev => ({ ...prev, [code]: false }));
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/validate-override`, {
+      const response = await fetchWithAuth(`/api/ai/validate-override`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
         body: JSON.stringify({
           originalMaterialName: currentItem.material.name,
@@ -183,6 +172,9 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
             if (dataStr === '[DONE]') break;
             try {
               const parsed = JSON.parse(dataStr);
+              if (parsed?.meta?.noSources) {
+                setValidateNoSources(prev => ({ ...prev, [code]: true }));
+              }
               if (parsed.text) {
                 setValidateText(prev => ({ ...prev, [code]: (prev[code] ?? '') + parsed.text }));
               }
@@ -307,6 +299,11 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
                         <p className="font-semibold text-slate-800 mb-1 flex items-center gap-1.5 text-xs">
                           🛡️ Conformitate Normativă
                         </p>
+                        {validateNoSources[alt.internalCode] && (
+                          <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+                            Fără surse normative indexate. Răspuns orientativ.
+                          </div>
+                        )}
                         <div className="leading-relaxed text-xs text-slate-700">
                           {validateText[alt.internalCode]}
                           {validateLoading[alt.internalCode] && (
@@ -330,6 +327,11 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
                         <p className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
                           <span className="text-lg">🤖</span> Zidario AI
                         </p>
+                        {aiNoSources && (
+                          <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+                            Fără surse normative indexate. Răspuns orientativ.
+                          </div>
+                        )}
                         <div className="leading-relaxed">
                           {aiExplanation}
                           {isAiLoading && <span className="inline-block w-1.5 h-4 ml-1 bg-blue-500 animate-pulse" />}

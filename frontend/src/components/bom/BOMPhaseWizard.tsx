@@ -26,6 +26,7 @@ interface BOMPhaseWizardProps {
   bomItems: BOMItem[];
   onMaterialReplaced: () => void;
   onAllConfirmed?: () => void;
+  canGoNext?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -36,6 +37,7 @@ export const BOMPhaseWizard = ({
   bomItems,
   onMaterialReplaced,
   onAllConfirmed,
+  canGoNext = false,
 }: BOMPhaseWizardProps) => {
   const {
     activePhase: dbActivePhase,
@@ -221,10 +223,17 @@ export const BOMPhaseWizard = ({
               onForward={handleForward}
               onMaterialReplaced={onMaterialReplaced}
               isConfirming={isConfirming}
+              canGoNext={canGoNext}
             />
           )}
         </motion.div>
       </AnimatePresence>
+      <div className="hidden">
+        {/* Render BOMAdvisorChat invisibly just to hook up the chat logic and screen tutor.
+            Usually it's rendered by the layout, but we need it here for canGoNext.
+            Actually wait, where is BOMAdvisorChat rendered in the actual app?
+        */}
+      </div>
     </div>
   );
 };

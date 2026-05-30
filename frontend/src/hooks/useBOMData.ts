@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiPrivate } from '../api/axios';
 
 export interface BOMItem {
   id: number;
@@ -28,23 +29,17 @@ export function useBOMData(projectId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/bom/${projectId}/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Eroare la generarea/preluarea BOM-ului');
-      }
-
-      const data = await response.json();
-      setBomItems(data);
+      const response = await apiPrivate.post(`/bom/${projectId}/generate`);
+      setBomItems(response.data);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'A apărut o eroare necunoscută.');
+      let msg = 'Eroare la generarea BOM-ului.';
+      if (err.response?.data?.error) {
+        msg = err.response.data.error;
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
