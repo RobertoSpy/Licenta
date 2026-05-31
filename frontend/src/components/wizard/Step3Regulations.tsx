@@ -41,7 +41,7 @@ const itemVariants = {
   }
 };
 
-export const Step3Regulations = ({ data, updateData, addSystemMessage }: Props) => {
+export const Step3Regulations = ({ data, updateData }: Props) => {
   const [isPredicting, setIsPredicting] = useState(true);
   const [aiExplanation, setAiExplanation] = useState("");
   const aiExplanationRef = useRef("");
@@ -125,15 +125,6 @@ body: JSON.stringify({
         }
       }
       updateData({ zoningRestrictions: aiExplanationRef.current });
-      
-      // Inject the blocking question after AI finishes explaining
-      if (addSystemMessage) {
-        import('../../data/tutorialContent').then(({ SCREEN_TUTORIALS }) => {
-           if (SCREEN_TUTORIALS.step3.questionMessage) {
-              addSystemMessage(SCREEN_TUTORIALS.step3.questionMessage);
-           }
-        });
-      }
     } catch {
       setAiExplanation("Eroare la generarea explicației AI. Te rugăm să verifici conexiunea.");
     } finally {

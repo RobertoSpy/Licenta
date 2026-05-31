@@ -5,7 +5,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 const pdfParse = require('pdf-parse');
 
-import { embeddingService } from '../services/ai/embeddingService';
+import { embeddingService } from '../modules/ai/services/embeddingService';
 import {
   NORMATIVE_REGISTRY,
   NORMATIVE_FILES,

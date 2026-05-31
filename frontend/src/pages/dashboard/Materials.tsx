@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiPrivate } from '../../api/axios';
 import { PackageSearch, Search, SlidersHorizontal, RefreshCw, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../../context/useAuth';
 
 interface Material {
   id: number;
@@ -21,8 +22,10 @@ export const Materials = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Toate');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [newMaterialUrl, setNewMaterialUrl] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const { user } = useAuth();
 
   const fetchMaterials = () => {
     setIsLoading(true);
@@ -108,47 +111,73 @@ export const Materials = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="w-px bg-slate-200 mx-2 hidden md:block"></div>
-          <button className="hidden md:flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-buildorange transition-colors">
-            <SlidersHorizontal className="w-5 h-5" />
-            <span className="font-medium text-sm">Filtrează</span>
-          </button>
+          <div className="w-px bg-slate-200 mx-2"></div>
+          
+          {/* Buton Filtrează cu Dropdown */}
+          <div className="relative">
+            <button 
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-buildorange transition-colors h-full rounded-lg"
+            >
+              <SlidersHorizontal className="w-5 h-5" />
+              <span className="font-medium text-sm hidden sm:inline">
+                Filtrează {selectedCategory !== 'Toate' && `(${selectedCategory})`}
+              </span>
+            </button>
+            
+            <AnimatePresence>
+              {isFilterOpen && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-50 py-2 max-h-64 overflow-y-auto"
+                >
+                  <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Categorii
+                  </div>
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => { setSelectedCategory(cat); setIsFilterOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                        selectedCategory === cat 
+                          ? 'text-buildorange font-semibold bg-orange-50' 
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
         <div className="flex gap-2">
+          {/* Adaugă prin URL - Vizibil pentru TOȚI */}
           <button 
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-2.5 rounded-xl font-medium transition-colors shadow-sm"
           >
             <Plus className="w-5 h-5" />
-            Adaugă prin URL
+            <span className="hidden sm:inline">Adaugă prin URL</span>
+            <span className="sm:hidden">Adaugă</span>
           </button>
           
-          <button 
-            onClick={handleSync}
-            disabled={isSyncing}
-            className="flex items-center gap-2 bg-buildnavy hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-medium transition-colors shadow-sm disabled:opacity-70"
-          >
-            <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Se sincronizează...' : 'Sincronizare Live'}
-          </button>
+          {/* Sincronizare Live - Vizibil DOAR pentru ADMIN */}
+          {user?.role === 'admin' && (
+            <button 
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="flex items-center gap-2 bg-buildnavy hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-medium transition-colors shadow-sm disabled:opacity-70"
+            >
+              <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isSyncing ? 'Se sincronizează...' : 'Sincronizare'}</span>
+            </button>
+          )}
         </div>
-      </div>
-
-      {/* Categories Horizontal Scroll */}
-      <div className="flex overflow-x-auto gap-2 pb-4 mb-4 scrollbar-hide">
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-semibold transition-all ${selectedCategory === cat
-                ? 'bg-buildnavy text-white shadow-md'
-                : 'bg-white border border-slate-200 text-slate-600 hover:border-buildorange/50 hover:text-buildorange'
-              }`}
-          >
-            {cat}
-          </button>
-        ))}
       </div>
 
       {isLoading ? (

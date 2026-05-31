@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { Building2, Palette, Info, Check, AlertCircle } from 'lucide-react';
 import type { ProjectFormData } from './ProjectWizard';
@@ -45,20 +44,8 @@ const styles = [
   { id: 'Industrial', name: 'Industrial / Loft', desc: 'Mix de cărămidă, metal și beton aparent. Aspect brut.', color: 'slate' }
 ];
 
-export const Step4HouseType = ({ data, updateData, addSystemMessage }: Props) => {
+export const Step4HouseType = ({ data, updateData }: Props) => {
   const maxFloors = data.maxAllowedFloors || 2;
-  const hasTriggeredQuestion = React.useRef(false);
-
-  React.useEffect(() => {
-    if (data.houseStyle && addSystemMessage && !hasTriggeredQuestion.current) {
-       hasTriggeredQuestion.current = true;
-       import('../../data/tutorialContent').then(({ SCREEN_TUTORIALS }) => {
-          if (SCREEN_TUTORIALS.step4.questionMessage) {
-             addSystemMessage(SCREEN_TUTORIALS.step4.questionMessage);
-          }
-       });
-    }
-  }, [data.houseStyle, data.upperFloorsCount, data.hasBasement, addSystemMessage]);
 
   const toggleBasement = () => updateData({ hasBasement: !data.hasBasement });
 

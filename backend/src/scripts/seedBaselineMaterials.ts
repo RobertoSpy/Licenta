@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { scraperService } from '../services/scraperService';
+import { scraperService } from '../core/infrastructure/scraperService';
 
 const prisma = new PrismaClient();
 

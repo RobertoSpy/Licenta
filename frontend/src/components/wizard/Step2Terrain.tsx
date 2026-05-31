@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
 import { Maximize, Layers, Compass, TrendingUp, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -39,32 +39,14 @@ const calculateAreaFromMeters = (points: { x: string, y: string }[]) => {
 const springConfig = { type: "spring" as const, stiffness: 300, damping: 20 };
 
 
-export const Step2Terrain = ({ data, updateData, addSystemMessage }: Props) => {
+export const Step2Terrain = ({ data, updateData }: Props) => {
   const calculatedArea = useMemo(() => calculateAreaFromMeters(data.plotCoordinates), [data.plotCoordinates]);
-  const hasAskedTerrainQuestion = useRef(false);
 
   useEffect(() => {
     if (calculatedArea > 0 && data.plotAreaSqm !== calculatedArea) {
       updateData({ plotAreaSqm: calculatedArea });
     }
   }, [calculatedArea, data.plotAreaSqm, updateData]);
-
-  useEffect(() => {
-    if (addSystemMessage && !hasAskedTerrainQuestion.current) {
-      if (data.slopePercent > 0 || (data.soilType && data.soilType !== 'Nu știu')) {
-        hasAskedTerrainQuestion.current = true;
-        let msg = "";
-        if (data.slopePercent > 5) {
-          msg = `Văd că terenul tău are o pantă de **${data.slopePercent}%**. Știai că o pantă mai mare de 5% necesită de obicei un studiu geotehnic mai aprofundat și soluții de fundare în trepte sau ziduri de sprijin? \n\nAi înțeles cum îți poate afecta panta costul fundației, sau vrei să detaliez?`;
-        } else if (data.soilType && data.soilType !== 'Nu știu') {
-          msg = `Ai selectat tipul de sol **${data.soilType}**. Tipul solului este determinant pentru presiunea convențională pe care o poate suporta terenul. \n\nAi idee cum influențează natura solului (${data.soilType}) adâncimea și costul fundației tale, sau ai dori să-ți explic?`;
-        } else {
-          msg = `Ai configurat datele despre pantă și sol! Aceste detalii geotehnice dictează tipul de fundație necesar. \n\nEști confortabil cu aceste valori și înțelegi impactul lor asupra costurilor, sau ai vrea să îți detaliez?`;
-        }
-        addSystemMessage(msg);
-      }
-    }
-  }, [data.slopePercent, data.soilType, addSystemMessage]);
 
   const orientations = [
     { id: 'N', name: 'Nord' }, { id: 'NE', name: 'Nord-Est' }, 

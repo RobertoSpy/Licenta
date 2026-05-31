@@ -9,7 +9,7 @@
 //
 // SCALE: 1 pixel canvas = 5cm real → PIXELS_PER_METER = 20 (useEditorState.ts linia 13)
 
-import { ProjectMetrics } from '../services/bomService';
+import { ProjectMetrics } from '../modules/bom/bomService';
 
 // ─────────────────────────────────────────────────────────────────
 // CONSTANTĂ DE SCARĂ — sincronizată cu frontend/src/hooks/useEditorState.ts

@@ -29,6 +29,8 @@ export const useProjectGuard = () => {
               locality: project.locality,
               seismicZone: project.seismicZone,
               frostDepthCm: project.frostDepthCm,
+              plotAreaSqm: project.plotAreaSqm ?? 0,
+              polygonLatLngs: project.polygonGeoJSON?.coordinates?.[0]?.map((c: number[]) => [c[1], c[0]]) || [],
               // Screen 2
               soilType: project.soilType ?? 'Nu știu',
               slopePercent: project.slopePercent ?? 0,

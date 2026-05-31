@@ -17,6 +17,10 @@ model User {
   refreshToken String?   // SalveazÄƒ tokenul de refresh curent pentru securitate (opÈ›ional, dar recomandat pt validare la delogare)
   passwordResetToken   String?
   passwordResetExpires DateTime?
+  isVerified           Boolean   @default(false)
+  verificationToken    String?
+  verificationExpires  DateTime?
+  role                 String    @default("user")
   projects     Project[]
   createdAt    DateTime  @default(now())
 }

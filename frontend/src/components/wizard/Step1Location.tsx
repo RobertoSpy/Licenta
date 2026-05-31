@@ -46,7 +46,7 @@ const MapCenterController = ({ center }: { center: [number, number] }) => {
   return null;
 };
 
-export const Step1Location = ({ data, updateData, addSystemMessage }: Props) => {
+export const Step1Location = ({ data, updateData }: Props) => {
   const [errorMsg, setErrorMsg] = useState('');
   const [isPredicting, setIsPredicting] = useState(false);
   const [inputMode, setInputMode] = useState<'stereo70' | 'manual'>('stereo70');
@@ -56,9 +56,6 @@ export const Step1Location = ({ data, updateData, addSystemMessage }: Props) => 
   const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  // Ref pentru a preveni mesajele repetate
-  const hasAskedLocationQuestion = useRef(false);
 
   // Efect: De fiecare dată când utilizatorul editează tabelul X/Y, încercăm să generăm poligonul GPS
   useEffect(() => {
@@ -145,10 +142,21 @@ export const Step1Location = ({ data, updateData, addSystemMessage }: Props) => 
     // Restul (județ, seismic, frost) se extrag automat prin useEffect-ul existent
   };
 
+  const lastFetchedLatLng = useRef<{ lat: number; lng: number } | null>(null);
+
   useEffect(() => {
     const fetchGeospatialData = async () => {
       // Avem nevoie de lat/lng pentru backend ca sa extraga si county si locality via reverse geocoding
       if (!data.lat || !data.lng) return;
+
+      if (
+        lastFetchedLatLng.current?.lat === data.lat &&
+        lastFetchedLatLng.current?.lng === data.lng
+      ) {
+        return; // Am adus deja datele pt coordonatele astea, prevenim duplicate la navigarea back/forward
+      }
+
+      lastFetchedLatLng.current = { lat: data.lat, lng: data.lng };
 
       setIsPredicting(true);
       try {
@@ -165,13 +173,8 @@ export const Step1Location = ({ data, updateData, addSystemMessage }: Props) => 
             frostDepthCm: result.data.frostDepthCm
           });
           
-          if (addSystemMessage && !hasAskedLocationQuestion.current) {
-            hasAskedLocationQuestion.current = true;
-            addSystemMessage(`Am extras datele tehnice pentru terenul tău din **${result.data.county || 'România'}**! 
-Zona seismică conform normativului P100-1 este **${result.data.seismicZone || '0.20g'}**, iar adâncimea de îngheț este de **${result.data.frostDepthCm || 90}cm**.
-
-Înainte de a merge mai departe, poți să-mi spui, pe înțelesul tău, de ce crezi că valoarea zonei seismice (${result.data.seismicZone || '0.20g'}) este importantă pentru felul în care vom proiecta fundația și structura casei tale? Ai înțeles cum te impactează aceste valori?`);
-          }
+          // Stergem injectarea automata a intrebarii AI
+          // Acum tot flow-ul se bazeaza pe mesajul introductiv din useScreenTutor
         }
       } catch (err) {
         console.error("Eroare la analiza locației:", err);

@@ -46,6 +46,13 @@ export const AIChatBubble: React.FC<AIChatBubbleProps> = ({
     }
   }, [isOpen, onMarkAsRead, messages.length]);
 
+  // Deschide chat-ul automat când apare un mesaj nou de la sistem (unreadCount > 0)
+  useEffect(() => {
+    if (unreadCount > 0 && !isOpen) {
+      setIsOpen(true);
+    }
+  }, [unreadCount, isOpen]);
+
   // Auto scroll la ultimul mesaj DOAR dacă utilizatorul a întrebat ceva sau AI-ul scrie activ
   useEffect(() => {
     if (messages.length > 0 || isStreaming) {

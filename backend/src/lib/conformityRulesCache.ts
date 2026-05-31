@@ -1,5 +1,5 @@
 import { AgentType, AGENT_SOURCES_BY_PURPOSE, BuildingPurpose } from '../data/normative-registry';
-import { searchHybrid } from '../services/ai/ragService';
+import { searchHybrid } from '../modules/ai/services/ragService';
 import { NormativeChunk } from '@prisma/client';
 
 export interface ConformityRuleSource {
@@ -79,7 +79,7 @@ async function resolveRuleSeed(seed: RuleSeed, purpose: BuildingPurpose): Promis
   for (const chunk of chunks) {
     const value = extractMeters(chunk.content, seed.minRangeM, seed.maxRangeM);
     if (value !== null) {
-      const sources: ConformityRuleSource[] = chunks.slice(0, MAX_SOURCES).map((c) => ({
+      const sources: ConformityRuleSource[] = chunks.slice(0, MAX_SOURCES).map((c: NormativeChunk) => ({
         source: c.source,
         chapter: c.chapter,
         excerpt: buildExcerpt(c),

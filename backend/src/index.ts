@@ -4,17 +4,17 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 
-import { globalLimiter } from './middleware/rateLimiter';
-import authRoutes from './routes/authRoutes';
-import projectRoutes from './routes/projectRoutes';
-import terrainRoutes from './routes/terrainRoutes';
-import aiRoutes from './routes/aiRoutes';
-import materialRoutes from './routes/materialRoutes';
-import editorRoutes from './routes/editorRoutes';
-import exportRoutes from './routes/exportRoutes';
-import bomRoutes from './routes/bomRoutes';
-import constructionRoutes from './routes/constructionRoutes';
-import adminRoutes from './routes/adminRoutes';
+import { globalLimiter } from './core/middleware/rateLimiter';
+import authRoutes from './modules/auth/authRoutes';
+import projectRoutes from './modules/project/projectRoutes';
+import terrainRoutes from './modules/terrain/terrainRoutes';
+import aiRoutes from './modules/ai/aiRoutes';
+import materialRoutes from './modules/materials/materialRoutes';
+import editorRoutes from './modules/editor/editorRoutes';
+import exportRoutes from './modules/export/exportRoutes';
+import bomRoutes from './modules/bom/bomRoutes';
+import constructionRoutes from './modules/construction/constructionRoutes';
+import adminRoutes from './modules/admin/adminRoutes';
 
 dotenv.config();
 

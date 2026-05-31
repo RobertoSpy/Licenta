@@ -131,7 +131,14 @@ export const MyProjects = () => {
               variants={cardVariants}
               whileHover={{ y: -6, scale: 1.01, transition: { type: 'spring', stiffness: 400, damping: 15 } }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => navigate(`/dashboard/projects/${proj.id}`)}
+              onClick={() => {
+                if (proj.isCompleted) {
+                  navigate(`/dashboard/projects/${proj.id}`);
+                } else {
+                  localStorage.setItem('activeProjectId', proj.id.toString());
+                  setShowWizard(true);
+                }
+              }}
               className="bg-white border border-slate-200 p-6 rounded-3xl hover:border-buildorange/30 hover:shadow-xl transition-all group cursor-pointer relative overflow-hidden"
             >
               {/* Decorative background blob */}
@@ -149,7 +156,7 @@ export const MyProjects = () => {
                   }`}>
                     {proj.isCompleted
                       ? <><CheckCircle2 className="w-3 h-3" /> Faza 1 / 4</>  
-                      : <><Clock className="w-3 h-3" /> Pas {proj.wizardStep}/4</>
+                      : <><Clock className="w-3 h-3" /> Faza 1 Pas {proj.wizardStep} din 4</>
                     }
                   </div>
                 </div>

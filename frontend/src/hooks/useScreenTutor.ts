@@ -14,7 +14,7 @@ export function useScreenTutor({ screenId, addSystemMessage }: UseScreenTutorOpt
     // Prevent strict mode double execution via simple timeout
     const timer = setTimeout(() => {
       if (SCREEN_TUTORIALS[screenId]) {
-        addSystemMessage(SCREEN_TUTORIALS[screenId].introMessage, false);
+        addSystemMessage(SCREEN_TUTORIALS[screenId].introMessage, true);
       }
     }, 100);
 

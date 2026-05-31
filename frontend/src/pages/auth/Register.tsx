@@ -79,8 +79,8 @@ export const Register = () => {
         email: formData.email,
         password: formData.password
       });
-      // După înregistrare, redirecționăm către login
-      navigate('/login');
+      // După înregistrare, redirecționăm către ecranul de verificare email
+      navigate('/verify-email', { state: { email: formData.email } });
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(msg || 'Înregistrarea a eșuat. Această adresă ar putea fi deja folosită.');
