@@ -36,7 +36,7 @@ export const WIZARD_MESSAGES: Record<string, WizardMessage> = {
   },
 
   screen4: {
-    text: `Alege **stilul arhitectural** al casei tale.\n\nStilul influențează costul finisajelor și complexitatea șarpantei, dar **nu afectează rezistența structurală** — aceasta este determinată de zona seismică și tipul de sol.\n\n💡 **Sfat:** Mansarda adaugă aprox. 20% la costul structurii față de un etaj drept. Subsolul adaugă aprox. 30%.\n\nAi întrebări despre diferențele de cost între stiluri sau configurații? Scrie-mi mai jos.`,
+    text: `Alege **stilul arhitectural** al casei tale.\n\nStilul influențează costul finisajelor și complexitatea șarpantei, dar **nu afectează rezistența structurală** — aceasta este determinată de zona seismică și tipul de sol.\n\n💡 **Sfat:** Subsolul adaugă aprox. 30% la costul structurii.\n\nAi întrebări despre diferențele de cost între stiluri sau configurații? Scrie-mi mai jos.`,
     links: [
       { label: 'Case moderne — exemple reale', url: 'https://www.archdaily.com/tag/residential' },
       { label: 'Case clasice românești', url: 'https://igloo.ro' }

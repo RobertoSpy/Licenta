@@ -25,8 +25,16 @@ export const Login = () => {
     try {
       const response = await api.post('/auth/login', { email, password });
       // Răspunsul trebuie să conțină accessToken-ul, cookie-ul de refresh e trimis automat de backend.
+      const userRole = response.data.user.role;
       login(response.data.accessToken, response.data.user);
-      navigate('/dashboard');
+      
+      if (userRole === 'ADMIN') {
+        navigate('/admin');
+      } else if (userRole === 'CONTRACTOR') {
+        navigate('/contractor');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(msg || 'Conexiunea a eșuat. Verifică datele introduse.');

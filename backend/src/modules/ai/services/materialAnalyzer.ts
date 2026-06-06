@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type, Schema } from '@google/genai';
+import { prisma } from '../../../lib/prisma';
 
 let aiInstance: GoogleGenAI | null = null;
 const getAi = () => {
@@ -24,7 +25,7 @@ export const materialAnalysisSchema: Schema = {
   properties: {
     standardCode: {
       type: Type.STRING,
-      description: "Codul standard al materialului din taxonomia de bază. Trebuie să alegi obligatoriu una din aceste valori: STANDARD_BETON_C20_25, STANDARD_FIER_12, STANDARD_PLACAJ_COFRARE, STANDARD_BCA_25, STANDARD_BCA_12, STANDARD_TIGLA_CERAMICA, STANDARD_LEMN_STRUCTURA, STANDARD_SAPA, STANDARD_TENCUIALA, STANDARD_USA_EXTERIOR, STANDARD_USA_INTERIOR, STANDARD_FEREASTRA_PVC, STANDARD_VATA_BAZALTICA, sau CUSTOM_MATERIAL dacă nu se potrivește cu nimic."
+      description: "Codul standard al materialului. Bazează-te STRICT pe lista furnizată în instrucțiunile promptului, sau CUSTOM_MATERIAL."
     },
     category: {
       type: Type.STRING,
@@ -71,6 +72,12 @@ export class MaterialAnalyzerService {
   async analyzeMaterial(rawTitle: string, price: number, url: string): Promise<MaterialAnalysis | null> {
     const ai = getAi();
     
+    // Extragem toate codurile existente din baza de date
+    const dbMaterials = await prisma.material.findMany({
+      select: { internalCode: true }
+    });
+    const validCodes = dbMaterials.map(m => m.internalCode).join(', ');
+    
     const prompt = `Ești un Data Engineer și expert în materiale de construcții rezidențiale din România.
 Sistemul nostru a extras următorul produs real dintr-un magazin online:
 Titlu: "${rawTitle}"
@@ -79,7 +86,11 @@ URL Sursă: ${url}
 
 Analizează acest material și întoarce un JSON structurat conform schemei cerute. Deduceți corect categoria și unitatea de măsură folosită de regulă în devize.
 Mapează-l obligatoriu pe un 'standardCode' corespunzător sistemului de devize (BOM).
-Furnizează argumente 'pros' și 'cons' utile pentru un viitor proprietar de casă.`;
+Trebuie să folosești STRICT unul dintre următoarele coduri din baza noastră de date:
+[${validCodes}]
+Dacă produsul nu se potrivește deloc cu funcționalitățile acestor coduri, folosește CUSTOM_MATERIAL.
+
+Furnizează argumente 'pros', 'cons' și 'description' folosind un limbaj accesibil. Dacă menționezi termeni tehnici sau coeficienți, explică-i pe înțelesul unui om non-tehnic (viitor proprietar de casă).`;
 
     try {
       const response = await ai.models.generateContent({

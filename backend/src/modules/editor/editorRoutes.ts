@@ -11,6 +11,7 @@ import {
   validateConformity,
   explainConformity,
   generateLayout,
+  generateConfiguratorLayout,
 } from './editorController';
 import { validateRequest, createSnapshotSchema, validateConformitySchema, explainConformitySchema } from '../../core/middleware/validateMiddleware';
 
@@ -33,5 +34,6 @@ router.post('/explain-conformity', validateRequest(explainConformitySchema), exp
 
 // AI Autogenerare Layout
 router.post('/generate-layout', tenantGuard, generateLayout);
+router.post('/generate-configurator-layout', tenantGuard, generateConfiguratorLayout);
 
 export default router;

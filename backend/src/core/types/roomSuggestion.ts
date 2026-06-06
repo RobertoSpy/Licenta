@@ -8,7 +8,7 @@ export interface SuggestedRoom {
   label: string;                                         // Ex: "Dormitor Principal", "Baie 1"
   weightRatio: number;                                   // 0.5 – 4.0 — direct folosit în layoutPartitioner.ts ca ratioValue
   zone: 'distributie' | 'zi' | 'noapte' | 'tehnic';
-  floor: 'parter' | 'etaj1' | 'etaj2' | 'mansarda';
+  floor: 'parter' | 'etaj1';
   reasoning: string;                                     // Motivare scurtă per cameră (citată din normativ)
   minSqm: number;          // minim legal din Legea 114 / NP057
   maxSqm: number;          // limită superioară rezonabilă
@@ -35,6 +35,6 @@ export interface SuggestRoomsInput {
   hasBasement: boolean;
   streetOrientation: string;
   familySize: number;
-  budgetCategory: 'economic' | 'mediu' | 'premium';
+  budgetCategory: 'economic' | 'mediu';
   buildingPurpose: string;
 }

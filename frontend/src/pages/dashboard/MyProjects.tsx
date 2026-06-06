@@ -2,9 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiPrivate } from '../../api/axios';
 import { Button } from '../../components/ui/Button';
-import { Plus, Building, FileText, CheckCircle2, Clock, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import {
+  Plus, Building, FileText, CheckCircle2, Clock, ArrowRight,
+  Inbox, Send, AlertCircle, Building2, MapPin, Calendar, Users, XCircle
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ProjectWizard } from '../../components/wizard/ProjectWizard';
+import { useAuth } from '../../context/useAuth';
+import { quoteApi, type Quote } from '../../api/quoteApi';
 
 interface Project {
   id: number;
@@ -16,6 +21,19 @@ interface Project {
   houseStyle?: string;
   seismicZone?: string;
   bomItems?: unknown[];
+  planStatus?: string;
+  bomGeneratedAt?: string;
+}
+
+interface AcceptedProject {
+  id: number;
+  name: string;
+  county: string | null;
+  buildingPurpose: string | null;
+  totalArea: number | null;
+  createdAt: string;
+  user: { name: string | null; email: string };
+  totalAmount?: number;
 }
 
 const containerVariants = {
@@ -46,11 +64,218 @@ const SkeletonProjectCard = () => (
   </div>
 );
 
+// ========== CONTRACTOR VIEW ==========
+function ContractorProjectsView() {
+  const [acceptedProjects, setAcceptedProjects] = useState<AcceptedProject[]>([]);
+  const [pendingQuotes, setPendingQuotes] = useState<Quote[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      setLoading(true);
+      try {
+        const [projRes, quotesRes] = await Promise.all([
+          apiPrivate.get('/contractors/me/accepted-projects'),
+          quoteApi.getContractorQuotes()
+        ]);
+        setAcceptedProjects(projRes.data);
+        setPendingQuotes(quotesRes.filter((q: Quote) => q.status === 'PENDING'));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  }, []);
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-10">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Proiectele Mele</h1>
+        <p className="text-slate-500 mt-1">Proiectele câștigate și cererile clienților care te așteaptă.</p>
+      </div>
+
+      {/* === SECTION 1: Won/Active Projects === */}
+      <section>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Proiecte Câștigate</h2>
+            <p className="text-sm text-slate-400">Proiecte pentru care oferta ta a fost acceptată de client</p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+            {[1, 2].map(i => <div key={i} className="h-40 bg-slate-200 rounded-2xl" />)}
+          </div>
+        ) : acceptedProjects.length === 0 ? (
+          <div className="bg-white border border-slate-200 border-dashed rounded-2xl p-10 text-center">
+            <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 text-sm">Nu ai proiecte active încă. Trimite oferte pentru a câștiga proiecte.</p>
+          </div>
+        ) : (
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          >
+            {acceptedProjects.map((proj, i) => (
+              <motion.div
+                key={proj.id}
+                variants={cardVariants}
+                className="bg-white border border-slate-200 rounded-2xl p-6 hover:border-buildorange/40 hover:shadow-lg transition-all group"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full">
+                    CÂȘTIGAT
+                  </span>
+                </div>
+
+                <h3 className="font-bold text-slate-900 mb-1 truncate">
+                  {proj.name || `Proiect #${proj.id}`}
+                </h3>
+                <p className="text-sm text-slate-500 mb-3">
+                  Client: <span className="font-medium text-slate-700">{proj.user.name || proj.user.email}</span>
+                </p>
+
+                <div className="space-y-1.5 text-xs text-slate-500">
+                  {proj.county && (
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-buildorange" />
+                      {proj.county}
+                    </div>
+                  )}
+                  {proj.buildingPurpose && (
+                    <div className="flex items-center gap-1.5">
+                      <Building className="w-3.5 h-3.5 text-slate-400" />
+                      {proj.buildingPurpose}
+                      {proj.totalArea ? ` · ${proj.totalArea} m²` : ''}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    {new Date(proj.createdAt).toLocaleDateString('ro-RO')}
+                  </div>
+                </div>
+
+                {proj.totalAmount && (
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    <p className="text-xs text-slate-400">Valoare contractată</p>
+                    <p className="text-lg font-black text-buildorange">
+                      {proj.totalAmount.toLocaleString('ro-RO')} RON
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </section>
+
+      {/* === SECTION 2: Pending Quote Requests (from clients) === */}
+      <section>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+            <Inbox className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Cereri în Așteptare</h2>
+            <p className="text-sm text-slate-400">Clienți care așteaptă oferta ta — răspunde rapid pentru a câștiga proiectul</p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3 animate-pulse">
+            {[1, 2].map(i => <div key={i} className="h-20 bg-slate-200 rounded-2xl" />)}
+          </div>
+        ) : pendingQuotes.length === 0 ? (
+          <div className="bg-white border border-slate-200 border-dashed rounded-2xl p-10 text-center">
+            <Inbox className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 text-sm">
+              Nicio cerere nouă momentan. Du-te la{' '}
+              <span className="text-buildorange font-semibold">Cereri & Oferte</span> pentru a gestiona toate lead-urile.
+            </p>
+          </div>
+        ) : (
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="space-y-3"
+          >
+            {pendingQuotes.map((q) => (
+              <motion.div
+                key={q.id}
+                variants={cardVariants}
+                className="bg-white border border-amber-200 rounded-2xl p-5 flex items-center justify-between hover:border-buildorange/40 hover:shadow-md transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">
+                      Proiect #{q.projectId}
+                      {q.project?.user?.name && (
+                        <span className="text-slate-500 font-normal"> · {q.project.user.name}</span>
+                      )}
+                    </h3>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                      {q.project?.county && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {q.project.county}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {new Date(q.createdAt).toLocaleDateString('ro-RO')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="px-2.5 py-1 text-xs font-bold bg-amber-100 text-amber-700 rounded-full uppercase">
+                    Ofertă așteptată
+                  </span>
+                  <div className="flex items-center gap-1 text-buildorange font-bold text-sm group-hover:gap-2 transition-all">
+                    Răspunde <ArrowRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+
+        {!loading && pendingQuotes.length > 0 && (
+          <p className="text-xs text-slate-400 mt-3 text-center">
+            Mergi la <span className="text-buildorange font-semibold">Cereri & Oferte</span> pentru a trimite ofertele tale.
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}
+
+// ========== CLIENT VIEW ==========
 export const MyProjects = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+
+  // If contractor is somehow on the dashboard route, show contractor view
+  if (user?.role === 'CONTRACTOR') {
+    return <ContractorProjectsView />;
+  }
 
   useEffect(() => {
     if (showWizard) return;
@@ -150,14 +375,15 @@ export const MyProjects = () => {
                     <FileText className="w-6 h-6" />
                   </div>
                   <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                    proj.isCompleted
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-amber-100 text-amber-700'
+                    proj.bomGeneratedAt ? 'bg-purple-100 text-purple-700' :
+                    proj.planStatus === 'published' ? 'bg-emerald-100 text-emerald-700' :
+                    proj.isCompleted ? 'bg-blue-100 text-blue-700' :
+                    'bg-amber-100 text-amber-700'
                   }`}>
-                    {proj.isCompleted
-                      ? <><CheckCircle2 className="w-3 h-3" /> Faza 1 / 4</>  
-                      : <><Clock className="w-3 h-3" /> Faza 1 Pas {proj.wizardStep} din 4</>
-                    }
+                    {!proj.isCompleted && <><Clock className="w-3 h-3" /> Faza 1 Pas {proj.wizardStep} din 4</>}
+                    {proj.isCompleted && proj.planStatus !== 'published' && <><CheckCircle2 className="w-3 h-3" /> Faza 2 din 4</>}
+                    {proj.planStatus === 'published' && !proj.bomGeneratedAt && <><CheckCircle2 className="w-3 h-3" /> Faza 3 din 4</>}
+                    {proj.bomGeneratedAt && <><CheckCircle2 className="w-3 h-3" /> Faza 4 din 4</>}
                   </div>
                 </div>
 
@@ -186,4 +412,3 @@ export const MyProjects = () => {
     </div>
   );
 };
-

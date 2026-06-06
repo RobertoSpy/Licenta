@@ -1,13 +1,11 @@
 import { apiPrivate } from './axios';
 import type { CanvasElement } from '../hooks/useEditorState';
 
-export type FloorKey = 'parter' | 'etaj1' | 'etaj2' | 'mansarda';
+export type FloorKey = 'parter' | 'etaj1';
 
 export const FLOOR_LABELS: Record<FloorKey, string> = {
   parter:   'Parter',
   etaj1:    'Etaj 1',
-  etaj2:    'Etaj 2',
-  mansarda: 'Mansardă',
 };
 
 export interface GenerateLayoutPayload {
@@ -46,6 +44,24 @@ export const editorApi = {
    */
   async generateLayout(payload: GenerateLayoutPayload): Promise<CanvasElement[]> {
     const response = await apiPrivate.post('/editor/generate-layout', payload);
+    return response.data.elements;
+  },
+
+  /**
+   * Regenerează layout-ul configuratorului din backend folosind datele actualizate de la utilizator.
+   */
+  async generateConfiguratorLayout(
+    shape: 'rectangle' | 'l_shape' | 'u_shape' | 't_shape',
+    dimensions: any,
+    rooms: any[],
+    streetOrientation: string
+  ): Promise<CanvasElement[]> {
+    const response = await apiPrivate.post('/editor/generate-configurator-layout', {
+      shape,
+      dimensions,
+      rooms,
+      streetOrientation,
+    });
     return response.data.elements;
   },
 };

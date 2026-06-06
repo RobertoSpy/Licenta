@@ -45,7 +45,7 @@ const styles = [
 ];
 
 export const Step4HouseType = ({ data, updateData }: Props) => {
-  const maxFloors = data.maxAllowedFloors || 2;
+  const maxFloors = Math.min(data.maxAllowedFloors || 2, 2);
 
   const toggleBasement = () => updateData({ hasBasement: !data.hasBasement });
 
@@ -134,8 +134,8 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
                 <span className="text-xs font-bold text-slate-400">Limită locală: P + {maxFloors - 1}</span>
               </div>
               
-              <div className="grid grid-cols-3 gap-3">
-                {[0, 1, 2, 3, 4].map((count) => {
+              <div className="grid grid-cols-2 gap-3">
+                {[0, 1].map((count) => {
                   const total = 1 + count;
                   const isBlocked = total > maxFloors;
                   const isActive = data.upperFloorsCount === count;
@@ -154,7 +154,7 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
                       }`}
                     >
                       <span className="text-lg font-black">{count === 0 ? 'P' : `P+${count}`}</span>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-center">{count === 0 ? 'Doar parter' : `${count} Etaj${count > 1 ? 'e' : ''}`}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-center">{count === 0 ? 'Doar parter' : 'Parter + 1 etaj'}</span>
                       {isBlocked && (
                         <div className="absolute -top-1.5 -right-1.5">
                            <AlertCircle className="w-4 h-4 text-slate-400 fill-white bg-white rounded-full" />

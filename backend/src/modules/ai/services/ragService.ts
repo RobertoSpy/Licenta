@@ -1,16 +1,15 @@
 import { NormativeChunk } from '@prisma/client';
 import { embeddingService } from './embeddingService';
 import { AgentType, AGENT_SOURCES_BY_PURPOSE, BuildingPurpose } from '../../../data/normative-registry';
-import { normativeChunkRepository, RawChunkResult } from '../normativeChunkRepository';
 
 // ─────────────────────────────────────────────────────────────────
-// HYBRID SEARCH — Dense (pgvector cosine) + Sparse (BM25 full-text) + RRF
+// HYBRID SEARCH — Dense (pgvector cosine) + Sparse (PostgreSQL Full-Text Search ts_rank_cd) + RRF
 //
 // De ce hybrid:
 //   • Dense:  prinde sensul semantic chiar dacă întrebarea nu conține
 //             termenii exacți din normativ
 //   • Sparse: prinde termeni tehnici exacți — "ZIA", "DCH", "suțiune" —
-//             pe care dense search îi poate rata
+//             folosind dicționarul 'simple' pentru a evita limitările de flexiune.
 //   • RRF k=60: standard academic — score(d) = Σ 1/(k + rank(d))
 //
 // Notă modularitate:
@@ -47,29 +46,63 @@ export async function searchHybrid(
   
   const sourcesPgArray = allowedSources.length > 0 ? allowedSources : ['_none_'];
 
-  // Query SQL direct din Prisma folosind pgvector
-  const denseSql = isGeneral
-    ? `SELECT id, source, agent, chapter, content, applicability,
-              1 - (embedding <=> $1::vector) as similarity
-       FROM "NormativeChunk"
-       WHERE status != 'abrogat'
-         AND source = ANY($2)
-         AND 1 - (embedding <=> $1::vector) > 0.55
-       ORDER BY similarity DESC
-       LIMIT $3`
-    : `SELECT id, source, agent, chapter, content, applicability,
-              1 - (embedding <=> $1::vector) as similarity
-       FROM "NormativeChunk"
-       WHERE agent = $2
-         AND status != 'abrogat'
-         AND source = ANY($3)
-         AND 1 - (embedding <=> $1::vector) > 0.55
-       ORDER BY similarity DESC
-       LIMIT $4`;
+  const hybridSql = isGeneral
+    ? `
+      WITH dense_search AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY 1 - (embedding <=> $1::vector) DESC) as dense_rank
+        FROM "NormativeChunk"
+        WHERE status != 'abrogat' AND source = ANY($2)
+        ORDER BY 1 - (embedding <=> $1::vector) DESC
+        LIMIT 20
+      ),
+      sparse_search AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY ts_rank_cd(to_tsvector('simple', content), plainto_tsquery('simple', $4)) DESC) as sparse_rank
+        FROM "NormativeChunk"
+        WHERE status != 'abrogat' AND source = ANY($2)
+          AND to_tsvector('simple', content) @@ plainto_tsquery('simple', $4)
+        ORDER BY ts_rank_cd(to_tsvector('simple', content), plainto_tsquery('simple', $4)) DESC
+        LIMIT 20
+      )
+      SELECT n.id, n.source, n.agent, n.chapter, n.content, n.applicability,
+             COALESCE(1.0 / (60 + ds.dense_rank), 0.0) +
+             COALESCE(1.0 / (60 + ss.sparse_rank), 0.0) as similarity
+      FROM "NormativeChunk" n
+      LEFT JOIN dense_search ds ON n.id = ds.id
+      LEFT JOIN sparse_search ss ON n.id = ss.id
+      WHERE ds.id IS NOT NULL OR ss.id IS NOT NULL
+      ORDER BY similarity DESC
+      LIMIT $3
+    `
+    : `
+      WITH dense_search AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY 1 - (embedding <=> $1::vector) DESC) as dense_rank
+        FROM "NormativeChunk"
+        WHERE agent = $2 AND status != 'abrogat' AND source = ANY($3)
+        ORDER BY 1 - (embedding <=> $1::vector) DESC
+        LIMIT 20
+      ),
+      sparse_search AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY ts_rank_cd(to_tsvector('simple', content), plainto_tsquery('simple', $5)) DESC) as sparse_rank
+        FROM "NormativeChunk"
+        WHERE agent = $2 AND status != 'abrogat' AND source = ANY($3)
+          AND to_tsvector('simple', content) @@ plainto_tsquery('simple', $5)
+        ORDER BY ts_rank_cd(to_tsvector('simple', content), plainto_tsquery('simple', $5)) DESC
+        LIMIT 20
+      )
+      SELECT n.id, n.source, n.agent, n.chapter, n.content, n.applicability,
+             COALESCE(1.0 / (60 + ds.dense_rank), 0.0) +
+             COALESCE(1.0 / (60 + ss.sparse_rank), 0.0) as similarity
+      FROM "NormativeChunk" n
+      LEFT JOIN dense_search ds ON n.id = ds.id
+      LEFT JOIN sparse_search ss ON n.id = ss.id
+      WHERE ds.id IS NOT NULL OR ss.id IS NOT NULL
+      ORDER BY similarity DESC
+      LIMIT $4
+    `;
 
   const results = isGeneral
-    ? await prisma.$queryRawUnsafe<NormativeChunk[]>(denseSql, vectorStr, sourcesPgArray, limit)
-    : await prisma.$queryRawUnsafe<NormativeChunk[]>(denseSql, vectorStr, agent, sourcesPgArray, limit);
+    ? await prisma.$queryRawUnsafe<NormativeChunk[]>(hybridSql, vectorStr, sourcesPgArray, limit, question)
+    : await prisma.$queryRawUnsafe<NormativeChunk[]>(hybridSql, vectorStr, agent, sourcesPgArray, limit, question);
 
   // Filtrare post-query pe applicability
   const allowedApplicability: Array<'residential' | 'commercial' | 'mixed'> =
@@ -94,17 +127,33 @@ export async function searchMaterialsHybrid(
   const questionVectorArray = await embeddingService.embed(question);
   const vectorStr = `[${questionVectorArray.join(',')}]`;
 
-  const denseSql = `
+  const hybridSql = `
+    WITH dense_search AS (
+      SELECT mc.id, ROW_NUMBER() OVER (ORDER BY 1 - (mc.embedding <=> $1::vector) DESC) as dense_rank
+      FROM "MaterialChunk" mc
+      ORDER BY 1 - (mc.embedding <=> $1::vector) DESC
+      LIMIT 20
+    ),
+    sparse_search AS (
+      SELECT mc.id, ROW_NUMBER() OVER (ORDER BY ts_rank_cd(to_tsvector('simple', mc.content), plainto_tsquery('simple', $3)) DESC) as sparse_rank
+      FROM "MaterialChunk" mc
+      WHERE to_tsvector('simple', mc.content) @@ plainto_tsquery('simple', $3)
+      ORDER BY ts_rank_cd(to_tsvector('simple', mc.content), plainto_tsquery('simple', $3)) DESC
+      LIMIT 20
+    )
     SELECT mc.id, mc.content, mc.source, m.name as "materialName", m."internalCode",
-           1 - (mc.embedding <=> $1::vector) as similarity
+           COALESCE(1.0 / (60 + ds.dense_rank), 0.0) +
+           COALESCE(1.0 / (60 + ss.sparse_rank), 0.0) as similarity
     FROM "MaterialChunk" mc
     JOIN "Material" m ON m.id = mc."materialId"
-    WHERE 1 - (mc.embedding <=> $1::vector) > 0.40
+    LEFT JOIN dense_search ds ON mc.id = ds.id
+    LEFT JOIN sparse_search ss ON mc.id = ss.id
+    WHERE ds.id IS NOT NULL OR ss.id IS NOT NULL
     ORDER BY similarity DESC
     LIMIT $2
   `;
 
-  const results = await prisma.$queryRawUnsafe<any[]>(denseSql, vectorStr, limit);
+  const results = await prisma.$queryRawUnsafe<any[]>(hybridSql, vectorStr, limit, question);
   return results;
 }
 

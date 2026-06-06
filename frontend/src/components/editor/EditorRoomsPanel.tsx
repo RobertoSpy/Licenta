@@ -3,6 +3,7 @@ import { type ConformityRoom } from '../../hooks/useConformityCheck';
 import { useEditorState } from '../../hooks/useEditorState';
 import { CheckCircle2, AlertTriangle, XCircle, Home, Compass, Settings, CheckSquare, SquareDot, Sparkles, RefreshCw } from 'lucide-react';
 import { AiRoomSuggestModal } from './AiRoomSuggestModal';
+import { calculateShapeArea } from '../../utils/layoutPartitioner';
 
 interface Props {
   rooms: ConformityRoom[];
@@ -42,6 +43,7 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
     isAiModalOpen,
     setAiModalOpen,
     regenerateLayout,
+    isLayoutPendingRegeneration,
   } = useEditorState();
 
   const totalUsable = rooms.reduce((sum, r) => sum + r.usableSqm, 0);
@@ -196,23 +198,7 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
             <div className="flex justify-between">
               <span>Suprafață Amprentă:</span>
               <span className="text-slate-800 font-bold">
-                {houseShape === 'rectangle'
-                  ? (dimensions.widthM * dimensions.heightM).toFixed(1)
-                  : houseShape === 'l_shape'
-                  ? (
-                      (dimensions.wingWidthM ?? 4) * dimensions.heightM +
-                      (dimensions.widthM - (dimensions.wingWidthM ?? 4)) * (dimensions.wingLengthM ?? 4)
-                    ).toFixed(1)
-                  : houseShape === 'u_shape'
-                  ? (
-                      2 * (dimensions.wingWidthM ?? 4) * dimensions.heightM +
-                      (dimensions.widthM - 2 * (dimensions.wingWidthM ?? 4)) * (dimensions.wingLengthM ?? 4)
-                    ).toFixed(1)
-                  : (
-                      dimensions.widthM * (dimensions.wingLengthM ?? 4) +
-                      (dimensions.wingWidthM ?? 4) * (dimensions.heightM - (dimensions.wingLengthM ?? 4))
-                    ).toFixed(1) // T shape
-                } m²
+                {calculateShapeArea(houseShape, dimensions).toFixed(1)} m²
               </span>
             </div>
             <div className="flex justify-between">
@@ -258,13 +244,23 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
         </div>
 
         {/* Section 5: Regenerate button */}
-        <div className="pt-3 border-t border-slate-100">
+        <div className="pt-3 border-t border-slate-100 relative">
+          {isLayoutPendingRegeneration && (
+            <div className="absolute -top-10 left-0 right-0 bg-amber-100 border border-amber-200 text-amber-800 text-[10px] font-bold p-2 rounded-xl text-center mb-2 shadow-sm animate-pulse">
+              <AlertTriangle className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" />
+              Ai modificat camerele. Regenerează!
+            </div>
+          )}
           <button
             onClick={regenerateLayout}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all"
+            className={`w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl font-bold text-xs transition-all ${
+              isLayoutPendingRegeneration 
+                ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-200' 
+                : 'bg-slate-900 hover:bg-slate-800 text-white'
+            }`}
             title="Regenerează planul complet din camerele active de mai sus. Atenție: schimbările manuale vor fi pierdute."
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLayoutPendingRegeneration ? 'animate-spin' : ''}`} />
             Regenerează Plan
           </button>
           <p className="text-[10px] text-slate-400 text-center mt-1.5">

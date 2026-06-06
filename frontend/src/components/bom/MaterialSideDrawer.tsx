@@ -31,12 +31,6 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
   const [activeAltCode, setActiveAltCode] = useState<string | null>(null);
   const [aiNoSources, setAiNoSources] = useState(false);
 
-  // AI Validate Override state — per alternativă
-  const [validateText, setValidateText] = useState<Record<string, string>>({});
-  const [validateLoading, setValidateLoading] = useState<Record<string, boolean>>({});
-  const [validateDone, setValidateDone] = useState<Record<string, boolean>>({});
-  const [validateNoSources, setValidateNoSources] = useState<Record<string, boolean>>({});
-
   useEffect(() => {
     if (isOpen && currentItem) {
       // @ts-ignore (material.internalCode) - it should exist in API output if we updated the BOM interface, but let's fetch it based on formulaKey mapping or pass internalCode
@@ -94,68 +88,25 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
     setAiNoSources(false);
 
     try {
-      const baseName = currentItem.material.name;
-      const url = `/api/ai/explain-material?base=${encodeURIComponent(baseName)}&alt=${encodeURIComponent(alt.name)}`;
-      
-      const response = await fetchWithAuth(url);
+      const currentCode = (currentItem.material as any).internalCode as string | undefined;
 
-      if (!response.body) throw new Error("No body");
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const chunkStr = decoder.decode(value, { stream: true });
-        const lines = chunkStr.split('\n');
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.replace('data: ', '').trim();
-            if (dataStr === '[DONE]') {
-              setIsAiLoading(false);
-              break;
-            }
-            try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed?.meta?.noSources) {
-                setAiNoSources(true);
-              }
-              if (parsed.text) {
-                setAiExplanation(prev => prev + parsed.text);
-              }
-            } catch(e) {}
-          }
-        }
+      // Use the rich POST endpoint if we have both codes (full project context)
+      let response: Response;
+      if (currentCode) {
+        response = await fetchWithAuth(`/api/ai/explain-material`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            currentMaterialCode: currentCode,
+            alternativeMaterialCode: alt.internalCode,
+          }),
+        });
+      } else {
+        // Legacy fallback — no internalCode in BOMItem
+        const url = `/api/ai/explain-material?base=${encodeURIComponent(currentItem.material.name)}&alt=${encodeURIComponent(alt.name)}`;
+        response = await fetchWithAuth(url);
       }
-    } catch (e) {
-      console.error(e);
-      setAiExplanation("Eroare la conectarea cu Zidario AI.");
-      setIsAiLoading(false);
-    }
-  };
-
-  // Validare conformitate normativă înainte de aplicare
-  const validateWithAI = async (alt: Alternative) => {
-    if (!currentItem) return;
-    const code = alt.internalCode;
-    setValidateText(prev => ({ ...prev, [code]: '' }));
-    setValidateLoading(prev => ({ ...prev, [code]: true }));
-    setValidateDone(prev => ({ ...prev, [code]: false }));
-    setValidateNoSources(prev => ({ ...prev, [code]: false }));
-
-    try {
-      const response = await fetchWithAuth(`/api/ai/validate-override`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          originalMaterialName: currentItem.material.name,
-          newMaterialName: alt.name,
-          formulaKey: currentItem.formulaKey,
-        }),
-      });
 
       if (!response.body) throw new Error('No body');
       const reader = response.body.getReader();
@@ -166,30 +117,29 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
         if (done) break;
         const chunkStr = decoder.decode(value, { stream: true });
         const lines = chunkStr.split('\n');
+
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const dataStr = line.replace('data: ', '').trim();
-            if (dataStr === '[DONE]') break;
+            if (dataStr === '[DONE]') {
+              setIsAiLoading(false);
+              break;
+            }
             try {
               const parsed = JSON.parse(dataStr);
-              if (parsed?.meta?.noSources) {
-                setValidateNoSources(prev => ({ ...prev, [code]: true }));
-              }
-              if (parsed.text) {
-                setValidateText(prev => ({ ...prev, [code]: (prev[code] ?? '') + parsed.text }));
-              }
-            } catch (_) {}
+              if (parsed?.meta?.noSources) setAiNoSources(true);
+              if (parsed.text) setAiExplanation(prev => prev + parsed.text);
+            } catch(_) {}
           }
         }
       }
     } catch (e) {
       console.error(e);
-      setValidateText(prev => ({ ...prev, [code]: '⚠️ Eroare la verificare. Verificați manual normativele.' }));
-    } finally {
-      setValidateLoading(prev => ({ ...prev, [code]: false }));
-      setValidateDone(prev => ({ ...prev, [code]: true }));
+      setAiExplanation('Eroare la conectarea cu Zidario AI.');
+      setIsAiLoading(false);
     }
   };
+
 
   if (!isOpen || !currentItem) return null;
 
@@ -280,45 +230,6 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
                       </div>
                     </div>
 
-                    {/* AI Validate Override Section */}
-                    {validateDone[alt.internalCode] || validateLoading[alt.internalCode] ? (
-                      <div className={`rounded-xl p-4 text-sm relative overflow-hidden border ${
-                        (validateText[alt.internalCode] ?? '').includes('Neconform')
-                          ? 'bg-red-50 border-red-100'
-                          : (validateText[alt.internalCode] ?? '').includes('Atenție')
-                          ? 'bg-amber-50 border-amber-100'
-                          : 'bg-emerald-50 border-emerald-100'
-                      }`}>
-                        <div className={`absolute top-0 left-0 w-1 h-full ${
-                          (validateText[alt.internalCode] ?? '').includes('Neconform')
-                            ? 'bg-red-500'
-                            : (validateText[alt.internalCode] ?? '').includes('Atenție')
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
-                        }`} />
-                        <p className="font-semibold text-slate-800 mb-1 flex items-center gap-1.5 text-xs">
-                          🛡️ Conformitate Normativă
-                        </p>
-                        {validateNoSources[alt.internalCode] && (
-                          <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
-                            Fără surse normative indexate. Răspuns orientativ.
-                          </div>
-                        )}
-                        <div className="leading-relaxed text-xs text-slate-700">
-                          {validateText[alt.internalCode]}
-                          {validateLoading[alt.internalCode] && (
-                            <span className="inline-block w-1.5 h-3 ml-1 bg-slate-500 animate-pulse" />
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => validateWithAI(alt)}
-                        className="text-left flex items-center gap-2 text-sm text-purple-600 hover:text-purple-800 font-medium w-max px-2 py-1 -ml-2 rounded-lg hover:bg-purple-50 transition-colors"
-                      >
-                        🛡️ Validează conformitatea normativă
-                      </button>
-                    )}
 
                     {/* AI Section — explică alternativa */}
                     {activeAltCode === alt.internalCode && (aiExplanation || isAiLoading) ? (
@@ -332,7 +243,7 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
                             Fără surse normative indexate. Răspuns orientativ.
                           </div>
                         )}
-                        <div className="leading-relaxed">
+                        <div className="leading-relaxed whitespace-pre-wrap">
                           {aiExplanation}
                           {isAiLoading && <span className="inline-block w-1.5 h-4 ml-1 bg-blue-500 animate-pulse" />}
                         </div>
@@ -342,7 +253,7 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
                         onClick={() => explainWithAI(alt)}
                         className="text-left flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium w-max px-2 py-1 -ml-2 rounded-lg hover:bg-blue-50 transition-colors"
                       >
-                        🤖 Zidario: De ce să aleg {alt.brand || 'această alternativă'}?
+                        🤖 Întreabă Zidario: Pro și Contra față de materialul curent
                       </button>
                     )}
 
@@ -350,15 +261,15 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
                       onClick={() => handleReplace(alt)}
                       disabled={replacingCode === alt.internalCode}
                       className={`mt-2 w-full font-bold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                        validateDone[alt.internalCode] && (validateText[alt.internalCode] ?? '').includes('Neconform')
+                        activeAltCode === alt.internalCode && aiExplanation.includes('NU')
                           ? 'bg-orange-100 hover:bg-orange-200 text-orange-700 border-2 border-orange-300'
                           : 'bg-slate-900 hover:bg-slate-800 text-white'
                       }`}
                     >
                       {replacingCode === alt.internalCode
                         ? 'Se aplică...'
-                        : validateDone[alt.internalCode] && (validateText[alt.internalCode] ?? '').includes('Neconform')
-                        ? '⚠️ Aplică oricum (Neconform)'
+                        : activeAltCode === alt.internalCode && aiExplanation.includes('NU')
+                        ? '⚠️ Aplică oricum (Posibil Neconform)'
                         : 'Aplică această alternativă'
                       }
                     </button>

@@ -4,6 +4,7 @@ import { chatSummaryRepository } from './chatSummaryRepository';
 import { projectRepository } from '../project/projectRepository';
 import { GoogleGenAI } from '@google/genai';
 import { searchHybrid } from './services/ragService';
+import { FALLBACK_MODELS_CHAT } from './services/aiClient';
 
 // Lazy init — același pattern ca în orchestrator
 let aiInstance: GoogleGenAI | null = null;
@@ -76,15 +77,12 @@ export const aiController = {
   },
 
   async explainMaterial(req: Request, res: Response): Promise<void> {
+    // Supports both:
+    //   - POST with body { projectId, currentMaterialCode, alternativeMaterialCode }  (new, full-context)
+    //   - GET with query ?base=x&alt=y  (legacy fallback, minimal context)
+    const isPost = req.method === 'POST';
+
     try {
-      const base = req.query.base as string;
-      const alt = req.query.alt as string;
-
-      if (!base || !alt) {
-        res.status(400).json({ error: 'base și alt sunt obligatorii' });
-        return;
-      }
-
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
@@ -95,69 +93,155 @@ export const aiController = {
         res.write('data: [DONE]\n\n');
         res.end();
       }, 90000);
-
       res.on('close', () => clearTimeout(timeoutId));
 
-      const question = `Explică diferențele tehnice între materialele: "${alt}" vs "${base}". Include doar aspecte din normative.`;
+      let prompt: string;
+
+      if (isPost) {
+        const { projectId, currentMaterialCode, alternativeMaterialCode } = req.body;
+        if (!projectId || !currentMaterialCode || !alternativeMaterialCode) {
+          res.write(`data: ${JSON.stringify({ text: '[Eroare: lipsă projectId, currentMaterialCode sau alternativeMaterialCode.]' })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
+        const { prisma } = await import('../../lib/prisma');
+
+        const [project, currentMat, altMat, bomItems] = await Promise.all([
+          prisma.project.findUnique({
+            where: { id: Number(projectId) },
+            select: {
+              county: true, locality: true, seismicZone: true,
+              frostDepthCm: true, soilType: true, houseStyle: true,
+              totalFloors: true, buildingPurpose: true,
+            },
+          }),
+          prisma.material.findUnique({ where: { internalCode: currentMaterialCode } }),
+          prisma.material.findUnique({ where: { internalCode: alternativeMaterialCode } }),
+          prisma.projectBOM.findMany({
+            where: { projectId: Number(projectId) },
+            include: { material: { select: { name: true, category: true, internalCode: true } } },
+          }),
+        ]);
+
+        if (!project || !currentMat || !altMat) {
+          res.write(`data: ${JSON.stringify({ text: '[Eroare: Proiect sau material negăsit în baza de date.]' })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
+
+        // BOM summary by phase
+        const byPhase = bomItems.reduce((acc: Record<string, number>, item: any) => {
+          acc[item.phase] = (acc[item.phase] || 0) + item.totalPrice;
+          return acc;
+        }, {});
+        const bomSummary = Object.entries(byPhase)
+          .map(([phase, total]) => `  - ${phase}: ${(total as number).toLocaleString('ro-RO')} RON`)
+          .join('\n');
+
+        // Financial impact
+        const currentBOMItem = bomItems.find((b: any) => b.material.internalCode === currentMaterialCode);
+        let financialImpactBlock = '';
+        if (currentBOMItem) {
+          const costCurrent = currentBOMItem.totalPrice;
+          const costAlt = currentBOMItem.quantity * altMat.pricePerUnit;
+          const delta = costAlt - costCurrent;
+          financialImpactBlock = `
+IMPACT FINANCIAR CALCULAT DIN DEVIZ:
+- Cantitate necesară proiect: ${currentBOMItem.quantity} ${currentMat.unit}
+- Cost actual (${currentMat.name}): ${costCurrent.toLocaleString('ro-RO')} RON
+- Cost alternativă (${altMat.name}): ${costAlt.toLocaleString('ro-RO')} RON
+- Diferență: ${delta >= 0 ? '+' : ''}${delta.toLocaleString('ro-RO')} RON (${delta >= 0 ? 'mai scump' : 'economie'})`;
+        }
+
+        prompt = `Ești Zidario, consultant tehnic pentru construcții rezidențiale românești.
+
+CONTEXT AMPLASAMENT:
+- Județ: ${project.county ?? 'nespecificat'}, Localitate: ${project.locality ?? 'nespecificat'}
+- Zonă seismică: ${project.seismicZone ?? 'necunoscută'} (P100-1/2013)
+- Adâncime îngheț: ${project.frostDepthCm ?? '?'}cm (NP112-2014)
+- Tip sol: ${project.soilType ?? 'necunoscut'}
+- Stil casă: ${project.houseStyle ?? 'nespecificat'}, ${project.totalFloors ?? 1} etaje
+- Destinație: ${project.buildingPurpose ?? 'rezidențial'}
+
+MATERIAL CURENT ÎN DEVIZ:
+- Cod: ${currentMat.internalCode}
+- Nume: ${currentMat.name}
+- Categorie: ${currentMat.category} / ${currentMat.subcategory ?? '-'}
+- Preț: ${currentMat.pricePerUnit} RON/${currentMat.unit}
+- U-value: ${currentMat.uValue ?? 'nespecificat'} W/m²K
+- Descriere: ${currentMat.description ?? '-'}
+
+ALTERNATIVĂ PROPUSĂ:
+- Cod: ${altMat.internalCode}
+- Nume: ${altMat.name}
+- Categorie: ${altMat.category} / ${altMat.subcategory ?? '-'}
+- Preț: ${altMat.pricePerUnit} RON/${altMat.unit}
+- U-value: ${altMat.uValue ?? 'nespecificat'} W/m²K
+- Descriere: ${altMat.description ?? '-'}
+
+DEVIZ COMPLET PE FAZE (materiale deja selectate):
+${bomSummary || '  (deviz gol)'}
+${financialImpactBlock}
+
+SARCINI (răspunde structurat, maxim 200 cuvinte, în română):
+1. ✅/❌ COMPATIBILITATE: Este alternativa compatibilă cu zona seismică ${project.seismicZone ?? '?'} și solul ${project.soilType ?? '?'}?
+2. 🔧 COMPATIBILITATE MATERIALE: Se potrivește cu celelalte materiale alese în deviz?
+3. 🌡️ IMPACT ENERGETIC: Cum afectează clasa energetică? (compară U-values dacă disponibile)
+4. 💰 VERDICT FINANCIAR: Merită diferența de preț pentru acest proiect specific?
+5. 📋 NORMATIVE: Citează articolul exact dacă există restricții (CR6-2013, NE012-1:2022, Mc-001-2022, P100-1/2013).
+
+IMPORTANT: Dacă alternativa este incompatibilă cu zona seismică sau solul, spune NU clar și motivează.`;
+
+      } else {
+        // Legacy GET path — minimal context
+        const base = req.query.base as string;
+        const alt = req.query.alt as string;
+        if (!base || !alt) {
+          res.write(`data: ${JSON.stringify({ text: '[Eroare: parametri lipsă]' })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
+        prompt = `Ești Zidario AI, expert în normative de construcții românești.
+Explică pe scurt de ce un client ar trebui să aleagă "${alt}" în loc de "${base}".
+Include doar aspecte tehnice și normative relevante (CR6-2013, NE012, Mc-001-2022).
+Max 120 cuvinte. Fii direct și profesionist.`;
+      }
+
+      // RAG context
+      const question = prompt.substring(0, 300);
       const structuralChunks = await searchHybrid(question, 'structural', 3, undefined, 'residential');
       const energeticChunks = await searchHybrid(question, 'energetic', 2, undefined, 'residential');
       const combinedChunks = [...structuralChunks, ...energeticChunks];
 
       if (combinedChunks.length === 0) {
         res.write(`data: ${JSON.stringify({ meta: { noSources: true } })}\n\n`);
-        res.write(`data: ${JSON.stringify({ text: '⚠️ Atenție: Nu există surse normative indexate pentru această comparație. Verifică manual normativele aplicabile sau consultă un inginer proiectant.' })}\n\n`);
-        res.write('data: [DONE]\n\n');
-        res.end();
-        return;
+      } else {
+        const ragContext = combinedChunks.map(c => `§ ${c.source} — ${c.chapter}:\n${c.content}`).join('\n\n');
+        prompt = `SURSE NORMATIVE INDEXATE (RAG):\n${ragContext}\n\n---\n\n${prompt}`;
       }
 
-      const ragContext = combinedChunks
-        .map(c => `§ ${c.source} — ${c.chapter}:\n${c.content}`)
-        .join('\n\n');
-
-      const prompt = `Ești Zidario AI, expert în inginerie civilă și normative de construcții.
-Folosește EXCLUSIV sursele de mai jos. Dacă nu e suficientă informația, răspunde cu "⚠️ Atenție".
-
-SURSE NORMATIVE (RAG):
-${ragContext}
-
-Cerință:
-Explică pe scurt de ce un client ar trebui să aleagă "${alt}" în loc de "${base}", referindu-te strict la SURSELE de mai sus. Max 100 cuvinte. Fii direct și profesionist.`;
-
-      // Simulam un call de RAG sau folosim modelul Gemini direct cu fallback
-      const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       let stream: any = null;
       let lastError: any = null;
-      
-      for (const modelName of FALLBACK_MODELS) {
+      for (const modelName of FALLBACK_MODELS_CHAT) {
         try {
           stream = await getAi().models.generateContentStream({
             model: modelName,
             contents: prompt,
-            config: { maxOutputTokens: 220, temperature: 0.2 }
+            config: { maxOutputTokens: 1500, temperature: 0.2 }
           });
-          break; // Succes, ieșim din buclă
+          break;
         } catch (e: any) {
           lastError = e;
-          const is503 = e?.status === 503 || String(e?.message).includes('503') || String(e?.message).toLowerCase().includes('high demand');
-          if (is503) {
-            console.warn(`[explainMaterial] 503 cu ${modelName}, încercăm următorul...`);
-            continue;
-          }
-          console.warn(`[explainMaterial] Eroare cu ${modelName}, încercăm următorul... Motiv: ${e?.message?.substring(0, 100)}...`);
-          continue; // Mergem la următorul model
+          console.warn(`[explainMaterial] Eroare cu ${modelName}: ${e?.message?.substring(0, 80)}`);
         }
       }
-      
-      if (!stream) {
-        console.error(`[explainMaterial] Toate modelele au eșuat. Ultima eroare:`, lastError?.message);
-        throw new Error('Serviciul este momentan indisponibil.');
-      }
+      if (!stream) throw new Error('Serviciul este momentan indisponibil.');
 
       for await (const chunk of stream) {
-        if (chunk.text) {
-          res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
-        }
+        if (chunk.text) res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
       }
 
       clearTimeout(timeoutId);
@@ -170,6 +254,7 @@ Explică pe scurt de ce un client ar trebui să aleagă "${alt}" în loc de "${b
       res.end();
     }
   },
+
 
   async explainMaterialById(req: Request, res: Response): Promise<void> {
     try {
@@ -216,11 +301,10 @@ ${specs}
 
 Nu folosi un ton de marketing, ci unul strict ingineresc (izolație termică, rezistență, compresiune, fonoizolație, utilitate). Nu saluta.`;
 
-      const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       let stream: any = null;
       let lastError: any = null;
       
-      for (const modelName of FALLBACK_MODELS) {
+      for (const modelName of FALLBACK_MODELS_CHAT) {
         try {
           stream = await getAi().models.generateContentStream({
             model: modelName,
@@ -275,11 +359,10 @@ Nu folosi un ton de marketing, ci unul strict ingineresc (izolație termică, re
         ? `${systemPrompt}\n\n${text}`
         : text;
 
-      const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       let result: any = null;
       let lastError: any = null;
 
-      for (const modelName of FALLBACK_MODELS) {
+      for (const modelName of FALLBACK_MODELS_CHAT) {
         try {
           result = await getAi().models.generateContent({
             model: modelName,
@@ -384,7 +467,7 @@ Nu folosi un ton de marketing, ci unul strict ingineresc (izolație termică, re
         return;
       }
 
-      const validBudgets = ['economic', 'mediu', 'premium'];
+      const validBudgets = ['economic', 'mediu'];
       if (!validBudgets.includes(budgetCategory)) {
         res.status(400).json({ error: `budgetCategory invalid. Valori acceptate: ${validBudgets.join(', ')}` });
         return;
@@ -411,7 +494,7 @@ Nu folosi un ton de marketing, ci unul strict ingineresc (izolație termică, re
         hasBasement:      project.hasBasement,
         streetOrientation: project.streetOrientation ?? 'S',
         familySize:       familySizeNum,
-        budgetCategory:   budgetCategory as 'economic' | 'mediu' | 'premium',
+        budgetCategory:   budgetCategory as 'economic' | 'mediu',
         buildingPurpose:  project.buildingPurpose    ?? 'residential',
       });
 
@@ -499,11 +582,10 @@ Răspunde CONCIS în maxim 80 de cuvinte. Structura răspunsului:
 
 Nu inventa normative. Dacă nu știi cu certitudine, folosește "⚠️ Atenție".`;
 
-    const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
     let stream: any = null;
     let lastError: any = null;
     
-    for (const modelName of FALLBACK_MODELS) {
+    for (const modelName of FALLBACK_MODELS_CHAT) {
       try {
         stream = await getAi().models.generateContentStream({
           model: modelName,

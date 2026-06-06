@@ -75,7 +75,15 @@ export const Step1Location = ({ data, updateData }: Props) => {
         const avgLat = latLngs.reduce((sum, p) => sum + p[0], 0) / latLngs.length;
         const avgLng = latLngs.reduce((sum, p) => sum + p[1], 0) / latLngs.length;
 
-        updateData({ polygonLatLngs: latLngs, lat: avgLat, lng: avgLng });
+        let area = 0;
+        for (let i = 0; i < validPoints.length; i++) {
+          const p1 = validPoints[i];
+          const p2 = validPoints[(i + 1) % validPoints.length];
+          area += (Number(p1.y) * Number(p2.x)) - (Number(p2.y) * Number(p1.x));
+        }
+        area = Math.abs(area) / 2;
+
+        updateData({ polygonLatLngs: latLngs, lat: avgLat, lng: avgLng, plotAreaSqm: Math.round(area) });
         setErrorMsg('');
       } else {
         updateData({ polygonLatLngs: [] });
@@ -207,9 +215,8 @@ export const Step1Location = ({ data, updateData }: Props) => {
           value={data.buildingPurpose}
           onChange={(e) => updateData({ buildingPurpose: e.target.value })}
         >
-          <option value="residential">Locuință / Familie</option>
-          <option value="commercial">Spațiu Comercial / Birouri</option>
-          <option value="mixed">Mixt</option>
+          <option value="residential">Rezidențial (Casă / Vilă)</option>
+          <option value="commercial">Comercial (Birouri / Spații)</option>
         </select>
       </div>
 
@@ -306,6 +313,12 @@ export const Step1Location = ({ data, updateData }: Props) => {
                   >
                     <Plus className="w-4 h-4" /> Adaugă Punct
                   </button>
+                  {!!data.plotAreaSqm && (
+                    <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-center">
+                      <p className="text-xs font-bold text-slate-500 uppercase">Suprafață Calculată Teren</p>
+                      <p className="text-xl font-black text-buildorange">{data.plotAreaSqm} m²</p>
+                    </div>
+                  )}
                   {errorMsg && <p className="text-red-500 text-xs font-bold text-center mt-2">{errorMsg}</p>}
                 </div>
               </div>

@@ -18,6 +18,7 @@ export const DashboardLayout = () => {
     { to: "market", icon: <TrendingUp className="w-5 h-5" />, label: "Analiza Pieței" },
     { to: "materials", icon: <PackageSearch className="w-5 h-5" />, label: "Materiale Bricolaj" },
     { to: "experts", icon: <HardHat className="w-5 h-5" />, label: "Experți Construcții" },
+    { to: "profile", icon: <Building2 className="w-5 h-5" />, label: "Profilul Meu" },
   ];
 
   return (

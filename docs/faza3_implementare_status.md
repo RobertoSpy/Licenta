@@ -1,43 +1,41 @@
-# Status Implementare Faza 3: Etape Construcție, Materiale & Deviz Final
+# Sumar Implementare Faza 3: Etape Construcție, Materiale & Deviz Final (Actualizat)
 
-Acest document reflectă progresul implementării Fazei 3 din proiectul Zidario, bazat pe planul inițial.
+Acest document reflectă implementarea curentă a Fazei 3, focusată pe estimarea de costuri (BOM - Bill of Materials), gestiunea materialelor și urmărirea etapelor construcției. Datele reflectă arhitectura din codul sursă existent.
 
-## 1. Catalog Materiale & AI Entity Resolution (Finalizat ✅)
-- **Scraping Dinamic**: S-a renunțat la JSON static în favoarea unui script hibrid (`seedMaterials.ts`) care extrage produse de pe Dedeman (sau alte surse viitoare). Baza de date relațională înlătură orice noțiune de "mockup".
-- **Arhitectură Decuplată**: Sistemul este pregătit pentru scalabilitate — scriptul de seed poate fi oricând înlocuit cu un apel API B2B (ex. Dedeman/Leroy Merlin) pentru a trage zeci de mii de produse live, fără a modifica logica motorului BOM sau a AI-ului.
-- **Semantic Mapping (AI)**: Produsele reale sunt trecute printr-un prompt Gemini (`materialAnalyzer.ts`) cu reguli stricte (Schema Validation). AI-ul acționează ca un Data Engineer, mapând produsul real pe o taxonomie fixă de coduri standard din sistem (ex: `STANDARD_BCA_25`, `STANDARD_BETON_C20_25`).
-- **DB Schema**: Modelele `Material` și `PriceHistory` au fost actualizate și migrate în Prisma.
+## 1. Catalogul de Materiale și Scraping
+- **Seed Dinamic & Schema DB (`schema.prisma`)**: Catalogul are o reprezentare solidă prin modelul `Material`, cu suport direct pentru prețuri (`pricePerUnit`), categorii, metadate tehnice (ex: `compressiveStrength`), url-uri din magazine și un model secundar `PriceHistory` pentru a urmări evoluția.
+- **RAG pe Materiale (`MaterialChunk`)**: Fișele tehnice text sunt procesate via `MaterialChunk` ca vectori, permițând AI-ului să caute și să compare tehnic specificații.
+- **Mapping Semantic (AI as Data Engineer) (`materialAnalyzer.ts`)**: Prin Gemini, produsele brute din scraping sau seed sunt standardizate pe o taxonomie strictă de coduri de bază (ex. `STANDARD_BCA_25`).
 
-## 2. BOM Engine — Calcul Deviz (Finalizat ✅)
-- **Eliminarea Estimarilor Statice**: S-a șters complet vechiul sistem bazat pe indici macro (`build-costs.json`), iar aplicația se bazează acum exclusiv pe calculul determinist Faza 3 cu prețuri reale.
-- **Taxonomie**: Formulele de calcul au fost trecute într-un JSON standardizat (`bom-formulas.json`), fiecare vizând un cod fix asigurat de AI (ex: `STANDARD_LEMN_STRUCTURA`).
-- **BOM Repository**: Funcții CRUD pentru `ProjectBOM` care permit recalcularea sau ștergerea ușoară la schimbări.
-- **BOM Service**: Funcția `calculateBOM` injectează formulele extrase din fișier cu datele planului 2D (`ProjectMetrics`) evaluându-le matematic pentru a produce necesarul de materiale, adăugând un coeficient de pierderi (waste). Calculul este interactiv — dacă utilizatorul modifică planul în Faza 2, devizul se recalculează automat.
-- **Rute API**: Rute sub `/api/bom` create și protejate.
+## 2. Motorul BOM (Bill of Materials) (`bomService.ts`)
+- **Formule Determinate**: Fără indexări de cost la m2. Calculul folosește JSON-ul cu formule (`bom-formulas.json`) unde variabilele cantitative (suprafețe extrase din plan 2D) se înmulțesc cu prețurile materialelor curente asociate codurilor din sistem.
+- **Persistență în `ProjectBOM`**: La recalculare, vechiul BOM se curăță și este regenerat, stocând per etapă faza, formula (`formulaKey`), cantitatea calculată, prețul de referință și notele tehnice explicative de calcul.
+- **Înlocuirea Materialelor (Overrides)**: Baza de date suportă `ProjectMaterialOverride` prin care utilizatorul poate forța un alt material pentru o formulă (ex: schimbare marcă BCA). Ruta API (`PATCH /api/bom/:projectId/material`) gestionează direct acest lucru.
 
-## 3. Etapele Construcției (Finalizat ✅)
-- **Model Date**: Etapele cronologice (Fundație, Structură etc.) din `construction-phases.json` generează în baza de date modele `ConstructionPhase` per proiect.
-- **Service & Repositories**: Crearea etapelor automat și actualizarea stării de "finalizat" (`markPhaseCompleted`).
-- **Rute API**: Rute sub `/api/construction` expuse și atașate la index.
+## 3. Urmărirea Etapelor de Construcție (Timeline)
+- **Model `ConstructionPhase`**: La inițializarea fazei 3, etapele din `construction-phases.json` sunt populate automat în baza de date cu ordinea cronologică (fundație, structură, acoperiș, etc.).
+- Funcționalitate de finalizare a etapelor (API: `/api/construction/:projectId/phases/:phaseId/complete`), vizibilă în `ProjectTimeline.tsx`.
 
-## 3.1 BOM Advisor — Progres Etape, Confirmare & Recomandări Normative (Finalizat ✅)
-- **Consultanță Normativă (AI ca Arhitect)**: Agenții RAG (ex: `materiale`, `deviz`) nu folosesc surse PDF pentru a evita halucinarea prețurilor vechi. În schimb, AI-ul folosește normative de specialitate (ex. MC001 pentru NZEB, NE012 pentru îngheț) ca să extragă cerințe legale și să recomande materialul optim din baza de date live, justificând decizia legislativ.
-- **Model dedicat**: Persistență pentru progresul etapelor BOM în `BomPhaseProgress` (fără reutilizarea `ChatSummary`).
-- **Tracker UI**: Step tracker vizual în header-ul chat-ului BOM, cu etapă activă și etape completate.
-- **Confirmare etapă**: Buton explicit "Confirmă etapa" + suport pentru mesajul "confirm".
-- **SSE Events**: `event: phase` pentru starea etapelor și `event: message` pentru stream text.
+## 4. BOM Advisor (AI Consultanță și Workflow)
+- **`BomPhaseProgress` DB Model**: Stocare dedicată a stadiului (faza activă de configurat, fazele completate) necesară chat-ului.
+- **`useBOMAdvisorChat.ts` & UI Tracker**: Asistent AI care analizează fiecare etapă specifică (ex: Structură, Zidărie) pe rând.
+- **Acțiuni Specifice**: Când AI-ul discută devizul unei faze, există suport pentru acțiunea explicită de confirmare (ruta POST `/api/bom/:projectId/phase-state/confirm`), permițând sistemului să mute utilizatorul la faza de construcție următoare.
+- **Intro AI Cache-uit**: Modelul `BomIntroCache` ține ultimul discurs introductiv pentru performanță (`getBOMIntro`).
 
-## 4. Integrare Frontend (Finalizat ✅)
-- **Navigare**: Am adăugat banner-ul "Faza 3" în `ProjectDetail.tsx` pentru a face tranziția clară după Faza 2.
-- **Rute și Hook-uri**: Rutele `/dashboard/projects/:id/bom` și `/dashboard/projects/:id/timeline` au fost adăugate, folosind hook-uri custom (`useBOMData`, `useConstructionData`) pentru comunicarea sigură cu API-ul.
-- **Pagina de Deviz (`ProjectBOM.tsx`)**: Un tabel modern împărțit logic pe etape, preluând instant calculele din API, și însoțit de componenta `BOMSummary.tsx` cu un grafic interactiv tip Pie Chart (integrat via `recharts`).
-- **Timeline-ul Interactiv (`ProjectTimeline.tsx`)**: O componentă vizuală (`ConstructionTimeline.tsx`) cu bară de progres global și acțiuni de "Marchează ca Finalizat" care apelează backend-ul pentru a updata baza de date.
-- **BOM Intro Personalizat**: Mesaj de introducere generat AI cu fallback determinist și cache per proiect.
+## 5. UI Faza 3
+- Pagina de deviz are componenta `BOMSummary.tsx` bazată pe `recharts` pentru grafice (Pie Chart), integrată perfect cu hook-urile de preluare asincronă `useBOMData.ts`.
+- Aplicația trece transparent de la finalizarea `PlanSnapshot`-ului publicat din Editor, trăgând instant valorile metrice în BOM Engine.
 
-## Următorii Pași (To Do)
-- [x] **Variante Alternative**: Sistemul permite interogarea și _înlocuirea manuală_ a materialelor via un Side Drawer interactiv.
-- [x] **Optimizarea Bugetului (AI Zidario)**: Integrat stream SSE pentru explicarea normativelor tehnice direct în panoul de alternative.
-- [ ] **Export PDF Deviz Final**: O funcție care generează devizul complet, planul și etapele într-un PDF descărcabil (ex: Puppeteer).
-- [ ] **Cron Job de Prețuri**: Crearea unui cron pentru `priceService` (săptămânal) pentru a actualiza automat prețul materialelor pe Dedeman/Leroy Merlin.
+## 6. Limitări Cunoscute și Extinderi Viitoare (Note pentru Lucrare)
 
-_Ultima actualizare: Mai 2026 (30)_
+În vederea documentării obiective a stadiului platformei pentru susținere, au fost identificate următoarele limitări și decizii arhitecturale în Faza 3:
+
+### 6.1 Formule BOM Incomplete (Limitare Implementare)
+Deși motorul BOM este complet funcțional din punct de vedere arhitectural (calculează asincron cantitățile, aplică waste factors și mapează materialele curente), setul de formule matematice (`bom-formulas.json`) **nu este exhaustiv**. Categoriile precum **Finisaje Fine, hidroizolația, coroana de beton și instalațiile (sanitare/termice/electrice)** nu au fost încă transpuse în ecuații deterministe. Acestea reprezintă o limitare a implementării curente și sunt vizate strict ca extinderi viitoare pentru atingerea unui deviz 100% complet.
+
+### 6.2 Agentul Deviz fără Surse Vectorizate (RAG Zero-Hit)
+Sistemul de rute hibride înregistrează oficial agentul „deviz” (via `agentRegistry.ts`), însă momentan script-ul de populare a bazei de date nu a introdus niciun document tip `NormativeChunk` asociat acestui agent specific. Consecința practică este că, dacă un utilizator adresează o întrebare tehnică referitoare la normativele de preț sau devizare prin asistent, **sistemul RAG va returna 0 rezultate**. LLM-ul va răspunde strict pe baza cunoștințelor sale pre-antrenate (zero context normativ intern), ceea ce expune platforma la un risc teoretic de halucinare pe segmentul de devizare. Această lacună este recunoscută și va fi acoperită prin ingerarea viitoare a indicatoarelor de norme de deviz (ex. seria Ts).
+
+### 6.3 Scraping Automat vs. Sincronizare Manuală (Pivotare Arhitecturală)
+Platforma a pivotat justificat de la extragerea live prin Puppeteer (datorită mecanismelor de protecție agresive tip WAF/Cloudflare ale magazinelor de bricolaj), trecând la un proces decuplat de injecție a prețurilor. 
+Totuși, trebuie precizat că, deși fișierul `scraperService.ts` există în codebase-ul aplicației ca un Proof of Concept, el este **inactiv în mediul de producție**. Sincronizarea prețurilor nu se realizează automat printr-un *cron job*, ci necesită declanșare manuală din interfața de administrare (via un buton de Sync). Această limitare trebuie menționată explicit pentru a evita discrepanța vizuală dintre existența modulului de scraping în arhitectură și lipsa execuției lui autonome.

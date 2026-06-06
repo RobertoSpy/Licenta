@@ -10,8 +10,11 @@ const router = Router();
 // Nu are projectId propriu în params — contextul vine din body ca string pre-construit de frontend
 router.post('/chat', protect, validateRequest(chatSchema), aiController.chatStream);
 
-// GET /api/ai/explain-material?base=x&alt=y
+// GET /api/ai/explain-material?base=x&alt=y  (legacy)
 router.get('/explain-material', protect, aiController.explainMaterial);
+
+// POST /api/ai/explain-material  (full-context with projectId + material codes)
+router.post('/explain-material', protect, aiController.explainMaterial);
 
 // GET /api/ai/explain-material/:materialId
 router.get('/explain-material/:materialId', protect, aiController.explainMaterialById);

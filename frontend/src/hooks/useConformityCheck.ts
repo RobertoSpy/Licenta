@@ -220,6 +220,7 @@ export function useConformityCheck(
         rooms: rooms.map((r) => {
           // Calculate windowAreaSqm
           let windowAreaSqm = 0;
+          let hasExteriorAccess = false;
           const roomEl = elements?.find(el => el.id === r.id);
           if (roomEl) {
             const adjacentWindows = windows.filter(win => {
@@ -238,6 +239,29 @@ export function useConformityCheck(
               const winWidthM = Math.max(win.width, win.height) * scale;
               windowAreaSqm += winWidthM * 1.5; // WINDOW_STANDARD_HEIGHT_M = 1.5
             }
+            
+            // Verificăm dacă are acces la exterior (atinge o fereastră sau o ușă de exterior)
+            const adjacentDoors = elements?.filter(e => e.type === 'door').filter(doorEl => {
+              const cx = doorEl.x + doorEl.width / 2;
+              const cy = doorEl.y + doorEl.height / 2;
+              return (
+                cx >= roomEl.x - 15 && cx <= roomEl.x + roomEl.width + 15 &&
+                cy >= roomEl.y - 15 && cy <= roomEl.y + roomEl.height + 15
+              );
+            }) ?? [];
+            
+            // O ușă e exterioară dacă atinge < 2 camere
+            const hasExteriorDoor = adjacentDoors.some(doorEl => {
+               const cx = doorEl.x + doorEl.width / 2;
+               const cy = doorEl.y + doorEl.height / 2;
+               const intersectingRooms = elements?.filter(el => el.type === 'room' && 
+                   cx >= el.x - 15 && cx <= el.x + el.width + 15 &&
+                   cy >= el.y - 15 && cy <= el.y + el.height + 15
+               ) ?? [];
+               return intersectingRooms.length < 2;
+            });
+            
+            hasExteriorAccess = adjacentWindows.length > 0 || hasExteriorDoor;
           }
 
           return {
@@ -247,6 +271,7 @@ export function useConformityCheck(
             widthM: r.widthM,
             heightM: r.heightM,
             windowAreaSqm,
+            hasExteriorAccess,
           };
         }),
         doors: doors?.map((d) => {

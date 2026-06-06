@@ -8,6 +8,7 @@ import { CheckCircle2, ChevronLeft, ChevronRight, ArrowRight, AlertCircle } from
 import type { BOMItem } from '../../hooks/useBOMData';
 import type { BomPhaseConfig } from '../../hooks/useBOMPhaseWizard';
 import { MaterialSideDrawer } from './MaterialSideDrawer';
+import { Link } from 'react-router-dom';
 
 // ─────────────────────────────────────────────────────────────────
 // FORMAT RON
@@ -193,9 +194,18 @@ export const BOMPhaseCard = ({
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 ) : (
-                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-bold">
-                    <CheckCircle2 className="w-4 h-4" />
-                    Deviz Finalizat
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-bold">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Deviz Finalizat
+                    </div>
+                    <Link
+                      to="/dashboard/contractors"
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all shadow-sm shadow-blue-200"
+                    >
+                      Caută Constructori
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
                   </div>
                 )
               ) : (

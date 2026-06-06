@@ -13,6 +13,11 @@ interface Material {
   inStock?: boolean;
   stockQuantity?: number;
   description?: string;
+  uValue?: number;
+  compressiveStrength?: number;
+  minSeismicZone?: number;
+  maxFloors?: number;
+  normativeCode?: string;
 }
 
 export const Materials = () => {
@@ -205,9 +210,37 @@ export const Materials = () => {
                   {mat.category}
                 </span>
               </div>
-              <h3 className="font-bold text-slate-800 text-lg leading-tight mb-2 flex-1">
+              <h3 className="font-bold text-slate-800 text-lg leading-tight mb-2">
                 {mat.name}
               </h3>
+              
+              {mat.description && (
+                <p className="text-xs text-slate-500 line-clamp-2 mb-3">
+                  {mat.description}
+                </p>
+              )}
+
+              {(mat.uValue || mat.compressiveStrength || mat.normativeCode) && (
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {mat.uValue && (
+                    <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100" title="Coeficient Termic (U-Value)">
+                      U: {mat.uValue} W/m²K
+                    </span>
+                  )}
+                  {mat.compressiveStrength && (
+                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200" title="Rezistență la Compresiune">
+                      Rez: {mat.compressiveStrength} N/mm²
+                    </span>
+                  )}
+                  {mat.normativeCode && (
+                    <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-100" title="Normativ de referință">
+                      {mat.normativeCode}
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              <div className="flex-1"></div>
               
               <div className="mb-4">
                 {mat.inStock !== false ? (

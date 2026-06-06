@@ -1,7 +1,10 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { 
   syncDedemanMaterials, 
   addMaterialFromUrl,
+  addMaterialManual,
+  importMaterialsCsv,
   getUsers,
   getAllMaterials,
   updateMaterial,
@@ -12,6 +15,7 @@ import { protect } from '../../core/middleware/authMiddleware';
 import { requireAdmin } from '../../core/middleware/requireAdmin';
 
 const router = Router();
+const upload = multer({ dest: 'uploads/' });
 
 // Toate rutele de aici necesită autentificare
 router.use(protect);
@@ -24,6 +28,8 @@ router.use(requireAdmin);
 
 router.get('/users', getUsers);
 router.get('/materials', getAllMaterials);
+router.post('/materials/manual', addMaterialManual);
+router.post('/materials/import-csv', upload.single('csvFile'), importMaterialsCsv);
 router.put('/materials/:id', updateMaterial);
 router.delete('/materials/:id', deleteMaterial);
 router.post('/scrape/sync', syncDedemanMaterials);

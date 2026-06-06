@@ -9,7 +9,8 @@ export const AGENT_DESCRIPTIONS: Partial<Record<AgentType, string>> = {
   legal: "Legislație, autorizații de construire, certificat de urbanism, primărie, vecini, retrageri, limite de proprietate, suprafețe minime legale și avize.",
   deviz: "Costuri, prețuri, buget, estimare financiară, cheltuieli, oferte și achiziții de materiale.",
   energetic: "Eficiență energetică, clasă energetică, izolație termică, audit energetic, norme NZEB, consum energie.",
-  instalatii: "Instalații electrice, sanitare, apă rece, caldă, canalizare, prize, cabluri, tablouri electrice, conducte și țevi."
+  instalatii: "Instalații electrice, sanitare, apă rece, caldă, canalizare, prize, cabluri, tablouri electrice, conducte și țevi.",
+  financial: "Analiză financiară, piața construcțiilor, inflație, indici de preț INSSE, costuri pe metru pătrat, prognoze, evoluția prețurilor, moment optim de construire."
 };
 
 let cachedAgentEmbeddings: Record<string, number[]> | null = null;
@@ -41,13 +42,15 @@ export function isOffTopic(message: string): boolean {
 
 export const SCREEN_AGENTS: Record<string, AgentType[]> = {
   screen1: ['geotehnic', 'seismic'],
-  screen2: ['geotehnic'],
+  screen2: ['geotehnic', 'seismic'],
   screen3: ['seismic', 'structural', 'legal'],
-  screen4: ['legal'],
-  editor:  ['legal', 'structural', 'instalatii'],
+  screen4: ['legal', 'architectural'],
+  editor:  ['legal', 'structural', 'instalatii', 'architectural'],
   bom:     ['structural', 'materiale', 'deviz', 'energetic', 'instalatii'],
   timeline:['legal', 'structural'],
   energy:  ['energetic', 'structural', 'instalatii'],
+  market:  ['financial', 'deviz'],  // Analiză piață construcții
+  wizard:  ['geotehnic', 'seismic', 'architectural', 'legal'], // Pentru asistentul din configuratorul de proiect
 };
 
 export async function detectRequiredAgents(
@@ -81,6 +84,9 @@ export async function detectRequiredAgents(
   }
   if (/instalati|sanitar|apa rece|apa calda|apă rece|apă caldă|canalizare|teava|țeavă|conducta|conductă|electric|curent|priza|priză|cablu|intrerupator|întrerupător|tablou electric|iluminat/i.test(q)) {
     agents.add('instalatii');
+  }
+  if (/inflatie|inflație|indice cost|\bcns\b|insse|pret constructie|preț constructie|cost.*mp|când.*construi|cand.*construi|moment.*optim|piata constructii|piața construcțiilor|prognoze|forecast|material.*s-a scumpit|cat.*costa.*2027|cât.*costă.*202[78]|construi.*acum|merita.*acum/i.test(q)) {
+    agents.add('financial');
   }
 
   if (agents.size === 0) {
@@ -117,6 +123,11 @@ export async function detectRequiredAgents(
   if (agents.size === 0 && screen && SCREEN_AGENTS[screen]) {
     SCREEN_AGENTS[screen].forEach(a => agents.add(a));
     console.log(`[detectRequiredAgents] Fallback pe screen "${screen}": [${[...agents].join(', ')}]`);
+  }
+
+  // Pe ecranul de market, forțăm agentul financiar să fie prezent oricum
+  if (screen === 'market') {
+    agents.add('financial');
   }
 
   if (agents.size === 0) {

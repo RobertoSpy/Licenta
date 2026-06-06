@@ -19,6 +19,7 @@ import { bomRepository } from './bomRepository';
 import { Prisma } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
+import { selectMaterialForBOM, MaterialQuery } from './materialSelector';
 
 // ─────────────────────────────────────────────────────────────────
 // TIPURI
@@ -140,15 +141,33 @@ export const bomService = {
 
   formatForPrompt(spec: FoundationSpec): string {
     return [
-      `Clasa beton fundație: ${spec.concreteClass} (NE012-1-2022, Tab. 4.1)`,
-      `Adâncime minimă fundare: ${spec.minDepthCm} cm (NP112-2014)`,
+      `Clasa beton fundație: ${spec.concreteClass}`,
+      `Adâncime minimă fundare: ${spec.minDepthCm} cm`,
       `Motivare: ${spec.note}`,
     ].join('\n');
   },
 
   // ── CALCUL BOM PRINCIPAL ────────────────────────────────────────
 
+  // In-memory mutex per projectId — previne generare dublă în React StrictMode / double-fetch
+  _bomGenerating: new Set<number>(),
+
   async calculateBOM(projectId: number) {
+    // Mutex simplu: dacă e deja în progres pentru acest proiect, returnăm ce avem în DB
+    if ((this as any)._bomGenerating.has(projectId)) {
+      console.warn(`[BOM] Calcul deja în curs pentru proiect #${projectId}, returnăm cache din DB.`);
+      return bomRepository.findByProject(projectId);
+    }
+    (this as any)._bomGenerating.add(projectId);
+
+    try {
+      return await this._calculateBOMInternal(projectId);
+    } finally {
+      (this as any)._bomGenerating.delete(projectId);
+    }
+  },
+
+  async _calculateBOMInternal(projectId: number) {
     // 1. Date proiect din DB
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) throw new Error(`Proiect negăsit (id=${projectId})`);
@@ -161,18 +180,19 @@ export const bomService = {
       soilType:     project.soilType,
       frostDepthCm: project.frostDepthCm,
       totalFloors:  floorsCount,
+      hasBasement:  project.hasBasement,
       houseStyle:   project.houseStyle,
       energyClass:  project.energyClass,
     };
     const ctx = buildContextMultipliers(ctxInput);
 
-    // 3. Extragere metrici din PlanSnapshot publicat
+    // 3. Extragere metrici din ultimul PlanSnapshot salvat (indiferent dacă e publicat explicit)
     const snapshot = await prisma.planSnapshot.findFirst({
-      where: { projectId, floor: 'parter', isPublished: true },
+      where: { projectId, floor: 'parter' },
       orderBy: { createdAt: 'desc' },
     });
     if (!snapshot) {
-      throw new Error('Nu există un plan 2D publicat. Publică planul din editor înainte de generarea devizului.');
+      throw new Error('Nu există un plan 2D salvat. Salvează planul din editor înainte de generarea devizului.');
     }
     const extraction = extractMetricsFromSnapshot(
       snapshot?.planJSON ?? null,
@@ -241,60 +261,33 @@ export const bomService = {
         const quantityWithWaste = rawQuantity * (1 + formula.wastePercent / 100);
         const finalQty = Math.ceil(quantityWithWaste * 100) / 100;
 
-        // 10. Selectăm materialul:
-        //   Prioritate 1: override explicit din DB (utilizatorul/AI-ul a schimbat)
-        //   Prioritate 2: clasa de beton selectată automat de contextMultiplierEngine
-        //   Prioritate 3: defaultMaterialCode din formulă
-        let materialCodeToUse: string = formula.defaultMaterialCode;
+        // 10. Selectăm materialul dinamic folosind materialSelector
+        const query: MaterialQuery = formula.materialQuery;
+        let material: any = null;
 
-        // Clasa betonului auto-upgrade (Problema 3 din review)
-        const isConcreteFormula = [
-          'foundation_concrete',
-          'structure_pillars_concrete',
-          'structure_tie_beams_concrete',
-          'slab_concrete',
-        ].includes(formulaKey);
+        if (query) {
+          // Motorul de upgrade (STRICT_NORMATIVE depinde de acest engineCode)
+          let engineCode: string | undefined = undefined;
+          if (query.engineKey === 'concreteCode') engineCode = ctxWithPlan.concreteCode;
+          if (query.engineKey === 'rebarCode') engineCode = ctxWithPlan.rebarCode;
+          // Pt upgrade-uri din materialSelector.ts
+          let projectSeismicZoneFloat: number | undefined = undefined;
+          if (project.seismicZone) {
+             projectSeismicZoneFloat = parseFloat(project.seismicZone.replace('g', ''));
+          }
 
-        if (isConcreteFormula && ctxWithPlan.concreteCode !== 'STANDARD_BETON_C20_25') {
-          materialCodeToUse = ctxWithPlan.concreteCode;
+          material = await selectMaterialForBOM(query, (project as any).budgetCategory || 'mediu', engineCode, projectSeismicZoneFloat);
         }
 
-        // Auto-upgrade inteligent pentru materiale (seismic, clima, stil)
-        if (formulaKey === 'wall_exterior' && ctxWithPlan.exteriorWallCode !== 'STANDARD_BCA_25') {
-          materialCodeToUse = ctxWithPlan.exteriorWallCode;
-        } else if (formulaKey === 'windows' && ctxWithPlan.windowsCode !== 'STANDARD_FEREASTRA_PVC') {
-          materialCodeToUse = ctxWithPlan.windowsCode;
-        } else if (formulaKey === 'insulation_roof' && ctxWithPlan.insulationRoofCode !== 'vata-minerala-15cm') {
-          materialCodeToUse = ctxWithPlan.insulationRoofCode;
-        } else if (formulaKey === 'foundation_rebar' && ctxWithPlan.rebarCode !== 'STANDARD_FIER_12') {
-          materialCodeToUse = ctxWithPlan.rebarCode;
-        }
-
-        // Override manual (are prioritate peste auto-upgrade)
+        // Override manual (are prioritate absolută)
         const override = overrides.find(o => o.formulaKey === formulaKey);
         if (override) {
           const overrideMat = materials.find(m => m.id === override.materialId);
-          if (overrideMat) materialCodeToUse = overrideMat.internalCode;
+          if (overrideMat) material = overrideMat;
         }
 
-        // 11. Căutăm materialul în catalog
-        const material = materials.find(m => m.internalCode === materialCodeToUse);
         if (!material) {
-          // Fallback explicit la C20/25 dacă C25/30 lipsește (Problema 3 din review)
-          if (materialCodeToUse === 'STANDARD_BETON_C25_30') {
-            const fallback = materials.find(m => m.internalCode === 'STANDARD_BETON_C20_25');
-            if (fallback) {
-              console.error(`[BOM] ❌ STANDARD_BETON_C25_30 lipsă în catalog → fallback C20/25 pentru ${formulaKey}. Rulați seedBaselineMaterials.`);
-              // Continuăm cu fallback-ul
-              const totalPrice = parseFloat((finalQty * fallback.pricePerUnit).toFixed(2));
-              totalEstimatedCost += totalPrice;
-              bomItems.push(buildBOMItem(projectId, fallback, formula, formulaKey, finalQty, rawQuantity, ctxWithPlan, '⚠️ FALLBACK C20/25 (C25/30 lipsă catalog)'));
-            } else {
-              console.error(`[BOM] ❌ Atât STANDARD_BETON_C25_30 cât și STANDARD_BETON_C20_25 lipsesc! Sărim ${formulaKey}.`);
-            }
-          } else {
-            console.warn(`[BOM] Material lipsă: "${materialCodeToUse}" pentru formula "${formulaKey}". Rulați seedBaselineMaterials.`);
-          }
+          console.warn(`[BOM] ❌ Niciun material conform găsit pentru formula "${formulaKey}". (query: ${JSON.stringify(query)})`);
           continue;
         }
 
@@ -373,183 +366,7 @@ export const bomService = {
       `  Clasa beton fundație aplicată automat: ${ctx.concreteClass} (${ctx.concrete_note})`,
       `  foundation_width_m: ${ctx.foundation_width_m}m`,
       `  frost_depth_m: ${ctx.frost_depth_m}m`,
-      '',
-      'Când discuți despre fundație sau armătură, citează acești coeficienți.',
-      'Nu recalcula aceste valori — sunt determinate normativ.',
     ].join('\n');
-  },
-};
-
-// ─────────────────────────────────────────────────────────────────
-// EXPLICAȚII ACCESIBILE — fiecare formulă are:
-//   • normativeCitation: referința exactă din normativ (pentru inginer/comisie)
-//   • plainExplanation:  ce înseamnă asta în limbaj simplu (pentru orice user)
-// ─────────────────────────────────────────────────────────────────
-
-const PLAIN_EXPLANATIONS: Record<string, { normativeCitation: string; plainExplanation: string }> = {
-  foundation_concrete: {
-    normativeCitation: 'NE 012-1:2022 Tab.5.2 + NP 112-2014',
-    plainExplanation: 'Betonul fundației trebuie să fie suficient de rezistent pentru a ține casa stabilă zeci de ani. Cu cât solul e mai slab sau zona mai seismică, cu atât normativul cere un beton mai bun.',
-  },
-  foundation_rebar: {
-    normativeCitation: 'P100-1/2013 Cap.8 + NE 012-1:2022 Tab.E.1',
-    plainExplanation: 'Fierul din fundație (armătura) preia forțele seismice și împiedică crăparea betonului. Cantitatea crește automat dacă ești în zonă seismică.',
-  },
-  foundation_formwork: {
-    normativeCitation: 'NE 012-1:2022 §4 — execuție cofraje',
-    plainExplanation: 'Cofrajele sunt panourile temporare din lemn care dau forma betonului înainte să se întărească. Se calculează după suprafața laterală a fundației.',
-  },
-  foundation_waterproofing: {
-    normativeCitation: 'NP 112-2014 Art.9 — hidroizolație fundație',
-    plainExplanation: 'Membrana bituminoasă protejează fundația de apa din pământ. Fără ea, apa intră în beton și îl degradează în câțiva ani.',
-  },
-  foundation_sand_bed: {
-    normativeCitation: 'NP 112-2014 Art.6.3',
-    plainExplanation: 'Stratul de balast de 20cm sub fundație distribuie uniform greutatea casei și permite scurgerea apei. Este obligatoriu — fără el fundația s-ar putea tasă inegal.',
-  },
-  foundation_leveling_concrete: {
-    normativeCitation: 'NE 012-1:2022 §4.3',
-    plainExplanation: 'Betonul de egalizare (B100) este un strat subțire de 10cm care creează o suprafață plană sub fundație. Fără el, cofrajele și armătura nu pot fi montate corect.',
-  },
-  foundation_moisture_barrier: {
-    normativeCitation: 'NP 112-2014 Art.9.1 + C 112-86',
-    plainExplanation: 'Folia de polietilenă împiedică apa din pământ să ajungă la betonul proaspăt înainte de a se întări. Este o protecție simplă dar esențială.',
-  },
-  foundation_bitumen_primer: {
-    normativeCitation: 'NP 112-2014 Art.9.2 + C 112-86',
-    plainExplanation: 'Amorsajul bituminos este ca un "grund" aplicat pe beton înainte de membrana impermeabilă — asigură că membrana lipește bine și nu se dezlipește în timp.',
-  },
-  wall_exterior: {
-    normativeCitation: 'CR 6-2013 §4 + Mc-001-2022 Tab.3',
-    plainExplanation: 'Peretele exterior este "coaja" casei. Materialul ales (BCA sau cărămidă) determină cât de bine ține căldura în casă iarna și cât de rezistent e la cutremur.',
-  },
-  wall_interior: {
-    normativeCitation: 'CR 6-2013 §4 + NP 057-2002 Art.6',
-    plainExplanation: 'Pereții interiori despart camerele. Sunt mai subțiri decât cei exteriori, dar trebuie totuși să fie stabili și să ofere izolație fonică între camere.',
-  },
-  mortar_masonry: {
-    normativeCitation: 'CR 6-2013 Tab.3.1 §3.2.2',
-    plainExplanation: 'Mortarul (sau adezivul la BCA) ține cărămizile/blocurile lipite între ele. Tipul de mortar depinde de materialul ales — BCA necesită un adeziv special cu rost subțire de 1-3mm.',
-  },
-  structure_pillars_concrete: {
-    normativeCitation: 'CR 6-2013 Art.7.4 + P100-1/2013',
-    plainExplanation: 'Stâlpișorii de beton armat (buiandrugi verticali) fixează zidăria și preiau forțele seismice. Fără ei, pereții s-ar crăpa la primul cutremur.',
-  },
-  structure_pillars_rebar: {
-    normativeCitation: 'CR 6-2013 Art.7.4 + P100-1/2013 Cap.8',
-    plainExplanation: 'Armătura din stâlpișori este „scheletul" care preia forțele de tracțiune — betonul singur e rezistent la compresiune, dar nu la tensiuni. Fierul compensează.',
-  },
-  structure_tie_beams_concrete: {
-    normativeCitation: 'CR 6-2013 Art.7.5',
-    plainExplanation: 'Centurile sunt grinzi orizontale de beton armat care „leagă" toți pereții la fiecare nivel. Ele fac casa să se comporte ca un singur corp la cutremur.',
-  },
-  structure_tie_beams_rebar: {
-    normativeCitation: 'CR 6-2013 Art.7.5 + P100-1/2013',
-    plainExplanation: 'Armătura din centuri este continuă pe tot perimetrul casei — practic „brățara" din oțel care ține totul unit.',
-  },
-  slab_concrete: {
-    normativeCitation: 'NE 012-1:2022 + CR 0-2012',
-    plainExplanation: 'Planșeul (placa de beton) este „podeaua" turnată între etaje. Susține mobila, oamenii, și izolează fonic între niveluri.',
-  },
-  slab_rebar: {
-    normativeCitation: 'CR 0-2012 + NE 012-1:2022 Tab.5.2',
-    plainExplanation: 'Armătura din planșeu asigură că placa nu se fisurează sub greutate. Este calculată la greutatea maximă posibilă a etajului.',
-  },
-  slab_formwork: {
-    normativeCitation: 'NE 012-1:2022 §4',
-    plainExplanation: 'Cofrajul susține betonul planșeului până se întărește (minim 28 zile). De obicei se folosesc panouri de lemn sau sisteme metalice refolosibile.',
-  },
-  roof_timber: {
-    normativeCitation: 'CR 1-1-4-2012 Art.6 + NP 005-2003',
-    plainExplanation: 'Lemnul șarpantei formează structura acoperișului. Grosimea și distanța dintre grinzi depind de greutatea învelitorii și de vântul din zona ta.',
-  },
-  roof_area: {
-    normativeCitation: 'CR 1-1-4-2012 Art.6',
-    plainExplanation: 'Suprafața învelitorii este întotdeauna mai mare decât suprafața casei — panta acoperișului adaugă extra metraj. Ai ales tipul de învelitoare (țiglă, tablă) — aceasta este cantitatea necesară.',
-  },
-  roof_batten: {
-    normativeCitation: 'CR 1-1-4-2012 Art.6 + fișe tehnice Tondach/Bramac',
-    plainExplanation: 'Șipcile sunt șinele de lemn pe care se prind țiglele sau tabla. Se montează la 33cm distanță una de alta — standardul producătorilor de țiglă.',
-  },
-  roof_underlay: {
-    normativeCitation: 'Mc-001-2022 §7.3 + SR EN 13859-1',
-    plainExplanation: 'Folia anticondens este un strat respirant sub țigle care lasă vaporii să iasă dar nu lasă apa să intre. Fără ea, condensul din pod putrezește lemnul șarpantei.',
-  },
-  roof_gutter: {
-    normativeCitation: 'CR 1-1-4-2012 Art.6.3',
-    plainExplanation: 'Jgheabul colectează apa de ploaie de pe acoperiș și o dirijează la burlane. Fără el, apa cade direct pe fundație și o degradează în timp.',
-  },
-  roof_downpipe: {
-    normativeCitation: 'CR 1-1-4-2012 Art.6.3',
-    plainExplanation: 'Burlanele transportă apa de la jgheab în sol sau în sistemul de canalizare pluvial. Un burlan Ø80mm poate prelua apa de pe max 50mp de acoperiș.',
-  },
-  insulation_exterior_walls: {
-    normativeCitation: 'Mc-001-2022 §7.2 + Legea 372/2005',
-    plainExplanation: 'Termoizolația exterioară (polistiren sau vată) reduce factura la încălzire cu 30-50%. Grosimea minimă e impusă prin lege pentru clădirile noi.',
-  },
-  insulation_roof: {
-    normativeCitation: 'Mc-001-2022 §7.3',
-    plainExplanation: 'Vata din pod izolează cel mai bine — căldura urcă, iar fără izolație 30% din energia de încălzire se pierde prin acoperiș.',
-  },
-  etics_mesh: {
-    normativeCitation: 'ST 011-2014 §5.3',
-    plainExplanation: 'Plasa de fibră de sticlă este „armătura" sistemului de termoizolație exterior. Fără ea, tencuiala decorativă s-ar fisura la primul îngheț.',
-  },
-  etics_finish: {
-    normativeCitation: 'ST 011-2014 §5.5 + Mc-001-2022 §7.2',
-    plainExplanation: 'Tencuiala decorativă este finisajul exterior al casei — ce se vede din stradă. Tipul siloxanic respinge apa și nu se mucegăiește.',
-  },
-  floor_screed: {
-    normativeCitation: 'NE 012-1:2022 + SR EN 13813',
-    plainExplanation: 'Șapa este stratul neted de ciment turnat pe planșeu, pe care se pun parchetul sau gresia. O șapă bună asigură că podeaua nu va "pocni" sau crăpa.',
-  },
-  wall_plaster: {
-    normativeCitation: 'SR EN 998-1:2017 (tencuieli)',
-    plainExplanation: 'Tencuiala acoperă zidăria brută și creează suprafețele netede pe care se aplică gletul și vopseaua. Este prima operație de finisaj interior.',
-  },
-  glet_interior: {
-    normativeCitation: 'SR EN 13279-1 — spec. Knauf Multifinish',
-    plainExplanation: 'Gletul este stratul fin alb aplicat peste tencuială, care face peretele perfect neted pentru vopsea. Fără glet, vopseaua scoate în evidență orice neregularitate.',
-  },
-  paint_interior: {
-    normativeCitation: 'SR EN 13300 — spec. Kober Spor',
-    plainExplanation: 'Vopseaua lavabilă finalizează interiorul casei. „Lavabilă" înseamnă că se poate spăla cu apă — esențial în bucătărie, baie și camerele copiilor.',
-  },
-  windows: {
-    normativeCitation: 'SR EN 14351-1 + Mc-001-2022 Tab.4',
-    plainExplanation: 'Ferestrele triple (3K) pierd de 3 ori mai puțină căldură față de ferestrele simple. Norma impune un coeficient termic maxim (Uw) pentru clădiri noi.',
-  },
-  door_exterior: {
-    normativeCitation: 'SR EN 14351-1 + NP 057-2002 Art.4',
-    plainExplanation: 'Ușa exterioară trebuie să fie etanșă la aer și apă, termoizolată și sigură. Dimensiunea minimă e impusă normativ pentru a permite trecerea cu mobila.',
-  },
-  door_interior: {
-    normativeCitation: 'NP 057-2002 Art.4 + NP 063-2002 (acces PMR)',
-    plainExplanation: 'Ușile interioare sunt dimensionate să permită trecerea confortabilă. Dacă e cazul, lățimea minimă pentru accesibilitate PMR (persoane cu dizabilități) este de 90cm.',
-  },
-  electrical_cable_prize: {
-    normativeCitation: 'I 7-2011 §5',
-    plainExplanation: 'Cablul de prize CYY-F 3×2.5mm² este standardul pentru toate prizele din casă. 3×2.5 înseamnă 3 fire (fază, nul, împământare) de 2.5mm² fiecare — suficient pentru 2500W per circuit.',
-  },
-  electrical_cable_light: {
-    normativeCitation: 'I 7-2011 §5',
-    plainExplanation: 'Circuitul de iluminat folosește un cablu mai subțire (1.5mm²) — becurile consumă mult mai puțin decât prizele, deci firul poate fi mai mic.',
-  },
-  electrical_conduit: {
-    normativeCitation: 'I 7-2011 Tab.4.1',
-    plainExplanation: 'Tubul de protecție PVC protejează cablurile electrice sub tencuială. Dacă mai târziu trebuie să schimbi cablul, îl scoți prin tub fără să spargi peretele.',
-  },
-  plumbing_supply: {
-    normativeCitation: 'I 9-2022 §8.3 + SR EN ISO 15874',
-    plainExplanation: 'Țevile PPR transportă apa rece și caldă în casă. PPR este un plastic special rezistent la temperaturi de până la 95°C — nu ruginesc și durează zeci de ani.',
-  },
-  plumbing_drainage_main: {
-    normativeCitation: 'I 9-2022 §13.3 + SR EN 12056-2',
-    plainExplanation: 'Coloana de canalizare Ø110mm este „autostrada" prin care merg toate apele uzate din casă. Ø110mm e obligatoriu dacă WC-ul se racordează la ea.',
-  },
-  plumbing_drainage_secondary: {
-    normativeCitation: 'I 9-2022 §13 + SR EN 12056-2',
-    plainExplanation: 'Țevile Ø50mm leagă lavoarele, dușurile și chiuveta de coloana principală. Panta lor de minim 2% asigură că apa curge singură, fără pompe.',
   },
 };
 
@@ -580,15 +397,9 @@ function buildBOMItem(
   ].filter(Boolean).join(' | ');
 
   // ─── Explicație afișată în UI — tehnică + accesibilă ────────────
-  const explanation = PLAIN_EXPLANATIONS[formulaKey];
-  const normativeReason = explanation
-    ? `📐 ${explanation.normativeCitation} — ${explanation.plainExplanation}`
-    : formula.note
-      ? `📐 ${formula.note}`
-      : '';
-
-  // Îmbinăm nota tehnică internă cu explicația prietenoasă, despărțite de un separator clar
-  const finalNote = normativeReason ? `${noteparts} ||EXPLAIN|| ${normativeReason}` : noteparts;
+  const finalNote = formula.note
+    ? `${noteparts} ||EXPLAIN|| 📐 ${formula.note}`
+    : noteparts;
 
   return {
     projectId,

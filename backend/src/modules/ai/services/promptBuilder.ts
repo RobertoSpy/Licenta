@@ -3,6 +3,19 @@ import { searchHybrid } from './ragService';
 import { bomService } from '../../bom/bomService';
 import { detectRequiredAgents } from './agentRouter';
 
+export function rewriteShortQuery(question: string, screen: string): string {
+  const q = question.toLowerCase().trim();
+  if (question.length < 15 || ['gata', 'ok', 'am terminat', 'next', 'da', 'nu'].includes(q)) {
+    if (screen === 'screen1') return 'reglementari urbanism legea 50 certificat urbanism POT CUT maxim etaje';
+    if (screen === 'screen2') return 'teren fundatie sol zona seismica adancime inghet panta';
+    if (screen === 'screen3') return 'suprafete minime familie reglementari legea locuintei spatiu minim';
+    if (screen === 'screen4') return 'stil architectural buget estimare cost materiale';
+    if (screen === 'editor') return 'plan arhitectura iluminat natural ferestre suprafete minime legea locuintei orientare usi';
+    if (screen === 'bom') return 'deviz estimare beton armat fier beton zidarie pret manopera';
+  }
+  return question;
+}
+
 export async function buildRAGContext(
   question: string,
   screen: string,
@@ -36,7 +49,9 @@ export async function buildRAGContext(
 
       if (agentSources.length === 0) return null;
 
-      const chunks = await searchHybrid(question, agent, limitPerAgent, agentSources, purpose);
+      const augmentedQuery = rewriteShortQuery(question, screen);
+
+      const chunks = await searchHybrid(augmentedQuery, agent, limitPerAgent, agentSources, purpose);
       if (chunks.length === 0) return null;
 
       const chunksText = chunks
@@ -87,6 +102,7 @@ export function agentLabel(agents: AgentType[]): string {
     energetic:     'Eficiență Energetică',
     instalatii:    'Instalații Sanitare & Electrice',
     general:       'General',
+    financial:     'Analiză Piață & Costuri INSSE',
   };
   return agents.map(a => labels[a] || a).join(', ');
 }

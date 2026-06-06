@@ -1,6 +1,6 @@
 import { prisma } from '../../lib/prisma';
 
-export type FloorKey = 'parter' | 'etaj1' | 'etaj2' | 'mansarda';
+export type FloorKey = 'parter' | 'etaj1';
 
 export const editorRepository = {
   /**

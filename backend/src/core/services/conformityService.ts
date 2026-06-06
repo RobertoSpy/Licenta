@@ -43,6 +43,7 @@ export interface ConformityRoomInput {
   widthM?: number;
   heightM?: number;
   windowAreaSqm?: number;
+  hasExteriorAccess?: boolean;
 }
 
 export interface ConformityDoorInput {
@@ -159,6 +160,22 @@ function evaluateRoom(room: ConformityRoomInput, buildingPurpose: string): Confo
         suggestion: `Mărește camera cu cel puțin ${delta} m² util.`,
       });
     }
+  }
+
+  // Regula: Garajul trebuie să aibă acces exterior (să atingă perimetrul casei / să aibă o ușă de exterior)
+  if (key.includes('garaj') && room.hasExteriorAccess === false) {
+    issues.push({
+      targetType: 'room',
+      targetId: room.id,
+      code: 'ARCH_GARAGE_ACCESS',
+      severity: 'error',
+      article: 'Regula de Arhitectură / Accesibilitate',
+      message: `Garajul este blocat în interiorul casei și nu are acces auto spre exterior.`,
+      currentValue: 0,
+      requiredValue: 1,
+      deltaValue: 1,
+      suggestion: `Mută garajul pe perimetrul exterior al casei (ideal spre stradă) pentru a permite accesul mașinilor.`,
+    });
   }
 
   // Validare Fereastră (Ratios)

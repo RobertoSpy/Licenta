@@ -1,0 +1,20 @@
+Sursă: INSSE-BSP-07-2022 | Domeniu: Indicii de cost în construcții
+Perioadă: Iulie 2022 | An de bază de referință: 2015=100
+
+CONTEXT MACROECONOMIC IULIE 2022:
+Rata inflației în luna iulie 2022 comparativ cu luna iulie 2021 a fost 15,0%. Prețurile mărfurilor nealimentare au crescut cu 16,6%, creștere propulsată major de evoluția prețurilor la energie electrică, gaze și încălzire centrală (+35,6%). Prețurile producției industriale pe total (piața internă și piața externă) au înregistrat o creștere de 5,2% față de luna precedentă.
+
+INDICII DE COST ÎN CONSTRUCȚII — IULIE 2022:
+- Clădiri rezidențiale (Total cost): 187,8 (creștere accelerată față de începutul anului).
+- Costul materialelor de construcții: 190,1 (reprezintă o creștere de +22,5% față de ianuarie 2022).
+- Clădiri nerezidențiale: 191,2
+- Construcții inginerești: 185,0
+
+ELEMENTE DE COST SEMNIFICATIVE (Tabelul 15B):
+- Forța de muncă în construcții: 258,80 (+18,2% față de ianuarie 2022).
+- Combustibili: 163,89
+- Energie electrică: 319,86 (+20,9% față de ianuarie 2022).
+- Energie electrică + gaze: 436,32 (+30% față de ianuarie 2022).
+
+INTERPRETARE ȘI CAUZALITATE PENTRU AGENTUL FINANCIAR:
+Explozia costurilor de execuție din vara anului 2022 a fost generată direct de criza energetică globală și de blocajele logistice pe oțel-beton și materii prime survenite după declanșarea conflictului din Ucraina (februarie 2022). Producția de BCA, ciment și cărămidă fiind procese puternic energo-intensive, prețurile materialelor au înregistrat un salt de peste 22% în doar 6 luni. Creșterea indicelui de forță de muncă la 258,80 reflectă presiunea suplimentară creată de lipsa de personal calificat de pe șantiere.

@@ -29,6 +29,17 @@ export const registerSchema = z.object({
   password: z.string().min(8),
 }).strip();
 
+export const registerContractorSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(8),
+  companyName: z.string().min(2),
+  cui: z.string().min(5),
+  county: z.string().min(2),
+  specializations: z.array(z.string()).min(1),
+  coverageRadius: z.number().min(5).max(1000).optional(),
+}).strip();
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
@@ -39,8 +50,14 @@ export const emailOnlySchema = z.object({
 }).strip();
 
 export const resetPasswordSchema = z.object({
-  token: z.string(),
-  newPassword: z.string().min(6),
+  email: z.string().email(),
+  otp: z.string().min(6),
+  newPassword: z.string().min(8),
+}).strip();
+
+export const verifyEmailSchema = z.object({
+  email: z.string().email(),
+  otp: z.string().min(6),
 }).strip();
 
 // ==========================================
@@ -69,7 +86,7 @@ export const saveSummarySchema = z.object({
 export const suggestRoomsSchema = z.object({
   projectId: z.union([z.string(), z.number()]),
   familySize: z.number().min(1).max(20),
-  budgetCategory: z.enum(['economic', 'mediu', 'premium']),
+  budgetCategory: z.enum(['economic', 'mediu']),
   houseAreaSqm: z.number().min(10),
   totalFloors: z.number().min(1).optional().default(1),
   projectData: z.any().optional(),
@@ -91,9 +108,9 @@ export const createSnapshotSchema = z.object({
 }).strip();
 
 export const validateConformitySchema = z.object({
-  elements: z.array(z.any()),
-  floorKey: z.string().optional(),
-  projectData: z.any().optional(),
+  rooms: z.array(z.any()),
+  doors: z.array(z.any()).optional(),
+  buildingPurpose: z.string().optional(),
 }).strip();
 
 export const explainConformitySchema = z.object({

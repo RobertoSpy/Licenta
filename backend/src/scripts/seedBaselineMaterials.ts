@@ -12,11 +12,18 @@ interface BaselineMaterial {
   pricePerUnit: number; // RON, estimativ 2024
   description: string;
   isDefault: boolean;
-  storeUrl?: string;
+  storeUrl?: string | null;
 }
 
 const BASELINE_MATERIALS: BaselineMaterial[] = [
-  // ── FUNDAȚIE (Beton, Armătură, Hidroizolație) ──────────────────────────────────
+  // ── FUNDAȚIE (Materiale de Bază și Terasamente) ────────────────────────────────────────────────
+  {
+    internalCode: 'SAPATURA_MECANIZATA',
+    name: 'Săpătură Mecanizată Fundație/Subsol',
+    category: 'Fundație', subcategory: 'Terasamente', unit: 'mc', pricePerUnit: 45,
+    description: 'Săpătură mecanizată cu excavatorul pentru fundații continue sau groapă generală subsol.',
+    isDefault: true, storeUrl: null
+  },
   {
     internalCode: 'STANDARD_BETON_C20_25',
     name: 'Beton C20/25 (B250)',

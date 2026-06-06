@@ -15,6 +15,9 @@ import exportRoutes from './modules/export/exportRoutes';
 import bomRoutes from './modules/bom/bomRoutes';
 import constructionRoutes from './modules/construction/constructionRoutes';
 import adminRoutes from './modules/admin/adminRoutes';
+import marketRoutes from './modules/market/marketRoutes';
+import contractorRoutes from './modules/contractor/contractorRoutes';
+import quoteRoutes from './modules/quote/quoteRoutes';
 
 dotenv.config();
 
@@ -70,6 +73,9 @@ app.use('/api/export', exportRoutes);
 app.use('/api/bom', bomRoutes);
 app.use('/api/construction', constructionRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/market', marketRoutes);
+app.use('/api/contractors', contractorRoutes);
+app.use('/api/quotes', quoteRoutes);
 
 // ─────────────────────────────────────────────
 // 7. FALLBACK: Rută necunoscută

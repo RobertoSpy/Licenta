@@ -2,11 +2,12 @@ import { normativeCache } from './normativeCache';
 import { AgentType, BuildingPurpose, AGENT_SOURCES_BY_PURPOSE } from '../../../data/normative-registry';
 import { searchHybrid } from './ragService';
 import type { RoomSuggestion, SuggestRoomsInput } from '../../../core/types/roomSuggestion';
-import conformityRules from '../../../data/conformity-rules.json';
 
 import { getAi, FALLBACK_MODELS_CHAT, FALLBACK_MODELS_JSON, MAX_RETRIES_PER_MODEL } from './aiClient';
 import { isOffTopic, detectRequiredAgents } from './agentRouter';
 import { buildRAGContext, agentLabel, getStatusDisclaimer } from './promptBuilder';
+import { buildChatPrompt, buildOffTopicRefusalStream } from './chatPromptBuilder';
+import { buildRoomProgramPrompt, validateRoomSuggestion } from './roomProgramPrompt';
 
 export const agentOrchestrator = {
   async getAiStreamForChat(
@@ -28,18 +29,25 @@ export const agentOrchestrator = {
   ) {
     if (isOffTopic(userQuestion)) {
       console.log(`[agentOrchestrator] Off-topic clar: "${userQuestion.slice(0, 60)}"`);
-      async function* refusalStream() {
-        yield { text: 'Această întrebare nu pare legată de construcția sau amenajarea casei tale. ' };
-        yield { text: 'Sunt specializat pe tot ce ține de casa ta: plan, camere, materiale, normative, costuri, autorizații, instalații, finisaje.' };
-        yield { text: '\n\nCe te interesează legat de proiectul tău?' };
-      }
-      return refusalStream();
+      return buildOffTopicRefusalStream();
     }
 
-    const staticNormatives = await normativeCache.load();
+
     const screen = screenContext ?? 'screen1';
     const activeAgents = await detectRequiredAgents(userQuestion, screen);
     console.log(`[agentOrchestrator] Agenți detectați: [${activeAgents.join(', ')}]`);
+
+    // Injectăm contextul de piață în mod automat când ecranul este 'market'
+    let enrichedContextString = contextString;
+    if (screen === 'market') {
+      try {
+        const { marketService } = await import('../../market/marketService');
+        const summary = await marketService.getSummary();
+        enrichedContextString = summary.contextString + '\n\n' + contextString;
+      } catch (e: any) {
+        console.warn('[agentOrchestrator] Nu am putut îmbogăți contextul market:', e.message);
+      }
+    }
 
     const ragContext = await buildRAGContext(
       userQuestion,
@@ -60,55 +68,17 @@ export const agentOrchestrator = {
         '\n\n';
     }
 
-    const label = agentLabel(activeAgents);
-    const editorMentorBlock = screen === 'editor'
-      ? `
-CONTEXT SPECIAL — EDITOR 2D (companioniat activ):
-- Explică DE CE camerele sunt recomandate așa (orientare, relații funcționale, normative NP057).
-- Semnalează greșeli frecvente la compartimentare și cum se evită.
-- Spune ce trebuie verificat înainte de a trece la Faza 3.
-`
-      : '';
-    const prompt = `Ești Zidario, asistent tehnic AI și mentor educațional în construcții.
-ROLUL TĂU STRICT: Utilizatorul tocmai a răspuns la o întrebare tehnică generată pe ecranul curent.
-1. Analizează răspunsul utilizatorului. Indiferent dacă a răspuns perfect sau parțial corect, confirmă și completează răspunsul.
-2. OBLIGATORIU: EXPLICĂ DIRECT, CLAR și DETALIAT toate implicațiile tehnice bazate pe RAG și normative, explicând fiecare detaliu. 
-3. CRITIC: NU îi mai adresa sub nicio formă alte întrebări de verificare. O singură întrebare e suficientă, nu vrem să stresăm utilizatorul. După explicația clară, spune-i pur și simplu că poate continua apăsând pe butonul "Următorul Pas" sau să continue treaba în ecranul curent.
-Domenii active pentru această întrebare: **${label}**
-${statusDisclaimer}
-${
-  historySummary
-    ? `=== CONTEXT PROIECT (din conversații anterioare) ===\n${historySummary}\n`
-    : ''
-}
-CONTEXT CURENT UTILIZATOR (informații preluate automat):
-${contextString}
+    const prompt = buildChatPrompt({
+      userQuestion,
+      contextString: enrichedContextString,
+      conversationHistory,
+      screenContext: screen,
+      historySummary,
+      activeAgents,
+      statusDisclaimer,
 
-LIMITĂ TEHNICĂ CALCULATĂ DETERMINIST (nu o modifica, nu o recalcula):
-- Citește "Maximum tehnic etaje", "Județ", "Localitate" din secțiunea CONTEXT CURENT UTILIZATOR.
-- Această valoare vine din CR6-2013 + P100-1/2013, nu din AI.
-
-OBLIGATORIU când discuți despre numărul de etaje permis:
-1. Prezintă limita tehnică națională din context.
-2. Avertizează că Primăria locală poate impune restricții mai stricte prin PUG.
-3. Recomandă obținerea Certificatului de Urbanism de la Primărie — termen 30 zile, taxă 5-30 RON, temei Legea 50/1991.
-4. Menționează că PUG-ul diferă de la primărie la primărie.
-5. Subliniază că estimările ZIDARIO nu înlocuiesc documentația legală oficială.
-
-NORMATIVE STATICE (CAG — referință fixă, date numerice exacte):
-${staticNormatives}
-
-REGLEMENTĂRI RELEVANTE DIN NORMATIVE (RAG — Hybrid Search: ${label}):
-${ragContext}
-
-${editorMentorBlock}
-
-${historyStr}ÎNTREBARE UTILIZATOR:
-"${userQuestion}"
-
-Răspunde profesional și clar. Explici DE CE înainte de CE.
-Citează sursele exacte când menționezi normative (ex: Conform NP 112-2014, Art. 5.2).
-Folosește limbaj simplu, paragrafe scurte. Markdown: doar bold și liste. NU pune întrebări suplimentare de verificare!`;
+      ragContext,
+    });
 
     let lastError: any = null;
 
@@ -148,7 +118,7 @@ Folosește limbaj simplu, paragrafe scurte. Markdown: doar bold și liste. NU pu
 export async function suggestRoomProgram(input: SuggestRoomsInput): Promise<RoomSuggestion> {
   const targetArea = Math.min(Math.max(input.houseAreaSqm, 40), input.plotAreaSqm);
   
-  const staticNormatives = await normativeCache.load();
+
 
   const purpose = (input.buildingPurpose as BuildingPurpose) ?? 'residential';
   
@@ -175,67 +145,12 @@ export async function suggestRoomProgram(input: SuggestRoomsInput): Promise<Room
     ? contextParts.filter(Boolean).join('\n\n---\n\n')
     : 'Normative generale — zone funcționale și suprafețe minime.';
 
-  const floorsDescription = [
-    input.hasBasement ? 'subsol' : null,
-    'parter',
-    ...Array.from({ length: input.totalFloors - 1 }, (_, i) => `etaj${i + 1}`),
-  ].filter(Boolean).join(' + ');
+  const prompt = buildRoomProgramPrompt({
+    input,
+    ragContext,
 
-  const prompt = `Ești Zidario, expert în proiectare rezidențială română.
-Recomandă programul funcțional optim pentru o locuință.
-Răspunde EXCLUSIV în JSON valid, fără text suplimentar.
-
-DATE PROIECT:
-- Suprafață construită totală: ${targetArea} mp (OBLIGATORIU respectat)
-- Suma suprafețelor camerelor: între ${Math.round(targetArea * 0.80)}–${Math.round(targetArea * 0.92)} mp
-- Structura: ${floorsDescription}
-- Număr persoane: ${input.familySize}
-- Stil arhitectural: ${input.houseStyle}
-- Categorie buget: ${input.budgetCategory}
-- Orientare față de stradă: ${input.streetOrientation}
-
-NORMATIVE ÎN VIGOARE (consultă și respectă obligatoriu):
-${ragContext}
-
-NORMATIVE STATICE (valori numerice exacte):
-${staticNormatives}
-
-REGULI STRICTE DE BUGET (${input.budgetCategory.toUpperCase()}):
-${input.budgetCategory === 'economic' 
-  ? "- Spațiile trebuie să fie EXTREM DE EFICIENTE. Folosește suprafețe individuale FOARTE APROPIATE de minimul legal din Legea Locuinței 114/1996 (ex: Living ~18-20mp, Dormitoare ~10-12mp).\n- FĂRĂ camere extravagante (fără dressinguri mari, fără multiple băi en-suite, fără birouri uriașe).\n- Dacă ai o suprafață totală permisă mare, mai bine adaugi un dormitor util în plus decât să faci un living disproporționat de uriaș (ex: 60mp)."
-  : input.budgetCategory === 'mediu'
-  ? "- Balans între eficiență și confort. Depășește minimele legale cu 20-30% pentru confort sporit (ex: Living ~25-35mp).\n- Permis un birou și un dressing dedicat. Băi decente, compartimentare aerisită."
-  : "- Fără restricții de eficiență extremă. Maximizează luxul și spațiul. Living-uri mari (40+ mp), dormitoare matrimoniale cu baie și dressing propriu (en-suite).\n- Poți adăuga spații de relaxare, spălătorie, terase generoase."}
-
-RĂSPUNDE DOAR CU JSON. ESTE STRICT OBLIGATORIU SĂ INCLUZI TOATE CÂMPURILE PENTRU FIECARE CAMERĂ (dacă nu ai o valoare, folosește null sau []):
-{
-  "rooms": [
-    {
-      "type": "hol",
-      "label": "Hol Intrare",
-      "weightRatio": 1.0,
-      "zone": "distributie",
-      "floor": "parter",
-      "isCirculation": true,
-      "hasStaircase": false,
-      "minSqm": null,
-      "maxSqm": null,
-      "mustAdjacentTo": [],
-      "hasDoorTo": ["living", "bucatarie"], // OBLIGATORIU: Orice cameră trebuie să aibă ușă către minim altă cameră (de obicei hol)
-      "naturalLight": true, // OBLIGATORIU true pentru camere de zi/dormitoare, false pentru debarale/holuri
-      "orientation": [],
-      "reasoning": "citat exact din normativul găsit"
-    }
-  ],
-  "totalEstimatedSqm": 900,
-  "layoutAdvice": "...",
-  "normativeNote": "..."
-}
-
-Tipuri valide 'type': hol, living, bucatarie, dormitor, baie, wc, camara, birou, sala_mese, terasa, debara
-Zone valide: distributie, zi, noapte, tehnic
-Floor valide: parter, etaj1, etaj2, mansarda
-weightRatio: 0.5 (mic) → 4.0 (mare)`;
+    targetArea,
+  });
 
   let lastError: any = null;
 
@@ -252,25 +167,7 @@ weightRatio: 0.5 (mic) → 4.0 (mare)`;
         });
 
         const raw = response.text ?? '';
-        const parsed = JSON.parse(raw) as RoomSuggestion;
-
-        if (!parsed.rooms || !Array.isArray(parsed.rooms) || parsed.rooms.length === 0) {
-          throw new Error('JSON invalid: câmpul "rooms" lipsește sau e gol.');
-        }
-
-        if (parsed.totalEstimatedSqm < targetArea * 0.75) {
-          throw new Error(`Validare eșuată: AI a generat doar ${parsed.totalEstimatedSqm}mp din ${targetArea}mp ceruți.`);
-        }
-
-        const normalizeLabel = (label?: string) => (label ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\\s+/g, '').replace(/[^a-z0-9]/g, '');
-        for (const room of parsed.rooms) {
-          const rule = conformityRules.room_min_sqm.find((r: any) => 
-            r.targets.includes(normalizeLabel(room.type))
-          );
-          if (rule && (room.minSqm === null || room.minSqm < rule.min_sqm)) {
-            room.minSqm = rule.min_sqm; 
-          }
-        }
+        const parsed = validateRoomSuggestion(JSON.parse(raw) as RoomSuggestion, targetArea);
 
         console.log(`[suggestRoomProgram] OK (Model: ${modelName}) — ${parsed.rooms.length} camere, ${input.familySize} pers, stil ${input.houseStyle}.`);
         return parsed;

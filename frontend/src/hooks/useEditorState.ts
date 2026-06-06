@@ -1,11 +1,52 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  generateConfiguratorLayout,
-  calculateShapeArea,
-  type ConfiguratorRoom,
-  type ConfiguratorDimensions,
-} from '../utils/layoutPartitioner';
+import { editorApi } from '../api/editorApi';
+
+export interface ConfiguratorRoom {
+  id: string;
+  label: string;
+  ratioValue: number;
+  minSqm?: number;
+  maxSqm?: number;
+  mustAdjacentTo?: string[];
+  hasDoorTo?: string[];
+  isCirculation?: boolean;
+  hasStaircase?: boolean;
+  naturalLight?: boolean;
+  orientation?: string[];
+  zone?: string;
+}
+
+export interface ConfiguratorDimensions {
+  widthM: number;
+  heightM: number;
+  wingWidthM?: number;
+  wingLengthM?: number;
+}
+
+export function calculateShapeArea(shape: string, dims: ConfiguratorDimensions): number {
+  const w = dims.widthM;
+  const h = dims.heightM;
+  const ww = dims.wingWidthM ?? 4;
+  const wl = dims.wingLengthM ?? 4;
+
+  if (shape === 'rectangle') {
+    return w * h;
+  } else if (shape === 'l_shape') {
+    const w1 = Math.min(ww, w - 2);
+    const h2 = Math.min(wl, h - 2);
+    return w1 * h + (w - w1) * h2;
+  } else if (shape === 'u_shape') {
+    const w1 = Math.min(ww, w / 2.5);
+    const h2 = Math.min(wl, h - 2);
+    return 2 * w1 * h + (w - 2 * w1) * h2;
+  } else if (shape === 't_shape') {
+    const h1 = Math.min(wl, h / 2.2);
+    const w2 = Math.min(ww, w - 2);
+    return w * h1 + w2 * (h - h1);
+  }
+  return w * h;
+}
 
 // ============================================================
 // Constante de scală — 1 pixel canvas = 5cm real
@@ -37,7 +78,7 @@ interface EditorSnapshot {
   timestamp: number;
 }
 
-export type FloorKey = 'parter' | 'etaj1' | 'etaj2' | 'mansarda';
+export type FloorKey = 'parter' | 'etaj1';
 
 export interface ProjectInitData {
   houseStyle?: string | null;
@@ -56,6 +97,7 @@ interface EditorStore {
   isSnapEnabled: boolean;
   showGrid: boolean;
   isDirty: boolean;
+  isLayoutPendingRegeneration: boolean;
 
   // Etaj activ
   activeFloor: FloorKey;
@@ -152,7 +194,7 @@ const INITIAL_DIMS: ConfiguratorDimensions = {
   wingLengthM: 4,
 };
 
-const initialElements = generateConfiguratorLayout(INITIAL_SHAPE, INITIAL_DIMS, DEFAULT_ROOMS);
+const initialElements: CanvasElement[] = [];
 
 export const useEditorState = create<EditorStore>((set, get) => ({
   elements: initialElements,
@@ -164,6 +206,7 @@ export const useEditorState = create<EditorStore>((set, get) => ({
   isSnapEnabled: true,
   showGrid: true,
   isDirty: false,
+  isLayoutPendingRegeneration: false,
   undoStack: [],
   redoStack: [],
 
@@ -342,10 +385,35 @@ export const useEditorState = create<EditorStore>((set, get) => ({
 
   setDimensions: (dims) => {
     get().pushToUndo();
-    set((state) => ({
-      dimensions: { ...state.dimensions, ...dims },
-    }));
-    get().regenerateLayout();
+    const { dimensions: oldDims, elements } = get();
+    const newDims = { ...oldDims, ...dims };
+    
+    // BUG 1 FIX - SCALARE PROPORȚIONALĂ ÎN LOC DE REGENERARE
+    const scaleX = newDims.widthM / oldDims.widthM;
+    const scaleY = newDims.heightM / oldDims.heightM;
+    
+    const newElements = elements.map(el => {
+      const nx = el.x * scaleX;
+      const ny = el.y * scaleY;
+      
+      if (el.type === 'room' || el.type === 'terasa') {
+        return { ...el, x: nx, y: ny, width: el.width * scaleX, height: el.height * scaleY };
+      } else if (el.type === 'wall') {
+        const isHorizontal = el.width > el.height;
+        return { 
+          ...el, 
+          x: nx, 
+          y: ny, 
+          width: isHorizontal ? el.width * scaleX : el.width, 
+          height: isHorizontal ? el.height : el.height * scaleY 
+        };
+      } else {
+        // door, window, staircase
+        return { ...el, x: nx, y: ny };
+      }
+    });
+
+    set({ dimensions: newDims, elements: newElements, isDirty: true });
   },
 
   toggleRoom: (label, checked) => {
@@ -373,56 +441,72 @@ export const useEditorState = create<EditorStore>((set, get) => ({
       newRooms = activeRooms.filter((r) => r.label !== label);
     }
 
-    set({ activeRooms: newRooms });
-    get().regenerateLayout();
+    set({ activeRooms: newRooms, isLayoutPendingRegeneration: true });
   },
 
   updateRoomRatio: (id, ratioValue) => {
     get().pushToUndo();
     const { activeRooms } = get();
     const newRooms = activeRooms.map((r) => (r.id === id ? { ...r, ratioValue } : r));
-    set({ activeRooms: newRooms });
-    get().regenerateLayout();
+    set({ activeRooms: newRooms, isLayoutPendingRegeneration: true });
   },
 
   swapRooms: (id1, id2) => {
     if (id1 === id2) return;
     get().pushToUndo();
-    const { activeRooms } = get();
-    const idx1 = activeRooms.findIndex((r) => r.id === id1);
-    const idx2 = activeRooms.findIndex((r) => r.id === id2);
-
-    if (idx1 !== -1 && idx2 !== -1) {
-      const newRooms = [...activeRooms];
-      const temp = newRooms[idx1];
-      newRooms[idx1] = newRooms[idx2];
-      newRooms[idx2] = temp;
-
-      set({ activeRooms: newRooms });
-      get().regenerateLayout();
+    const { elements } = get();
+    
+    // BUG 2 FIX - SWAP DOAR PE COORDONATE LOCALE (FĂRĂ REGENERARE)
+    const el1 = elements.find(el => el.id === id1);
+    const el2 = elements.find(el => el.id === id2);
+    
+    if (el1 && el2 && el1.type === 'room' && el2.type === 'room') {
+      const newElements = elements.map(el => {
+        if (el.id === id1) {
+          return { ...el, x: el2.x, y: el2.y, width: el2.width, height: el2.height };
+        }
+        if (el.id === id2) {
+          return { ...el, x: el1.x, y: el1.y, width: el1.width, height: el1.height };
+        }
+        return el;
+      });
+      set({ elements: newElements, isDirty: true });
     }
   },
 
   regenerateLayout: () => {
-    const { houseShape, dimensions, activeRooms, streetOrientation, userDeletedOpenings, addedOpenings } = get();
-    let elements = generateConfiguratorLayout(houseShape, dimensions, activeRooms, streetOrientation);
+    set({ isLayoutPendingRegeneration: true });
+    
+    if ((window as any).layoutDebounceTimeout) {
+      clearTimeout((window as any).layoutDebounceTimeout);
+    }
+    
+    (window as any).layoutDebounceTimeout = setTimeout(async () => {
+      const { houseShape, dimensions, activeRooms, streetOrientation, userDeletedOpenings, addedOpenings } = get();
+      try {
+        let elements = await editorApi.generateConfiguratorLayout(houseShape, dimensions, activeRooms, streetOrientation);
 
-    // Filter out deleted openings
-    elements = elements.filter(el => {
-      if (el.type === 'door' || el.type === 'window') {
-        const matchesDeleted = userDeletedOpenings.some(del => {
-          const dist = Math.hypot(el.x - del.x, el.y - del.y);
-          return dist < 10 && el.type === del.type;
+        // Filter out deleted openings
+        elements = elements.filter((el: CanvasElement) => {
+          if (el.type === 'door' || el.type === 'window') {
+            const matchesDeleted = userDeletedOpenings.some(del => {
+              const dist = Math.hypot(el.x - del.x, el.y - del.y);
+              return dist < 10 && el.type === del.type;
+            });
+            return !matchesDeleted;
+          }
+          return true;
         });
-        return !matchesDeleted;
+
+        // Append manually added openings
+        elements = [...elements, ...addedOpenings];
+
+        set({ elements, isDirty: true, isLayoutPendingRegeneration: false });
+      } catch (err) {
+        console.error('Failed to regenerate layout', err);
+        set({ isLayoutPendingRegeneration: false });
       }
-      return true;
-    });
-
-    // Append manually added openings
-    elements = [...elements, ...addedOpenings];
-
-    set({ elements, isDirty: true });
+    }, 300);
   },
 
   initializeFromProject: (project: ProjectInitData) => {

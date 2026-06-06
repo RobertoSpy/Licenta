@@ -33,6 +33,7 @@ export interface ProjectContextInput {
   soilType?: string | null;        // ex: 'Argilos', 'Nisipos', 'Stâncos', 'Pietros'
   frostDepthCm?: number | null;    // ex: 100 — din Faza 1, NP112-2014 Anexa B
   totalFloors?: number | null;     // ex: 2 — numărul de niveluri supraterane
+  hasBasement?: boolean;           // dacă proiectul are subsol
   houseStyle?: string | null;      // ex: 'Modern', 'Industrial'
   energyClass?: string | null;     // ex: 'A'
 }
@@ -258,7 +259,12 @@ export function buildContextMultipliers(
   const soilRule = getSoilRule(input.soilType);
   const foundationWidthM = calcFoundationWidth(floors, soilRule.concreteMult);
   const concreteInfo = calcConcreteClass(ag, frostDepthCm, input.soilType);
-  const frostDepthM = Math.max((frostDepthCm + 10) / 100, 0.80);
+  
+  let frostDepthM = Math.max((frostDepthCm + 10) / 100, 0.80);
+  if (input.hasBasement) {
+    // Dacă avem subsol, adâncimea fundației / săpăturii crește considerabil
+    frostDepthM = 2.80; // adâncime tipică subsol rezidențial
+  }
 
   const interiorWallsM = planMetrics?.interiorWallsM ?? 20 * floors; 
   const countWindows = planMetrics?.countWindows ?? 6 * floors;
@@ -322,6 +328,10 @@ export function buildContextMultipliers(
 
   const soil_note =
     `sol_mult=${soilRule.concreteMult} (${soilRule.label} — ${soilRule._normSource})`;
+
+  if (input.hasBasement) {
+    concreteInfo.note += ' [SĂPĂTURĂ/FUNDAȚIE ADÂNCĂ pt. SUBSOL (2.8m)]';
+  }
 
   return {
     seismic_multiplier:       seismicRule.multiplier,

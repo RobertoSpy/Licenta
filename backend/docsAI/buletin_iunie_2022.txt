@@ -1,0 +1,31 @@
+Sursă: INSSE-BSP-06-2022 | Secțiune: Indicii de cost în construcții și IPPI
+Perioadă: Iunie 2022 | An de bază de referință: 2015=100
+
+CONTEXT MACROECONOMIC IUNIE 2022:
+Rata inflației în luna iunie 2022 comparativ cu luna iunie 2021 a fost de 15,1%. Prețurile mărfurilor nealimentare au crescut în medie cu 17,9%, evoluție propulsată de scumpirile masive la combustibili (+41,3%) și la pachetul energie electrică, gaze și încălzire centrală (+41,1%). Prețurile producției industriale (IPPI) pe total au înregistrat o creștere de 3,1% doar față de luna precedentă (mai 2022).
+
+EVOLUȚIA PREȚURILOR INDUSTRIALE (EFECTUL DE LANȚ ASUPRA MATERIALELOR):
+Comparativ cu luna iunie 2021, prețurile producției industriale (porțile fabricilor) au înregistrat creșteri masive în sectoarele critice pentru piața de construcții:
+- Producția și furnizarea de energie electrică și termică, gaze, apă caldă: +145,8%
+- Industria extractivă (agregate, piatră, nisip, lut): +111,8%
+- Industria prelucrătoare: +27,5%
+
+Pe marile grupe industriale, presiunea directă pe costurile de fabricație se reflectă în următoarele cifre (față de iunie 2021):
+- Industria energetică: +139,6%
+- Industria bunurilor intermediare (categoria oficială ce include ciment, oțel-beton, cărămidă structurală, BCA): +29,6%
+
+INDICII DE COST ÎN CONSTRUCȚII — IUNIE 2022 (Tabelul 15):
+- CONSTRUCȚII - TOTAL: 184,4
+- Clădiri rezidențiale (Total cost compozit): 184,7
+- Costul pur al materialelor de construcții: 186,1 (ancoră critică pentru recalcularea catalogului BOM Zidario)
+- Clădiri nerezidențiale: 188,2
+- Construcții inginerești: 182,6
+
+ELEMENTE DE COST SEMNIFICATIVE JURIDIC (Tabelul 15B / OUG 64/2022):
+- Forța de muncă în construcții (salarii brute): 257,26
+- Coeficient combustibili: 167,30
+- Coeficient energie electrică: 292,64
+- Coeficient energie electrică + gaze: 351,82
+
+CAUZALITATE ȘI INTERPRETARE PENTRU AGENTUL FINANCIAR ZIDARIO:
+În luna iunie 2022, piața construcțiilor din România a fost supusă unui șoc inflaționist sever pe partea de ofertă (Cost-Push Inflation). Explozia tarifelor în industria energetică (+139,6% global și +145,8% pe segmentul electricitate/gaze) a lovit direct fabricile de materiale structurale. Procesele de producție pentru ciment, cărămidă și BCA fiind extrem de energo-intensive, producătorii au fost obligați să transfere aceste costuri în prețul de listă al bunurilor intermediare, generând un salt de +29,6% la poarta fabricii. Acest fenomen explică de ce indicele materialelor din devize a atins valoarea de 186,1. Orice deviz simulat sau calculat pentru această perioadă istorică va reflecta o majorare directă cauzată de acest efect de lanț energetic, la care se adaugă presiunea logistică (combustibili la 167,30) și penuria de personal (forța de muncă indexată la 257,26).

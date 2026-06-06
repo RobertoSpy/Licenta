@@ -1,16 +1,19 @@
 import { Router } from 'express';
 import {
   register,
+  registerContractor,
   login,
   refresh,
   logout,
   forgotPassword,
   resetPassword,
   verifyEmail,
-  resendVerification
+  resendVerification,
+  deleteAccount
 } from './authController';
-import { authEmailLimiter, authIpLimiter, globalLimiter } from '../../core/middleware/rateLimiter';
-import { validateRequest, registerSchema, loginSchema, emailOnlySchema, resetPasswordSchema } from '../../core/middleware/validateMiddleware';
+import { protect } from '../../core/middleware/authMiddleware';
+import { authEmailLimiter, authIpLimiter } from '../../core/middleware/rateLimiter';
+import { validateRequest, registerSchema, registerContractorSchema, loginSchema, emailOnlySchema, resetPasswordSchema, verifyEmailSchema } from '../../core/middleware/validateMiddleware';
 
 const router = Router();
 
@@ -22,6 +25,7 @@ const router = Router();
 // IP-ul cu prag mai mare nu penalizează utilizatorii pe WiFi comun (campus, birou).
 
 router.post('/register', authEmailLimiter, authIpLimiter, validateRequest(registerSchema), register);
+router.post('/register-contractor', authEmailLimiter, authIpLimiter, validateRequest(registerContractorSchema), registerContractor);
 router.post('/login', authEmailLimiter, authIpLimiter, validateRequest(loginSchema), login);
 
 // /refresh nu are email în body → email limiter cade pe IP fallback, deci
@@ -33,10 +37,13 @@ router.post('/forgot-password', authEmailLimiter, authIpLimiter, validateRequest
 router.post('/reset-password', authIpLimiter, validateRequest(resetPasswordSchema), resetPassword);
 
 // Flow verificare email OTP
-router.post('/verify-email', authEmailLimiter, authIpLimiter, verifyEmail);
+router.post('/verify-email', authEmailLimiter, authIpLimiter, validateRequest(verifyEmailSchema), verifyEmail);
 router.post('/resend-verification', authIpLimiter, validateRequest(emailOnlySchema), resendVerification);
 
 // /logout nu necesită rate limiting strict
 router.post('/logout', logout);
+
+// GDPR: Ștergere cont (necesită autentificare + parolă confirmare)
+router.delete('/account', protect, deleteAccount);
 
 export default router;

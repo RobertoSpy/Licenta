@@ -154,24 +154,38 @@ export function extractMetricsFromSnapshot(
   // ── Bounding box ────────────────────────────────────────────────
   const bbox = getBoundingBox(rooms)!;
 
-  // ── Perimetru: al dreptunghiului înscris în bounding box ─────────
-  // Acceptabil pentru forme simple (dreptunghiuri, L, U).
-  // Avertizare în nota BOM că pentru forme complexe e aproximare.
+  // ── Perimetru (Pereți Exteriori) ──────────────────────────────────
+  // Frontend-ul generează elemente de type 'wall' strict pentru conturul exterior (perimeter).
+  const walls = elements.filter(e => e.type === 'wall');
+  
   const bboxWidthM  = (bbox.maxX - bbox.minX) / PIXELS_PER_METER;
   const bboxHeightM = (bbox.maxY - bbox.minY) / PIXELS_PER_METER;
-  const perimeterM  = parseFloat((2 * (bboxWidthM + bboxHeightM)).toFixed(2));
+  
+  let perimeterM = 0;
+  if (walls.length > 0) {
+    // Calcul exact bazat pe pereții exteriori desenați (funcționează perfect pt forme complexe L, U, T)
+    perimeterM = parseFloat(walls.reduce((sum, w) => sum + wallLengthM(w), 0).toFixed(2));
+  } else {
+    // Fallback pentru backward compatibility
+    perimeterM  = parseFloat((2 * (bboxWidthM + bboxHeightM)).toFixed(2));
+  }
 
   // ── Suprafața totală a parterului (suma suprafețelor camerelor) ──
+  let roomsPerimeterM = 0;
   const parterAreaSqm = rooms.reduce((sum, r) => {
-    return sum + (r.width * r.height) / (PIXELS_PER_METER * PIXELS_PER_METER);
+    const wM = r.width / PIXELS_PER_METER;
+    const hM = r.height / PIXELS_PER_METER;
+    roomsPerimeterM += 2 * (wM + hM);
+    return sum + (wM * hM);
   }, 0);
   const totalFloorAreaSqm = parseFloat((parterAreaSqm * floorsCount).toFixed(2));
 
-  // ── Pereți interiori (elemente de tip 'wall') ───────────────────
-  const walls = elements.filter(e => e.type === 'wall');
-  const interiorWallsM = parseFloat(
-    walls.reduce((sum, w) => sum + wallLengthM(w), 0).toFixed(2)
-  );
+  // ── Pereți interiori ─────────────────────────────────────────────
+  // Formula geometrică exactă: Suma perimetrelor tuturor camerelor = Perimetrul Exterior + 2 * Pereții Interiori
+  // (pereții interiori sunt segmentați și împărțiți exact de 2 camere, deci apar de 2 ori în suma perimetrelor)
+  let interiorWallsM = (roomsPerimeterM - perimeterM) / 2;
+  if (interiorWallsM < 0) interiorWallsM = 0;
+  interiorWallsM = parseFloat(interiorWallsM.toFixed(2));
 
   // ── Uși și ferestre ─────────────────────────────────────────────
   const doors   = elements.filter(e => e.type === 'door');

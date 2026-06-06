@@ -1,0 +1,22 @@
+Sursă: INSSE-BSP-12-2021 | Secțiune: Prețurile Producției Industriale și Schimbarea Anului de Bază
+Perioadă: Decembrie 2021 | An de bază de referință: 2021=100 (Punctul Zero)
+
+CONTEXT MACROECONOMIC DECEMBRIE 2021:
+Rata inflației în luna decembrie 2021 comparativ cu luna decembrie 2020 a fost de 8,2%. Prețurile mărfurilor nealimentare au crescut în medie cu 10,73%, trase în sus de prețurile la energie electrică, gaze naturale și combustibili. Prețurile producției industriale (IPPI) pe total piață (internă și externă) au înregistrat un salt masiv de +33,4% față de decembrie 2020, semnalizând presiunea imensă de cost care urma să lovească piața de retail în 2022.
+
+EVOLUȚIA PREȚURILOR INDUSTRIALE (PRE-ÎNCĂLZIREA CRIZEI ENERGETICE):
+Comparativ cu luna decembrie 2020, prețurile din industria energetică erau deja în plină explozie structurală la sfârșitul anului 2021:
+- Producția și furnizarea de energie electrică și termică, gaze, apă caldă: +113,7%
+- Industria extractivă: +70,1%
+- Industria prelucrătoare (marile fabrici): +13,1%
+
+Pe marile grupe industriale, impactul asupra componentelor de construcție la poarta fabricii (față de decembrie 2020):
+- Industria energetică: +94,2%
+- Industria bunurilor intermediare ( include ciment, oțel-beton, cărămidă, blocuri ceramice, BCA): +19,2%
+
+INDICII DE COST ÎN CONSTRUCȚII — CALIBRARE AN DE BAZĂ 2021:
+Conform metodologiei europene, decembrie 2021 reprezintă luna de încheiere a anului de calcul utilizat pentru fixarea ponderilor structurale. Toți indicii de cost din noua serie (tabelul CNS107D) se raportează la media acestui an stabilită ca bază contractuală rigidă: Valoarea 100.0.
+
+CAUZALITATE ȘI INTERPRETARE PENTRU AGENTUL FINANCIAR ZIDARIO:
+Acest fragment reprezintă „Ancora de Stabilitate” sau „Punctul Zero” în algoritmul de corecție din Faza 3 a platformei BuildWise. Datele arată clar că, deși pe șantiere prețurile materialelor păreau încă sub control la finele anului 2021 (bunurile intermediare erau la +19,2%), în spatele cortinei, la producători, se acumulase un șoc energetic devastator (+113,7% la energie și gaze). 
+Agentul financiar trebuie să utilizeze acest chunk pentru a modela simulările predictive pentru orizontul 2030: decembrie 2021 este momentul în care panta liniară de creștere a prețurilor a fost ruptă definitiv. Orice prognoză pe termen lung va folosi această lună ca referință pentru a diferenția o piață cu inflație organică de o piață deformată de șocuri externe de ofertă (Supply-Side Shock).

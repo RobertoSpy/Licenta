@@ -9,6 +9,20 @@ datasource db {
   extensions = [vector]
 }
 
+enum UserRole {
+  CLIENT
+  CONTRACTOR
+  ADMIN
+}
+
+enum QuoteStatus {
+  PENDING
+  SENT
+  ACCEPTED
+  REJECTED
+  NEGOTIATING
+}
+
 model User {
   id           Int       @id @default(autoincrement())
   email        String    @unique
@@ -20,8 +34,10 @@ model User {
   isVerified           Boolean   @default(false)
   verificationToken    String?
   verificationExpires  DateTime?
-  role                 String    @default("user")
+  role                 UserRole  @default(CLIENT)
   projects     Project[]
+  contractor   ContractorProfile?
+  reviewsGiven ContractorReview[] @relation("ClientReviews")
   createdAt    DateTime  @default(now())
 }
 
@@ -62,6 +78,7 @@ model Project {
   upperFloorsCount Int       @default(0)
   hasMansard       Boolean   @default(false)
   totalFloors      Int?      // calculat: basement(0/1) + parter(1) + etaje + mansardÄƒ(0/1)
+  budgetCategory   String    @default("mediu") // "economic" | "mediu"
 
   // Starea Wizard-ului â€” DB este sursa de adevÄƒr
   wizardStep   Int     @default(1)
@@ -85,6 +102,7 @@ model Project {
   materialOverrides  ProjectMaterialOverride[]
   bomPhaseProgress   BomPhaseProgress?
   bomIntroCache      BomIntroCache?
+  contractorQuotes   ContractorQuote[]
 
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -103,12 +121,23 @@ model Material {
   pricePerUnit Float    // RON (prețul de bază din seedMaterials, actualizat prin scraping)
   brand        String?  // "Ytong" | "Tondach" | "Porta Doors"
   storeUrl     String?  // URL produs direct în magazin
-  imageUrl     String?  // URL imagine produs
   description  String?  // scurtă descriere tehnică
   uValue       Float?   // coeficient transmitanță termică (W/m²K) pentru calcul energetic
   isDefault    Boolean  @default(false) // materialul implicit pentru categoria sa
   inStock      Boolean  @default(true)
   stockQuantity Float?
+
+  // 1. Metadate Normative (Extrase via RAG/LLM)
+  compressiveStrength  Float?   // N/mm² — pt CR6-2013
+  minSeismicZone       Float?   // ex: 0.25 (g) pt comparații ușoare
+  maxFloors            Int?     // Număr maxim etaje permise
+  normativeCode        String?  // Sursa normativă, ex: "CR6-2013"
+  performanceClass     String?  // "economic" | "mediu"
+  
+  // 2. Observabilitate și Siguranță (AI Governance)
+  isVerified           Boolean  @default(false) // Necesită validare umană pt STRICT_NORMATIVE
+  extractionConfidence Float?   // Scorul de încredere oferit de LLM la extracție
+  extractionSource     String?  // Documentul din care s-a extras (ex: "Fisa_Ytong.pdf")
   
   alternatives Material[] @relation("MaterialAlternatives") // materiale alternative similare
   alternativeOf Material[] @relation("MaterialAlternatives")
@@ -280,4 +309,101 @@ model PlanSnapshot {
   createdAt DateTime @default(now())
 
   @@index([projectId])
+}
+
+// === MARKET INTELLIGENCE — Date CNS107D (INSSE) și Prognoze AI ===
+
+/// Un punct de indice cost din seria CNS107D (INSSE).
+/// Seeduit o singură dată din exportPivot_CNS107D.csv via npm run seed:market.
+/// indexValue este indicele oficial (baza mobilă: ian 2005 ≈ 38, 2021=100, mar 2026 ≈ 161).
+model MarketIndexPoint {
+  id         Int    @id @default(autoincrement())
+  year       Int    // ex: 2022
+  month      Int    // 1-12
+  /// 'rezidential' | 'nerezidential' | 'total_cladiri' | 'total_materiale'
+  category   String
+  indexValue Float  // valoarea indicelui CNS107D
+
+  @@unique([year, month, category])
+  @@index([category])
+  @@index([year])
+}
+
+/// Cache pentru prognoza AI (regenerată lunar, nu la fiecare request).
+/// Salvăm JSON-ul complet pentru a evita apeluri Gemini repetate.
+model MarketForecastCache {
+  id           Int      @id @default(autoincrement())
+  generatedAt  DateTime @default(now())
+  forecastJson String   // JSON serializat { years: [...], verdict: '...', methodology: '...' }
+  modelUsed    String   @default("gemini-1.5-pro")
+  isValid      Boolean  @default(true)
+
+  @@index([generatedAt])
+}
+
+// === MODULUL 3 — CONSTRUCTORI (MARKETPLACE) ===
+
+model ContractorProfile {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  companyName    String
+  cui            String?  // CUI firma
+  description    String?  // despre firmă, experiență
+  specializations String[] // ["Fundații", "Structuri", "Finisaje", "La cheie"]
+  county         String   // județul de operare principal
+  coverageRadius Int      @default(50) // km raza de acoperire
+  
+  yearsExperience Int?
+  completedProjects Int @default(0)
+  avgRating      Float   @default(0)
+  
+  portfolioUrls  String[] // link-uri către portofoliu (Instagram, FB, site)
+  certifications  String[] // "ISO 9001", "Constructor autorizat"
+  
+  isVerified     Boolean  @default(false) // verificat de admin (b2b onboarding)
+  isActive       Boolean  @default(true)
+  
+  quotes         ContractorQuote[]
+  reviews        ContractorReview[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ContractorQuote {
+  id              Int      @id @default(autoincrement())
+  contractorId    Int
+  contractor      ContractorProfile @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  projectId       Int
+  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  status          QuoteStatus @default(PENDING)
+  
+  totalAmount     Float?   // oferta financiară
+  executionDays   Int?     // durata estimată în zile
+  message         String?  // mesajul constructorului
+  
+  // Constructorul poate accepta BOM-ul sau propune variații
+  acceptsBOM      Boolean  @default(false)
+  bomVariations   Json?    // [{formulaKey, suggestedMaterial, newPrice, note}]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([contractorId, projectId])
+}
+
+model ContractorReview {
+  id           Int      @id @default(autoincrement())
+  contractorId Int
+  contractor   ContractorProfile @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  reviewerId   Int      // userId client
+  reviewer     User     @relation("ClientReviews", fields: [reviewerId], references: [id], onDelete: Cascade)
+  projectId    Int?
+  rating       Int      // 1-5
+  comment      String?
+  createdAt    DateTime @default(now())
+  
+  @@unique([contractorId, reviewerId, projectId])
 }

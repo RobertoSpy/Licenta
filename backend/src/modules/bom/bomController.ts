@@ -384,7 +384,8 @@ export const bomAdvisorChat = async (req: Request, res: Response): Promise<void>
     const bomText = bomItems.map(item => {
       const noteParts = item.note?.split('||EXPLAIN||') || [];
       const explanation = noteParts.length > 1 ? noteParts[1].trim() : '';
-      return `- Faza: ${item.phase} | Material: ${item.material?.name} | Cantitate: ${item.quantity} ${item.material?.unit} ${explanation ? '| Motivare: ' + explanation : ''}`;
+      const materialDesc = item.material?.description ? ` | Info material: ${item.material.description}` : '';
+      return `- Faza: ${item.phase} | Material: ${item.material?.name} | Cantitate: ${item.quantity} ${item.material?.unit} ${explanation ? '| Motivare: ' + explanation : ''}${materialDesc}`;
     }).join('\n');
 
     const contextString = contextLines.length > 0

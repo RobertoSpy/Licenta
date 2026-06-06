@@ -26,7 +26,7 @@ export interface SuggestedRoom {
   label: string;
   weightRatio: number;
   zone: 'distributie' | 'zi' | 'noapte' | 'tehnic';
-  floor: 'parter' | 'etaj1' | 'etaj2' | 'mansarda';
+  floor: 'parter' | 'etaj1';
   reasoning: string;
   minSqm: number;
   maxSqm: number;
@@ -45,7 +45,7 @@ export interface RoomSuggestion {
   normativeNote: string;
 }
 
-export type BudgetCategory = 'economic' | 'mediu' | 'premium';
+export type BudgetCategory = 'economic' | 'mediu';
 
 
 export const aiApi = {

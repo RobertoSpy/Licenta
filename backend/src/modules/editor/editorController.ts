@@ -17,7 +17,7 @@ export const createSnapshot = async (req: Request, res: Response) => {
       return;
     }
 
-    const validFloors = ['parter', 'etaj1', 'etaj2', 'mansarda'];
+    const validFloors = ['parter', 'etaj1'];
     const safeFloor = validFloors.includes(floor) ? floor : 'parter';
 
     const snapshot = await editorService.saveSnapshot(projectId, planJSON, safeFloor, label);
@@ -36,8 +36,8 @@ export const listSnapshots = async (req: Request, res: Response) => {
   try {
     const projectId = parseInt(req.params.projectId as string);
     const floor = req.query.floor as string | undefined;
-    const validFloors = ['parter', 'etaj1', 'etaj2', 'mansarda'];
-    const safeFloor = floor && validFloors.includes(floor) ? floor as 'parter' | 'etaj1' | 'etaj2' | 'mansarda' : undefined;
+    const validFloors = ['parter', 'etaj1'];
+    const safeFloor = floor && validFloors.includes(floor) ? floor as 'parter' | 'etaj1' : undefined;
 
     const snapshots = await editorService.listSnapshots(projectId, safeFloor);
     res.json(snapshots);
@@ -81,8 +81,8 @@ export const getLatestSnapshot = async (req: Request, res: Response) => {
   try {
     const projectId = parseInt(req.params.projectId as string);
     const floor = req.query.floor as string | undefined;
-    const validFloors = ['parter', 'etaj1', 'etaj2', 'mansarda'];
-    const safeFloor = floor && validFloors.includes(floor) ? floor as 'parter' | 'etaj1' | 'etaj2' | 'mansarda' : undefined;
+    const validFloors = ['parter', 'etaj1'];
+    const safeFloor = floor && validFloors.includes(floor) ? floor as 'parter' | 'etaj1' : undefined;
 
     const snapshot = await editorService.getLatestSnapshot(projectId, safeFloor);
     res.json(snapshot ?? null);
@@ -244,3 +244,28 @@ export const generateLayout = async (req: Request, res: Response): Promise<void>
     res.status(500).json({ message: 'Eroare la generarea planului', details: error.message });
   }
 };
+
+/**
+ * POST /api/editor/generate-configurator-layout
+ * API port from frontend layoutPartitioner.ts
+ */
+import { generateConfiguratorLayout as runPartitioner } from '../../core/services/layout/layoutPartitioner';
+
+export const generateConfiguratorLayout = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { shape, dimensions, rooms, streetOrientation } = req.body;
+    
+    if (!shape || !dimensions || !rooms) {
+      res.status(400).json({ message: 'shape, dimensions, și rooms sunt obligatorii.' });
+      return;
+    }
+
+    const elements = runPartitioner(shape, dimensions, rooms, streetOrientation || 'S');
+
+    res.json({ elements });
+  } catch (error: any) {
+    console.error('[EditorController] Eroare layout partitioner:', error);
+    res.status(500).json({ message: 'Eroare la generarea planului detaliat', details: error.message });
+  }
+};
+

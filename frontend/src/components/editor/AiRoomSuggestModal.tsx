@@ -14,7 +14,6 @@ import {
 import { aiApi, type RoomSuggestion, type BudgetCategory } from '../../api/aiApi';
 import { useEditorState } from '../../hooks/useEditorState';
 import { editorApi, type FloorKey } from '../../api/editorApi';
-import { generateConfiguratorLayout } from '../../utils/layoutPartitioner';
 
 interface Props {
   projectId: number;
@@ -25,8 +24,7 @@ interface Props {
 
 const BUDGET_OPTIONS: { value: BudgetCategory; label: string; desc: string; color: string }[] = [
   { value: 'economic', label: 'Economic',  desc: 'Camere esențiale, suprafețe minime', color: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
-  { value: 'mediu',    label: 'Mediu',      desc: 'Confort bun, spații generoase',       color: 'border-blue-300 bg-blue-50 text-blue-800'         },
-  { value: 'premium',  label: 'Premium',    desc: 'Birou, dressing, sală de mese',       color: 'border-purple-300 bg-purple-50 text-purple-800'   },
+  { value: 'mediu',    label: 'Normal',    desc: 'Confort bun, spații generoase',      color: 'border-blue-300 bg-blue-50 text-blue-800'         },
 ];
 
 const ZONE_COLORS: Record<string, string> = {
@@ -83,19 +81,30 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
     if (!suggestion) return;
     setIsSavingFloors(true);
 
-    // FIX — Problema 1: Calculăm dimensiunile casei din houseAreaSqm ales de user (ratio 4:3).
-    // Dacă user-ul a ajustat manual dimensiunile ȘI footprint-ul e mai mare, le respectăm.
-    const sqmPerFloor = Math.round(houseAreaSqm / Math.max(1, totalFloors));
-    const autoWidthM  = parseFloat(Math.sqrt(sqmPerFloor * (4 / 3)).toFixed(1));
-    const autoHeightM = parseFloat((sqmPerFloor / autoWidthM).toFixed(1));
+    // Grupăm camerele AI pe etaje
+    const FLOOR_ORDER: FloorKey[] = ['parter', 'etaj1'];
+    const byFloor: Record<string, typeof suggestion.rooms> = {};
+    for (const room of suggestion.rooms) {
+      const f = room.floor ?? 'parter';
+      if (!byFloor[f]) byFloor[f] = [];
+      byFloor[f].push(room);
+    }
+    // Fallback: dacă parterul e gol, punem toate camerele acolo
+    if (!byFloor['parter'] || byFloor['parter'].length === 0) {
+      byFloor['parter'] = suggestion.rooms;
+    }
 
-    // Dacă dimensiunile existente din store produc o suprafață mult prea mică față de sqmPerFloor,
-    // înlocuim cu valorile calculate din houseAreaSqm.
-    const existingArea = dimensions.widthM * dimensions.heightM;
-    const useAuto = existingArea < sqmPerFloor * 0.6;
+    // FIX — Problema 1 & 2: Calculăm dimensiunile corecte ale amprentei per etaj.
+    // Ne bazăm strict pe suprafața estimată de AI împărțită la numărul de etaje distincte.
+    const floorsCount = Object.keys(byFloor).length || 1;
+    const sqmPerFloor = suggestion.totalEstimatedSqm / floorsCount;
+    
+    // Calculăm dimensiuni proporționale (raport 1.3)
+    const autoHeightM = Math.sqrt(sqmPerFloor / 1.3);
+    const autoWidthM  = autoHeightM * 1.3;
 
-    const finalWidthM  = useAuto ? autoWidthM  : dimensions.widthM;
-    const finalHeightM = useAuto ? autoHeightM : dimensions.heightM;
+    const finalWidthM  = Math.round(autoWidthM * 10) / 10;
+    const finalHeightM = Math.round(autoHeightM * 10) / 10;
 
     const dims = {
       widthM:     finalWidthM,
@@ -107,18 +116,7 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
     // Actualizăm store-ul (și implicit canvas-ul) cu noile dimensiuni
     setDimensions(dims);
 
-    // Grupăm camerele AI pe etaje
-    const FLOOR_ORDER: FloorKey[] = ['parter', 'etaj1', 'etaj2', 'mansarda'];
-    const byFloor: Record<string, typeof suggestion.rooms> = {};
-    for (const room of suggestion.rooms) {
-      const f = room.floor ?? 'parter';
-      if (!byFloor[f]) byFloor[f] = [];
-      byFloor[f].push(room);
-    }
-    // Fallback: dacă parterul e gol, punem toate camerele acolo
-    if (!byFloor['parter'] || byFloor['parter'].length === 0) {
-      byFloor['parter'] = suggestion.rooms;
-    }
+
 
     try {
       // Generăm și salvăm fiecare etaj în ordine
@@ -141,7 +139,7 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
           mustAdjacentTo:  r.mustAdjacentTo  ?? [],
         }));
 
-        const floorElements = generateConfiguratorLayout(houseShape, dims, configRooms, streetOrientation);
+        const floorElements = await editorApi.generateConfiguratorLayout(houseShape, dims, configRooms, streetOrientation);
         await editorApi.saveFloor(projectId, floorKey, floorElements, `AI — ${floorKey}`);
       }
 
@@ -174,7 +172,7 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
         maxSqm:          r.maxSqm          ?? undefined,
         mustAdjacentTo:  r.mustAdjacentTo  ?? [],
       }));
-      const parterElements = generateConfiguratorLayout(houseShape, dims, parterConfigRooms, streetOrientation);
+      const parterElements = await editorApi.generateConfiguratorLayout(houseShape, dims, parterConfigRooms, streetOrientation);
       switchFloor('parter', parterElements);
       setActiveRooms(parterRooms);
 

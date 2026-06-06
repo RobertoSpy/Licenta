@@ -7,6 +7,6 @@ export const getAi = () => {
   return aiInstance;
 };
 
-export const FALLBACK_MODELS_CHAT = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+export const FALLBACK_MODELS_CHAT = ['gemini-2.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash'];
 export const FALLBACK_MODELS_JSON = ['gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-1.5-flash'];
 export const MAX_RETRIES_PER_MODEL = 2;

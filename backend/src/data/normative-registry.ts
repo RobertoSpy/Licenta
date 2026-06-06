@@ -39,7 +39,8 @@ export type AgentType =
   | 'energetic'  // Phase 3 placeholder — AGENT_SOURCES gol, nu face query DB
   | 'materiale'  // Phase 3 placeholder — AGENT_SOURCES gol, nu face query DB
   | 'instalatii' // I9-2022 (sanitare) si I7-2011 (electrice)
-  | 'deviz';     // Phase 3 placeholder — AGENT_SOURCES gol, nu face query DB
+  | 'deviz'      // Phase 3 placeholder — AGENT_SOURCES gol, nu face query DB
+  | 'financial'; // Market Intelligence — buletine INSSE + indici cost CNS107D
 
 export interface NormativeConfig {
   defaultAgent: AgentType;
@@ -238,6 +239,48 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
       { pattern: /curent|electric|tensiune|cablu|priză|iluminat|tablou|împământare/i, agent: 'instalatii' },
     ],
   },
+
+  // ─── Agent Financiar — Analiză piață construcții România ───
+  // Sursele sunt buletine INSSE (txt) și PDF-uri cu indici cost CNS107D.
+  // Indexate cu agent='financial' în NormativeChunk.
+  'BULETIN-INSSE-2021': {
+    defaultAgent: 'financial',
+    skipPatterns: [],
+    agentRules: [
+      { pattern: /inflație|indice|cost|material|energie|piață|buget|prognoză/i, agent: 'financial' },
+    ],
+  },
+  'BULETIN-INSSE-2022-IUN': {
+    defaultAgent: 'financial',
+    skipPatterns: [],
+    agentRules: [
+      { pattern: /inflație|indice|cost|material|energie|piață|buget|prognoză/i, agent: 'financial' },
+    ],
+  },
+  'BULETIN-INSSE-2022-IUL': {
+    defaultAgent: 'financial',
+    skipPatterns: [],
+    agentRules: [
+      { pattern: /inflație|indice|cost|material|energie|piață|buget|prognoză/i, agent: 'financial' },
+    ],
+  },
+  'BULETIN-INSSE-2026': {
+    defaultAgent: 'financial',
+    skipPatterns: [],
+    agentRules: [
+      { pattern: /inflație|indice|cost|material|energie|piață|buget|prognoză/i, agent: 'financial' },
+    ],
+  },
+  'INDICII-COST': {
+    defaultAgent: 'financial',
+    skipPatterns: [],
+    agentRules: [],
+  },
+  'ANEXE-4': {
+    defaultAgent: 'financial',
+    skipPatterns: [],
+    agentRules: [],
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -261,8 +304,15 @@ export const NORMATIVE_FILES: Record<string, string> = {
   'NP057-2002':    '17_18_NP_057_2002.md',
   'I9-2022':       '45 NORMATIV I9 - 2022.pdf',
   'I7-2011':       'Normativ-pentru-proiectarea-executia-si-exploatarea-instalatiilor-electrice-aferente-cladirilor-indicativ-I-7—2011.pdf',
-  'MC001-2022':    'Mc-001-2022-Metodologie-calcul-performanta-energetica-cladiri.pdf',
-  'Legea372-2005': 'legea-nr-372-2005-privind-performanta-energetica-a-cladirilor.pdf',
+  'MC001-2022':         'Mc-001-2022-Metodologie-calcul-performanta-energetica-cladiri.pdf',
+  'Legea372-2005':      'legea-nr-372-2005-privind-performanta-energetica-a-cladirilor.pdf',
+  // Agent Financial — buletine INSSE și indici cost
+  'BULETIN-INSSE-2021':     'buletin_decembrie_2021.txt',
+  'BULETIN-INSSE-2022-IUN': 'buletin_iunie_2022.txt',
+  'BULETIN-INSSE-2022-IUL': 'buletin_iulie_2022.txt',
+  'BULETIN-INSSE-2026':     'buletin_martie_2026.txt',
+  'INDICII-COST':           'Indicii-cost-in-constructii.pdf',
+  'ANEXE-4':                'ANEXE-4.pdf',
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -290,6 +340,7 @@ export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType,
     instalatii:    ['I9-2022', 'I7-2011'],
     materiale:     [],
     deviz:         [],
+    financial:     ['BULETIN-INSSE-2021', 'BULETIN-INSSE-2022-IUN', 'BULETIN-INSSE-2022-IUL', 'BULETIN-INSSE-2026', 'INDICII-COST', 'ANEXE-4'],
   },
   commercial: {
     architectural: ['CR1-1-4-2012', 'P100-1-2013', 'Legea350-2001', 'P118-99', 'NP051-2012'],
@@ -302,6 +353,7 @@ export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType,
     instalatii:    ['I9-2022', 'I7-2011'],
     materiale:     [],
     deviz:         [],
+    financial:     ['BULETIN-INSSE-2021', 'BULETIN-INSSE-2022-IUN', 'BULETIN-INSSE-2022-IUL', 'BULETIN-INSSE-2026', 'INDICII-COST', 'ANEXE-4'],
   },
   mixed: {
     architectural: ['CR1-1-4-2012', 'P100-1-2013', 'Legea350-2001', 'P118-99', 'NP051-2012', 'NP057-2002'],
@@ -314,5 +366,6 @@ export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType,
     instalatii:    ['I9-2022', 'I7-2011'],
     materiale:     [],
     deviz:         [],
+    financial:     ['BULETIN-INSSE-2021', 'BULETIN-INSSE-2022-IUN', 'BULETIN-INSSE-2022-IUL', 'BULETIN-INSSE-2026', 'INDICII-COST', 'ANEXE-4'],
   },
 };

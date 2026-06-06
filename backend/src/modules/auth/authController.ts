@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { userRepository } from './userRepository';
 import { sendPasswordResetEmail, sendVerificationEmail } from './emailService';
+import { AuthRequest } from '../../core/middleware/authMiddleware';
+import { prisma } from '../../lib/prisma';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -63,6 +65,82 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   } catch (error) {
     console.error('Eroare la înregistrare:', error);
+    res.status(500).json({ message: 'Eroare internă a serverului' });
+  }
+};
+
+export const registerContractor = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, password, name, companyName, cui, county, specializations, coverageRadius } = req.body;
+
+    if (!email || !password || !companyName || !cui || !county) {
+      res.status(400).json({ message: 'Toate câmpurile esențiale sunt obligatorii' });
+      return;
+    }
+
+    const isStrongPassword = password.length >= 8 &&
+      /[A-Z]/.test(password) &&
+      /[0-9]/.test(password) &&
+      /[^A-Za-z0-9]/.test(password);
+
+    if (!isStrongPassword) {
+      res.status(400).json({ message: 'Parola nu este suficient de puternică.' });
+      return;
+    }
+
+    const existingUser = await userRepository.findByEmail(email);
+    if (existingUser) {
+      res.status(409).json({ message: 'Un cont cu acest email există deja' });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Tranzacție — creăm user + profil contractor atomic
+    const newUser = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          name,
+          role: 'CONTRACTOR' as any,
+          isVerified: false // Verificare email normală
+        }
+      });
+
+      await tx.contractorProfile.create({
+        data: {
+          userId: user.id,
+          companyName,
+          cui,
+          county,
+          specializations: specializations || [],
+          coverageRadius: coverageRadius || 50,
+          isVerified: false // Verificare administrativă CUI separat
+        }
+      });
+
+      return user;
+    });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+    await userRepository.saveVerificationToken(
+      newUser.id,
+      hashedOtp,
+      new Date(Date.now() + 15 * 60 * 1000)
+    );
+
+    await sendVerificationEmail(email, otp);
+
+    res.status(201).json({
+      message: 'Cont de constructor creat. Te rugăm să verifici emailul.',
+      user: { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role }
+    });
+
+  } catch (error) {
+    console.error('Eroare la înregistrare constructor:', error);
     res.status(500).json({ message: 'Eroare internă a serverului' });
   }
 };
@@ -323,4 +401,38 @@ export const resendVerification = async (req: Request, res: Response) => {
   await sendVerificationEmail(email, otp);
 
   return res.status(200).json({ message: 'Un nou cod de verificare a fost trimis.' });
+};
+
+// DELETE ACCOUNT — GDPR: Dreptul de a fi uitat
+export const deleteAccount = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { password } = req.body;
+
+    if (!password) {
+      res.status(400).json({ message: 'Parola este obligatorie pentru confirmare.' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      res.status(404).json({ message: 'Utilizator inexistent.' });
+      return;
+    }
+
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      res.status(401).json({ message: 'Parolă incorectă. Contul nu a fost șters.' });
+      return;
+    }
+
+    // Ștergem utilizatorul — CASCADE va șterge profilul, proiectele, ofertele etc.
+    await prisma.user.delete({ where: { id: userId } });
+
+    res.clearCookie('refreshToken');
+    res.status(200).json({ message: 'Contul și toate datele asociate au fost șterse permanent.' });
+  } catch (error) {
+    console.error('deleteAccount error:', error);
+    res.status(500).json({ message: 'Eroare la ștergerea contului.' });
+  }
 };

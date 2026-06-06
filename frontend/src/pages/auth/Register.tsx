@@ -11,13 +11,19 @@ export const Register = () => {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'CLIENT', // 'CLIENT' | 'CONTRACTOR'
+    companyName: '',
+    cui: '',
+    county: ''
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedGdpr, setAcceptedGdpr] = useState(false);
   const navigate = useNavigate();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -73,12 +79,37 @@ export const Register = () => {
       return;
     }
 
+    if (!acceptedTerms || !acceptedGdpr) {
+      setError('Trebuie să accepți Termenii și Condițiile și Politica de Confidențialitate (GDPR) pentru a continua.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      await api.post('/auth/register', {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password
-      });
+      if (formData.role === 'CONTRACTOR') {
+        if (!formData.companyName || !formData.cui || !formData.county) {
+          setError('Firma, CUI-ul și Județul sunt obligatorii pentru constructori.');
+          setIsLoading(false);
+          return;
+        }
+        await api.post('/auth/register-contractor', {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          companyName: formData.companyName,
+          cui: formData.cui,
+          county: formData.county,
+          specializations: ['General'],
+          coverageRadius: 50
+        });
+      } else {
+        await api.post('/auth/register', {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password
+        });
+      }
+      
       // După înregistrare, redirecționăm către ecranul de verificare email
       navigate('/verify-email', { state: { email: formData.email } });
     } catch (err: unknown) {
@@ -134,12 +165,37 @@ export const Register = () => {
               </div>
             )}
 
+            <div className="flex gap-4 mb-4">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, role: 'CLIENT' })}
+                className={`flex-1 py-3 px-4 rounded-xl border-2 font-medium transition-colors ${
+                  formData.role === 'CLIENT' 
+                    ? 'border-buildorange bg-orange-50 text-buildorange' 
+                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                }`}
+              >
+                Sunt Client
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, role: 'CONTRACTOR' })}
+                className={`flex-1 py-3 px-4 rounded-xl border-2 font-medium transition-colors ${
+                  formData.role === 'CONTRACTOR' 
+                    ? 'border-buildorange bg-orange-50 text-buildorange' 
+                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                }`}
+              >
+                Sunt Constructor
+              </button>
+            </div>
+
             <Input
               label="Nume Complet"
               name="name"
               type="text"
               icon={<User className="w-5 h-5" />}
-              placeholder="ex. Ion Popescu"
+              placeholder={formData.role === 'CONTRACTOR' ? 'Nume Reprezentant' : 'ex. Ion Popescu'}
               value={formData.name}
               onChange={handleChange}
               required
@@ -155,6 +211,50 @@ export const Register = () => {
               onChange={handleChange}
               required
             />
+
+            {formData.role === 'CONTRACTOR' && (
+              <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h4 className="text-sm font-semibold text-slate-700">Detalii Firmă</h4>
+                <Input
+                  label="Denumire Firmă"
+                  name="companyName"
+                  type="text"
+                  icon={<Building2 className="w-5 h-5" />}
+                  placeholder="SC Construct SRL"
+                  value={formData.companyName}
+                  onChange={handleChange}
+                  required
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="CUI / CIF"
+                    name="cui"
+                    type="text"
+                    placeholder="RO123456"
+                    value={formData.cui}
+                    onChange={handleChange}
+                    required
+                  />
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Județ</label>
+                    <select
+                      name="county"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-buildorange outline-none"
+                      value={formData.county}
+                      onChange={handleChange}
+                      required
+                    >
+                      <option value="">Alege Județ</option>
+                      <option value="Bucuresti">București</option>
+                      <option value="Cluj">Cluj</option>
+                      <option value="Timis">Timiș</option>
+                      <option value="Iasi">Iași</option>
+                      <option value="Ilfov">Ilfov</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-4">
@@ -204,7 +304,41 @@ export const Register = () => {
               )}
             </div>
 
-            <Button type="submit" className="w-full mt-4" size="lg" isLoading={isLoading} disabled={passwordStrength < 4}>
+            {/* GDPR & Terms Checkboxes */}
+            <div className="space-y-3 pt-2 pb-1">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={e => setAcceptedTerms(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-buildorange focus:ring-buildorange"
+                />
+                <span className="text-sm text-slate-600 leading-snug">
+                  Am citit și sunt de acord cu{' '}
+                  <Link to="/terms" target="_blank" className="font-semibold text-buildorange hover:underline">
+                    Termenii și Condițiile
+                  </Link>
+                  {' '}de utilizare.
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={acceptedGdpr}
+                  onChange={e => setAcceptedGdpr(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-buildorange focus:ring-buildorange"
+                />
+                <span className="text-sm text-slate-600 leading-snug">
+                  Am luat la cunoștință{' '}
+                  <Link to="/privacy" target="_blank" className="font-semibold text-buildorange hover:underline">
+                    Politica de Confidențialitate (GDPR)
+                  </Link>
+                  {' '}și sunt de acord cu prelucrarea datelor mele personale.
+                </span>
+              </label>
+            </div>
+
+            <Button type="submit" className="w-full mt-4" size="lg" isLoading={isLoading} disabled={passwordStrength < 4 || !acceptedTerms || !acceptedGdpr}>
               Creează Cont
             </Button>
           </form>

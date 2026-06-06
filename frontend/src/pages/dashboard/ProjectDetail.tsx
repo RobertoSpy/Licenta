@@ -37,6 +37,7 @@ interface Project {
   hasMansard?: boolean;
   totalFloors?: number;
   planStatus?: string;
+  bomGeneratedAt?: string;
 }
 
 const containerVariants = {
@@ -133,12 +134,15 @@ export const ProjectDetail = () => {
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">{project.title}</h1>
             <div className="flex items-center gap-3 mt-1">
               <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                project.isCompleted
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-amber-100 text-amber-700'
+                project.bomGeneratedAt ? 'bg-purple-100 text-purple-700' :
+                project.planStatus === 'published' ? 'bg-emerald-100 text-emerald-700' :
+                project.isCompleted ? 'bg-blue-100 text-blue-700' :
+                'bg-amber-100 text-amber-700'
               }`}>
-                {project.isCompleted ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                {project.isCompleted ? 'Completat' : `În Progres (Pasul ${project.wizardStep}/4)`}
+                {!project.isCompleted && <><Clock className="w-3 h-3" /> Faza 1 (Pasul {project.wizardStep}/4)</>}
+                {project.isCompleted && project.planStatus !== 'published' && <><CheckCircle2 className="w-3 h-3" /> Faza 2 din 4</>}
+                {project.planStatus === 'published' && !project.bomGeneratedAt && <><CheckCircle2 className="w-3 h-3" /> Faza 3 din 4</>}
+                {project.bomGeneratedAt && <><CheckCircle2 className="w-3 h-3" /> Faza 4 din 4</>}
               </div>
               <span className="text-sm text-slate-400">Creat {new Date(project.createdAt).toLocaleDateString('ro-RO')}</span>
             </div>

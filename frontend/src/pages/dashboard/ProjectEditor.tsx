@@ -4,6 +4,7 @@ import { useEditorState } from '../../hooks/useEditorState';
 import { useRoomCalculator } from '../../hooks/useRoomCalculator';
 import { useEditorAutoSave } from '../../hooks/useEditorAutoSave';
 import { useConformityCheck } from '../../hooks/useConformityCheck';
+import { useAutoFix } from '../../hooks/useAutoFix';
 import { EditorCanvas } from '../../components/editor/EditorCanvas';
 import { EditorToolbar } from '../../components/editor/EditorToolbar';
 import { EditorRoomsPanel } from '../../components/editor/EditorRoomsPanel';
@@ -102,7 +103,11 @@ export const ProjectEditor: React.FC = () => {
   // Stare dialog label
   const [labelDialog, setLabelDialog] = useState<{ id: string; x: number; y: number } | null>(null);
 
-  const { elements, updateElement, markClean, isDirty, undo, redo, deleteSelected, setTool, setZoom, initializeFromProject, activeFloor, switchFloor } = useEditorState();
+  const { 
+    elements, updateElement, markClean, isDirty, undo, redo, deleteSelected, 
+    setTool, setZoom, initializeFromProject, activeFloor, switchFloor,
+    activeRooms, dimensions, houseShape, updateRoomRatio, regenerateLayout 
+  } = useEditorState();
   const rooms = useRoomCalculator(elements);
   const doors = elements
     .filter((el) => el.type === 'door')
@@ -120,6 +125,19 @@ export const ProjectEditor: React.FC = () => {
     warningIssues,
     isPending: isConformityPending,
   } = useConformityCheck(rooms, doors, elements, projectData?.buildingPurpose as string);
+
+  // Auto-Fix AI
+  const { applyAutoFix, previewModal, setPreviewModal } = useAutoFix({
+    elements,
+    activeRooms,
+    violationIssues,
+    warningIssues,
+    dimensions,
+    houseShape,
+    updateElement,
+    updateRoomRatio,
+    regenerateLayout
+  });
 
   // Auto-save
   useEditorAutoSave(projectId);
@@ -319,10 +337,8 @@ export const ProjectEditor: React.FC = () => {
           const pd = projectData;
           const floors: { key: FloorKey; label: string }[] = [];
           if (pd?.hasGroundFloor !== false) floors.push({ key: 'parter', label: FLOOR_LABELS.parter });
-          const upper = Number(pd?.upperFloorsCount ?? 0);
+          const upper = Math.min(Number(pd?.upperFloorsCount ?? 0), 1);
           if (upper >= 1) floors.push({ key: 'etaj1', label: FLOOR_LABELS.etaj1 });
-          if (upper >= 2) floors.push({ key: 'etaj2', label: FLOOR_LABELS.etaj2 });
-          if (pd?.hasMansard) floors.push({ key: 'mansarda', label: FLOOR_LABELS.mansarda });
           if (floors.length <= 1) return null;
           return (
             <>
@@ -429,6 +445,7 @@ export const ProjectEditor: React.FC = () => {
             violations={violations}
             violationIssues={violationIssues}
             warningIssues={warningIssues}
+            onAutoFix={applyAutoFix}
           />
         </div>
 
@@ -457,6 +474,54 @@ export const ProjectEditor: React.FC = () => {
         />
       )}
 
+      {/* Auto-Fix Preview Modal */}
+      {previewModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-slate-900 text-white p-4 flex items-center gap-2">
+              <span className="text-xl">✨</span>
+              <h3 className="font-bold">Auto-Fix AI: Redesenare Necesară</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600">
+                {previewModal.message}
+              </p>
+              
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Camere Ajustate:</p>
+                <ul className="space-y-1">
+                  {previewModal.affectedRooms.map((room, idx) => (
+                    <li key={idx} className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                      {room}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-3 text-amber-800 text-sm">
+                <span className="text-lg">⚠️</span>
+                <p><strong>Atenție:</strong> Modificările tale manuale de pe plan se vor pierde la regenerare.</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  onClick={previewModal.onCancel}
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  Anulează
+                </button>
+                <button
+                  onClick={previewModal.onConfirm}
+                  className="px-5 py-2 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-md transition-colors"
+                >
+                  Confirmă Redesenare
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

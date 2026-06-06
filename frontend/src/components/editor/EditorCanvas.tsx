@@ -131,10 +131,13 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>, id: string) => {
     const node = e.target;
 
+    const originalEl = elements.find(el => el.id === id);
+    if (!originalEl) return;
+
     const nodeX = node.x();
     const nodeY = node.y();
-    const nodeW = node.width();
-    const nodeH = node.height();
+    const nodeW = originalEl.width;
+    const nodeH = originalEl.height;
 
     let closestRoomId: string | null = null;
     let maxOverlapRatio = 0;
@@ -175,26 +178,7 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
   }, [elements, swapRooms]);
 
   // ── Magnetic Snapping during drag ────────────────────────────────────
-  const dragBoundFunc = useCallback((pos: Konva.Vector2d, nodeWidth: number, nodeHeight: number, id: string) => {
-    let { x, y } = pos;
-    const snapThreshold = 15; // magnetic radius
 
-    for (const el of elements) {
-      if (el.id === id) continue;
-      if (el.type !== 'room' && el.type !== 'wall' && el.type !== 'terasa') continue;
-
-      // Vertical snapping (X axis)
-      if (Math.abs(x - (el.x + el.width)) < snapThreshold) x = el.x + el.width; // Snap left edge to right edge
-      else if (Math.abs((x + nodeWidth) - el.x) < snapThreshold) x = el.x - nodeWidth; // Snap right edge to left edge
-      else if (Math.abs(x - el.x) < snapThreshold) x = el.x; // Snap left to left
-
-      // Horizontal snapping (Y axis)
-      if (Math.abs(y - (el.y + el.height)) < snapThreshold) y = el.y + el.height; // Snap top edge to bottom edge
-      else if (Math.abs((y + nodeHeight) - el.y) < snapThreshold) y = el.y - nodeHeight; // Snap bottom edge to top edge
-      else if (Math.abs(y - el.y) < snapThreshold) y = el.y; // Snap top to top
-    }
-    return { x, y };
-  }, [elements]);
 
   return (
     <Stage
@@ -212,12 +196,12 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
         {renderBackground()}
       </Layer>
 
-      {/* Layer 2 — Elements */}
+      {/* Layer 2 — Rooms and Terraces (Bottom) */}
       <Layer>
-        {elements.map((el) => {
-          const isSelected = selectedId === el.id;
-
-          if (el.type === 'room' || el.type === 'terasa') {
+        {elements
+          .filter((el) => el.type === 'room' || el.type === 'terasa')
+          .map((el) => {
+            const isSelected = selectedId === el.id;
             const isTerasa = el.type === 'terasa';
             let fill, stroke, labelColor;
 
@@ -240,7 +224,6 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
                 y={el.y}
                 draggable={true}
                 onDragStart={(e) => e.target.moveToTop()}
-                dragBoundFunc={(pos) => dragBoundFunc(pos, el.width, el.height, el.id)}
                 onDragEnd={(e) => handleDragEnd(e, el.id)}
                 onClick={() => selectElement(el.id)}
                 onTap={() => selectElement(el.id)}
@@ -295,145 +278,143 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
                 </Group>
               </Group>
             );
-          }
+          })}
+      </Layer>
 
-          if (el.type === 'wall') {
-            const isVirtual = el.metadata?.isVirtualBoundary === true;
-            return (
-              <Rect
-                key={el.id}
-                id={el.id}
-                x={el.x}
-                y={el.y}
-                width={el.width}
-                height={el.height}
-                fill={isVirtual ? 'transparent' : OPENING_COLORS.wall.fill}
-                stroke={isSelected ? '#ef4444' : (isVirtual ? '#cbd5e1' : OPENING_COLORS.wall.stroke)}
-                strokeWidth={isSelected ? 2 : (isVirtual ? 1 : 1)}
-                dash={isVirtual ? [4, 4] : undefined}
-                listening={true}
-                onClick={() => selectElement(el.id)}
-                onTap={() => selectElement(el.id)}
-              />
-            );
-          }
+      {/* Layer 3 — Walls and Openings (Top) */}
+      <Layer>
+        {elements
+          .filter((el) => el.type !== 'room' && el.type !== 'terasa')
+          .map((el) => {
+            const isSelected = selectedId === el.id;
 
-          if (el.type === 'door') {
-            // FIX — Problema 2: Reuşa este elementul principal vizibil (80cm largă sau înaltă),
-            // nu grosimea peretelui. Afişăm un dreptunghi mai mare cu arca de rotire.
-            const isVertical = el.height > el.width; // door is in a vertical wall
-            const colors = OPENING_COLORS.door;
-
-            // The door leaf: always at DOOR width (90cm = 18px) on the "open" dimension
-            const doorLeafSizePx = Math.round(0.9 * 20); // 18px = 90cm
-
-            return (
-              <Group
-                key={el.id}
-                id={el.id}
-                x={el.x}
-                y={el.y}
-                listening={true}
-                onClick={() => selectElement(el.id)}
-                onTap={() => selectElement(el.id)}
-              >
-                {/* Door frame — the thin wall-thickness rect */}
+            if (el.type === 'wall') {
+              const isVirtual = el.metadata?.isVirtualBoundary === true;
+              return (
                 <Rect
+                  key={el.id}
+                  id={el.id}
+                  x={el.x}
+                  y={el.y}
                   width={el.width}
                   height={el.height}
-                  fill={isSelected ? '#fef08a' : colors.fill}
-                  stroke={isSelected ? '#ef4444' : colors.stroke}
-                  strokeWidth={isSelected ? 2.5 : 1.5}
-                  cornerRadius={1}
+                  fill={isVirtual ? 'transparent' : OPENING_COLORS.wall.fill}
+                  stroke={isSelected ? '#ef4444' : (isVirtual ? '#cbd5e1' : OPENING_COLORS.wall.stroke)}
+                  strokeWidth={isSelected ? 2 : (isVirtual ? 1 : 1)}
+                  dash={isVirtual ? [4, 4] : undefined}
+                  listening={true}
+                  onClick={() => selectElement(el.id)}
+                  onTap={() => selectElement(el.id)}
                 />
-                {/* Door leaf swing arc — drawn perpendicular to wall */}
-                {isVertical ? (
-                  // Vertical wall: door opens left-right
-                  <>
-                    <Rect
-                      x={-doorLeafSizePx + el.width / 2}
-                      y={0}
-                      width={doorLeafSizePx}
-                      height={el.height}
-                      fill={isSelected ? '#fef9c3' : '#fffbeb'}
-                      stroke={colors.stroke}
-                      strokeWidth={1.5}
-                      cornerRadius={1}
-                    />
-                    {/* Arc indicator */}
-                    <Line
-                      points={[el.width / 2, 0, el.width / 2 - doorLeafSizePx, el.height, el.width / 2, el.height]}
-                      stroke={colors.stroke}
-                      strokeWidth={1}
-                      dash={[4, 3]}
-                      opacity={0.6}
-                    />
-                  </>
-                ) : (
-                  // Horizontal wall: door opens up-down
-                  <>
-                    <Rect
-                      x={0}
-                      y={-doorLeafSizePx + el.height / 2}
-                      width={el.width}
-                      height={doorLeafSizePx}
-                      fill={isSelected ? '#fef9c3' : '#fffbeb'}
-                      stroke={colors.stroke}
-                      strokeWidth={1.5}
-                      cornerRadius={1}
-                    />
-                    <Line
-                      points={[0, el.height / 2, el.width, el.height / 2 - doorLeafSizePx, el.width, el.height / 2]}
-                      stroke={colors.stroke}
-                      strokeWidth={1}
-                      dash={[4, 3]}
-                      opacity={0.6}
-                    />
-                  </>
-                )}
-              </Group>
-            );
-          }
+              );
+            }
 
-          if (el.type === 'window') {
-            const isVertical = el.width < el.height;
-            const colors = OPENING_COLORS.window;
-            return (
-              <Group
-                key={el.id}
-                id={el.id}
-                x={el.x}
-                y={el.y}
-                listening={true}
-                onClick={() => selectElement(el.id)}
-                onTap={() => selectElement(el.id)}
-              >
-                <Rect
-                  width={el.width}
-                  height={el.height}
-                  fill={isSelected ? '#bae6fd' : colors.fill}
-                  stroke={isSelected ? '#ef4444' : colors.stroke}
-                  strokeWidth={isSelected ? 2.5 : 1.5}
-                  cornerRadius={1}
-                />
-                {/* Window pane dividers */}
-                {isVertical ? (
-                  <>
-                    <Line points={[0, el.height / 3, el.width, el.height / 3]} stroke={colors.stroke} strokeWidth={1} />
-                    <Line points={[0, (el.height / 3) * 2, el.width, (el.height / 3) * 2]} stroke={colors.stroke} strokeWidth={1} />
-                  </>
-                ) : (
-                  <>
-                    <Line points={[el.width / 3, 0, el.width / 3, el.height]} stroke={colors.stroke} strokeWidth={1} />
-                    <Line points={[(el.width / 3) * 2, 0, (el.width / 3) * 2, el.height]} stroke={colors.stroke} strokeWidth={1} />
-                  </>
-                )}
-              </Group>
-            );
-          }
+            if (el.type === 'door') {
+              const isVertical = el.height > el.width;
+              const colors = OPENING_COLORS.door;
+              const doorLeafSizePx = Math.round(0.9 * 20);
 
-          return null;
-        })}
+              return (
+                <Group
+                  key={el.id}
+                  id={el.id}
+                  x={el.x}
+                  y={el.y}
+                  listening={true}
+                  onClick={() => selectElement(el.id)}
+                  onTap={() => selectElement(el.id)}
+                >
+                  <Rect
+                    width={el.width}
+                    height={el.height}
+                    fill={isSelected ? '#fef08a' : colors.fill}
+                    stroke={isSelected ? '#ef4444' : colors.stroke}
+                    strokeWidth={isSelected ? 2.5 : 1.5}
+                    cornerRadius={1}
+                  />
+                  {isVertical ? (
+                    <>
+                      <Rect
+                        x={-doorLeafSizePx + el.width / 2}
+                        y={0}
+                        width={doorLeafSizePx}
+                        height={el.height}
+                        fill={isSelected ? '#fef9c3' : '#fffbeb'}
+                        stroke={colors.stroke}
+                        strokeWidth={1.5}
+                        cornerRadius={1}
+                      />
+                      <Line
+                        points={[el.width / 2, 0, el.width / 2 - doorLeafSizePx, el.height, el.width / 2, el.height]}
+                        stroke={colors.stroke}
+                        strokeWidth={1}
+                        dash={[4, 3]}
+                        opacity={0.6}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Rect
+                        x={0}
+                        y={-doorLeafSizePx + el.height / 2}
+                        width={el.width}
+                        height={doorLeafSizePx}
+                        fill={isSelected ? '#fef9c3' : '#fffbeb'}
+                        stroke={colors.stroke}
+                        strokeWidth={1.5}
+                        cornerRadius={1}
+                      />
+                      <Line
+                        points={[0, el.height / 2, el.width, el.height / 2 - doorLeafSizePx, el.width, el.height / 2]}
+                        stroke={colors.stroke}
+                        strokeWidth={1}
+                        dash={[4, 3]}
+                        opacity={0.6}
+                      />
+                    </>
+                  )}
+                </Group>
+              );
+            }
+
+            if (el.type === 'window') {
+              const isVertical = el.width < el.height;
+              const colors = OPENING_COLORS.window;
+              return (
+                <Group
+                  key={el.id}
+                  id={el.id}
+                  x={el.x}
+                  y={el.y}
+                  listening={true}
+                  onClick={() => selectElement(el.id)}
+                  onTap={() => selectElement(el.id)}
+                >
+                  <Rect
+                    width={el.width}
+                    height={el.height}
+                    fill={isSelected ? '#bae6fd' : colors.fill}
+                    stroke={isSelected ? '#ef4444' : colors.stroke}
+                    strokeWidth={isSelected ? 2.5 : 1.5}
+                    cornerRadius={1}
+                  />
+                  {isVertical ? (
+                    <>
+                      <Line points={[0, el.height / 3, el.width, el.height / 3]} stroke={colors.stroke} strokeWidth={1} />
+                      <Line points={[0, (el.height / 3) * 2, el.width, (el.height / 3) * 2]} stroke={colors.stroke} strokeWidth={1} />
+                    </>
+                  ) : (
+                    <>
+                      <Line points={[el.width / 3, 0, el.width / 3, el.height]} stroke={colors.stroke} strokeWidth={1} />
+                      <Line points={[(el.width / 3) * 2, 0, (el.width / 3) * 2, el.height]} stroke={colors.stroke} strokeWidth={1} />
+                    </>
+                  )}
+                </Group>
+              );
+            }
+
+            return null;
+          })}
       </Layer>
     </Stage>
   );
