@@ -1,0 +1,499 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for ai/services/agentRouter.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">ai/services</a> agentRouter.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">59.7% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>40/67</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">64.86% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>24/37</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">80% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>4/5</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">60.31% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>38/63</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line medium'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { AgentType } from '../../../data/normative-registry';
+import { embeddingService } from './embeddingService';
+&nbsp;
+export const AGENT_DESCRIPTIONS: Partial&lt;Record&lt;AgentType, string&gt;&gt; = {
+  geotehnic: "Informații despre sol, fundații, pământ, infiltrații, tasare, studiu geotehnic, foraje și adâncimea de îngheț.",
+  seismic: "Cutremure, siguranță seismică, zonare, rezistență la cutremur, spectru de răspuns și parametri seismici.",
+  structural: "Structura de rezistență, materiale de construcție, beton, armătură, fier, zidărie, stâlpi, grinzi, planșee și acoperiș.",
+  architectural: "Design, arhitectură, planul casei, spații, compartimentare, scări, uși, ferestre, fațadă, iluminat, ventilare și funcționalitate.",
+  legal: "Legislație, autorizații de construire, certificat de urbanism, primărie, vecini, retrageri, limite de proprietate, suprafețe minime legale și avize.",
+  deviz: "Costuri, prețuri, buget, estimare financiară, cheltuieli, oferte și achiziții de materiale.",
+  energetic: "Eficiență energetică, clasă energetică, izolație termică, audit energetic, norme NZEB, consum energie.",
+  instalatii: "Instalații electrice, sanitare, apă rece, caldă, canalizare, prize, cabluri, tablouri electrice, conducte și țevi.",
+  financial: "Analiză financiară, piața construcțiilor, inflație, indici de preț INSSE, costuri pe metru pătrat, prognoze, evoluția prețurilor, moment optim de construire."
+};
+&nbsp;
+let cachedAgentEmbeddings: Record&lt;string, number[]&gt; | null = null;
+&nbsp;
+function <span class="fstat-no" title="function not covered" >cosineSimilarity(</span>vecA: number[], vecB: number[]): number {
+  let dotProduct = <span class="cstat-no" title="statement not covered" >0;</span>
+  let normA = <span class="cstat-no" title="statement not covered" >0;</span>
+  let normB = <span class="cstat-no" title="statement not covered" >0;</span>
+<span class="cstat-no" title="statement not covered" >  for (let i = <span class="cstat-no" title="statement not covered" >0;</span> i &lt; vecA.length; i++) {</span>
+<span class="cstat-no" title="statement not covered" >    dotProduct += vecA[i] * vecB[i];</span>
+<span class="cstat-no" title="statement not covered" >    normA += vecA[i] * vecA[i];</span>
+<span class="cstat-no" title="statement not covered" >    normB += vecB[i] * vecB[i];</span>
+  }
+<span class="cstat-no" title="statement not covered" >  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));</span>
+}
+&nbsp;
+const OFF_TOPIC_PATTERNS = [
+  /reteta|rețetă|gatit|gătit|mancare|mâncare|restaurant|pizza|prajitura|prăjitură/i,
+  /politica|politică|alegeri|partid|premier|presedinte|președinte|guvern|stire|știre/i,
+  /fotbal|baschet|tenis|handbal|olimpiada|olimpiadă|meci|echipa de fotbal/i,
+  /film|serial|muzica|muzică|actor|cantaret|cântăreț|concert|celebrity|influencer/i,
+  /diagnostic|medicament|boala|boală|spital|tratament|simptome/i,
+  /criptomoneda|criptomonedă|actiuni|acțiuni|bursa|bursă|forex|trading/i,
+];
+&nbsp;
+export function isOffTopic(message: string): boolean {
+  return OFF_TOPIC_PATTERNS.some(pattern =&gt; pattern.test(message));
+}
+&nbsp;
+export const SCREEN_AGENTS: Record&lt;string, AgentType[]&gt; = {
+  screen1: ['geotehnic', 'seismic'],
+  screen2: ['geotehnic', 'seismic'],
+  screen3: ['seismic', 'structural', 'legal'],
+  screen4: ['legal', 'architectural'],
+  editor:  ['legal', 'structural', 'instalatii', 'architectural'],
+  bom:     ['structural', 'materiale', 'deviz', 'energetic', 'instalatii'],
+  timeline:['legal', 'structural'],
+  energy:  ['energetic', 'structural', 'instalatii'],
+  market:  ['financial', 'deviz'],  // Analiză piață construcții
+  wizard:  ['geotehnic', 'seismic', 'architectural', 'legal'], // Pentru asistentul din configuratorul de proiect
+};
+&nbsp;
+export async function detectRequiredAgents(
+  question: string,
+  screen: string
+): Promise&lt;AgentType[]&gt; {
+  const q = question.toLowerCase();
+  const agents = new Set&lt;AgentType&gt;();
+&nbsp;
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (/sol|teren|fundati|fundare|inghet|îngheț|adancime|adâncime|argilos|nisipos|pietros|stancos|stâncos|apa freatica|apă freatică|infiltrar|geotehni|capacitate portant|tasar|foraj|studiu geotehnic|pamant|pământ|alunecare|umiditate/i.test(q)) {
+<span class="cstat-no" title="statement not covered" >    agents.add('geotehnic');</span>
+  }
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (/seismic|cutremur|etaj|inaltime cladire|înălțime clădire|zona|ag\b|tc\b|accelerati|spectru seismic|risc seismic|richter|zguduial/i.test(q)) {
+<span class="cstat-no" title="statement not covered" >    agents.add('seismic');</span>
+  }
+  if (/zidarie|zidărie|beton|armar|perete structural|zia\b|zna\b|zc\b|dch\b|dcm\b|grosime|rezistent|cleme|fixare|ancor|sutiune|suțiune|smulgere|stalp|stâlp|grinda|grindă|planseu|planșeu|fier|etrier|placa|placă|turnare|ciment|caramida|cărămidă|bca|sarpanta|șarpantă|caprior/i.test(q)) {
+    agents.add('structural');
+  }
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (/plan|regularitate|simetrie|categorie.*teren|rugozitate|expunere|vant|vânt|tip.*acoperis|acoperiș|forma|formă|design|aspect|compartimentare|scara|scară|hol|fereastra|fereastră|usa|ușă|iluminat|ventilare|fatada|fațadă/i.test(q)) {
+<span class="cstat-no" title="statement not covered" >    agents.add('architectural');</span>
+  }
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (/suprafata|suprafață|metru patrat|metru pătrat|\bmp\b|camera|cameră|living|dormitor|baie|bucatarie|bucătărie|minim legal|legea|autorizati|pug\b|puz\b|pud\b|urbanism|aviz|certificat|primarie|primărie|norme|reguli|retragere|limita proprietate|vecin|calcan|gard|aprobare/i.test(q)) {
+<span class="cstat-no" title="statement not covered" >    agents.add('legal');</span>
+  }
+  if (/cost|pret|preț|deviz|buget|estimare|mc\b|metru cub|cheltuieli|achiziti|cumpar|magazin|materiale|oferta/i.test(q)) {
+    agents.add('deviz');
+    agents.add('materiale');
+  }
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (/clasa energetica|clasă energetică|izolati|izolație|consum energie|kwh|nzeb|audit energetic|eficient|termic|vata|vată|eps|xps|polistiren|u-value|transmitant/i.test(q)) {
+<span class="cstat-no" title="statement not covered" >    agents.add('energetic');</span>
+  }
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (/instalati|sanitar|apa rece|apa calda|apă rece|apă caldă|canalizare|teava|țeavă|conducta|conductă|electric|curent|priza|priză|cablu|intrerupator|întrerupător|tablou electric|iluminat/i.test(q)) {
+<span class="cstat-no" title="statement not covered" >    agents.add('instalatii');</span>
+  }
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (/inflatie|inflație|indice cost|\bcns\b|insse|pret constructie|preț constructie|cost.*mp|când.*construi|cand.*construi|moment.*optim|piata constructii|piața construcțiilor|prognoze|forecast|material.*s-a scumpit|cat.*costa.*2027|cât.*costă.*202[78]|construi.*acum|merita.*acum/i.test(q)) {
+<span class="cstat-no" title="statement not covered" >    agents.add('financial');</span>
+  }
+&nbsp;
+  if (agents.size === 0) {
+    try {
+      if (!cachedAgentEmbeddings) {
+        cachedAgentEmbeddings = {};
+        for (const [agent, desc] of Object.entries(AGENT_DESCRIPTIONS)) {
+          cachedAgentEmbeddings[agent] = await embeddingService.embed(desc);
+        }
+      }
+&nbsp;
+      const questionEmbedding = await embeddingService.embed(question);
+      let foundSemantic = <span class="cstat-no" title="statement not covered" >false;</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >      for (const [agent, vector] of Object.entries(cachedAgentEmbeddings)) {</span>
+        const similarity = <span class="cstat-no" title="statement not covered" >cosineSimilarity(questionEmbedding, vector);</span>
+<span class="cstat-no" title="statement not covered" >        if (similarity &gt; 0.60) {</span>
+<span class="cstat-no" title="statement not covered" >          console.log(`[detectRequiredAgents] Semantic Match -&gt; Agent: ${agent} (Scor: ${similarity.toFixed(2)}) pentru "${question}"`);</span>
+<span class="cstat-no" title="statement not covered" >          agents.add(agent as AgentType);</span>
+<span class="cstat-no" title="statement not covered" >          foundSemantic = true;</span>
+          
+<span class="cstat-no" title="statement not covered" >          if (agent === 'deviz') <span class="cstat-no" title="statement not covered" >agents.add('materiale');</span></span>
+        }
+      }
+      
+<span class="cstat-no" title="statement not covered" >      if (foundSemantic) {</span>
+<span class="cstat-no" title="statement not covered" >        console.log(`[detectRequiredAgents] Agenți din semantic: [${[...agents].join(', ')}]`);</span>
+      }
+    } catch (e: any) {
+      console.error('[detectRequiredAgents] Eroare la clasificarea semantică:', e.message);
+    }
+  }
+&nbsp;
+  if (agents.size === 0 &amp;&amp; screen &amp;&amp; SCREEN_AGENTS[screen]) {
+    SCREEN_AGENTS[screen].forEach(a =&gt; agents.add(a));
+    console.log(`[detectRequiredAgents] Fallback pe screen "${screen}": [${[...agents].join(', ')}]`);
+  }
+&nbsp;
+  // Pe ecranul de market, forțăm agentul financiar să fie prezent oricum
+  if (screen === 'market') {
+    agents.add('financial');
+  }
+&nbsp;
+  if (agents.size === 0) {
+    agents.add('legal');
+  }
+&nbsp;
+  return [...agents];
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-06-06T17:17:45.766Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

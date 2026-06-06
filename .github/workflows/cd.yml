@@ -1,0 +1,39 @@
+name: CD - Continuous Deployment
+
+# Declanșează acest CD DOAR dacă CI-ul a trecut cu Succes pe branch-ul main!
+on:
+  workflow_run:
+    workflows: ["CI - Continuous Integration"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  deploy-to-production:
+    name: Deploy to Server/Cloud
+    # Ne asigurăm că workflow-ul de CI s-a terminat efectiv cu status de succes
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # EXEMPLU: Dacă am folosi Vercel pentru Frontend
+    - name: Deploy Frontend to Vercel
+      uses: amondnet/vercel-action@v20
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: ./frontend
+        vercel-args: '--prod'
+
+    # EXEMPLU: Dacă am publica imaginile backend pe Docker Hub sau AWS
+    - name: Build and Push Backend Docker Image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend
+        push: false # (Schimbat pe true în cazul real dacă avem Docker Hub conectat)
+        tags: roberto/licenta-backend:latest
