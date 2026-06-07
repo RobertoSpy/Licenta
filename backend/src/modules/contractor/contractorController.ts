@@ -17,7 +17,12 @@ export const getContractors = async (req: Request, res: Response) => {
 
 export const getContractorById = async (req: Request, res: Response) => {
   try {
-    const contractor = await contractorService.getContractorById(Number(req.params.id));
+    const contractorId = parseInt(req.params.id as string);
+    if (isNaN(contractorId)) {
+      return res.status(400).json({ message: 'ID constructor invalid' });
+    }
+
+    const contractor = await contractorService.getContractorById(contractorId);
     if (!contractor) {
       return res.status(404).json({ message: 'Constructorul nu a fost găsit' });
     }
@@ -57,22 +62,34 @@ export const addReview = async (req: AuthRequest, res: Response) => {
   try {
     const reviewerId = req.user!.id;
     const contractorId = parseInt(req.params.id as string);
+    if (isNaN(contractorId)) {
+      return res.status(400).json({ message: 'ID constructor invalid' });
+    }
+
     const { rating, comment, projectId } = req.body;
 
-    if (!rating || rating < 1 || rating > 5) {
+    if (!rating || !Number.isInteger(rating) || rating < 1 || rating > 5) {
       return res.status(400).json({ message: 'Rating invalid' });
     }
 
-    if (!projectId) {
+    if (!comment || typeof comment !== 'string' || comment.trim().length === 0 || comment.length > 1000) {
+      return res.status(400).json({ message: 'Comentariu invalid' });
+    }
+
+    const parsedProjectId = parseInt(projectId as string);
+    if (isNaN(parsedProjectId)) {
       return res.status(400).json({ message: 'Proiectul trebuie specificat' });
     }
 
-    const review = await contractorService.addReview(contractorId, reviewerId, rating, comment, projectId);
+    const review = await contractorService.addReview(contractorId, reviewerId, rating, comment, parsedProjectId);
     res.json({ success: true, review });
   } catch (error: any) {
     console.error('addReview error:', error);
     if (error.message === 'NOT_AUTHORIZED_OR_NO_ACCEPTED_QUOTE') {
       return res.status(403).json({ message: 'Nu poți lăsa o recenzie fără un contract acceptat pe acest proiect.' });
+    }
+    if (error.message === 'ALREADY_REVIEWED') {
+      return res.status(409).json({ message: 'Ai lăsat deja o recenzie pentru acest proiect.' });
     }
     res.status(500).json({ message: 'Eroare la adăugarea recenziei' });
   }

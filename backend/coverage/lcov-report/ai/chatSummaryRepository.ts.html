@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -113,17 +113,15 @@
 <a name='L48'></a><a href='#L48'>48</a>
 <a name='L49'></a><a href='#L49'>49</a>
 <a name='L50'></a><a href='#L50'>50</a>
-<a name='L51'></a><a href='#L51'>51</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L51'></a><a href='#L51'>51</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -134,9 +132,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -153,7 +151,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -163,15 +163,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { prisma } from '../../lib/prisma';</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { prisma } from '../../lib/prisma';
 &nbsp;
-export const <span class="cstat-no" title="statement not covered" >chatSummaryRepository = {</span>
+export const chatSummaryRepository = {
   /**
    * Returnează un singur rezumat pentru combinația (projectId, phase, screen).
    * Folosit la mount-ul unui ecran pentru a restaura contextul conversației.
    */
-  async <span class="fstat-no" title="function not covered" >getOne(</span>projectId: number, phase: string, screen: string | null) {
-<span class="cstat-no" title="statement not covered" >    return prisma.chatSummary.findUnique({</span>
+  async getOne(projectId: number, phase: string, screen: string | null) {
+    return prisma.chatSummary.findUnique({
       where: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         projectId_phase_screen: { projectId, phase, screen } as any
@@ -183,8 +183,8 @@ export const <span class="cstat-no" title="statement not covered" >chatSummaryRe
    * Returnează rezumatele pentru un set de screen-uri (dependențe).
    * Folosit pentru a construi contextul cross-screen la mount.
    */
-  async <span class="fstat-no" title="function not covered" >getMany(</span>projectId: number, screens: string[]) {
-<span class="cstat-no" title="statement not covered" >    return prisma.chatSummary.findMany({</span>
+  async getMany(projectId: number, screens: string[]) {
+    return prisma.chatSummary.findMany({
       where: {
         projectId,
         screen: { in: screens }
@@ -197,13 +197,13 @@ export const <span class="cstat-no" title="statement not covered" >chatSummaryRe
    * Creează sau actualizează rezumatul pentru (projectId, phase, screen).
    * Apelat automat de useZidarioChat la fiecare 10 mesaje.
    */
-  async <span class="fstat-no" title="function not covered" >upsert(</span>
+  async upsert(
     projectId: number,
     phase: string,
     screen: string | null,
     summary: string
   ) {
-<span class="cstat-no" title="statement not covered" >    return prisma.chatSummary.upsert({</span>
+    return prisma.chatSummary.upsert({
       where: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         projectId_phase_screen: { projectId, phase, screen } as any
@@ -220,7 +220,7 @@ export const <span class="cstat-no" title="statement not covered" >chatSummaryRe
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-06T17:17:45.766Z
+                at 2026-06-07T13:53:16.339Z
             </div>
         <script src="../prettify.js"></script>
         <script>

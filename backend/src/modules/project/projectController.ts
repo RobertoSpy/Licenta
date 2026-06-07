@@ -30,7 +30,7 @@ export const getUserProjects = async (req: AuthRequest, res: Response): Promise<
 // tenantGuard a verificat ownership și a atașat proiectul la req.project
 export const getProjectById = async (req: AuthRequest, res: Response): Promise<void> => {
   // tenantGuard garantează că req.project este întotdeauna populat pe această rută
-  res.json((req as any).project);
+  res.json(req.project);
 };
 
 // Actualizare proiect
@@ -38,7 +38,7 @@ export const getProjectById = async (req: AuthRequest, res: Response): Promise<v
 export const updateProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const projectId = parseInt(req.params.id as string);
-    const updatedProject = await projectService.updateProject(projectId, req.body);
+    const updatedProject = await projectService.updateProject(projectId, req.body, req.project);
     res.status(200).json(updatedProject);
   } catch (error: any) {
     if (error.message === 'NOT_FOUND') {

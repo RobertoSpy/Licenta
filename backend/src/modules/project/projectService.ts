@@ -1,5 +1,6 @@
 import { projectRepository } from './projectRepository';
 import * as turf from '@turf/turf';
+import { Project } from '@prisma/client';
 
 export const projectService = {
   calculateTotalFloors(existing: any, input: any) {
@@ -19,10 +20,10 @@ export const projectService = {
 
   /**
    * Actualizează proiectul după ID.
-   * Ownership-ul este deja verificat de tenantGuard înainte de apelul acestei metode.
+   * Dacă `prefetchedProject` este furnizat (ex: de la tenantGuard), se evită un apel suplimentar la baza de date.
    */
-  async updateProject(projectId: number, inputData: any) {
-    const existing = await projectRepository.findById(projectId);
+  async updateProject(projectId: number, inputData: any, prefetchedProject?: Project) {
+    const existing = prefetchedProject ?? await projectRepository.findById(projectId);
     if (!existing) throw new Error('NOT_FOUND');
 
     let totalFloors: number | undefined;

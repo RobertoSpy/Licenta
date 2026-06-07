@@ -1,13 +1,13 @@
 import request from 'supertest';
 import express from 'express';
-import { prismaMock } from '../setup';
-import projectRoutes from '../../src/modules/project/projectRoutes';
+import { prismaMock } from '../../../../tests/setup';
+import projectRoutes from '../projectRoutes';
 
 const app = express();
 app.use(express.json());
 
 // Mocam securitatea pentru a simula utilizatorul 1 (Client autentificat)
-jest.mock('../../src/core/middleware/authMiddleware', () => ({
+jest.mock('../../../core/middleware/authMiddleware', () => ({
   protect: (req: any, res: any, next: any) => {
     req.user = { id: 1 };
     next();

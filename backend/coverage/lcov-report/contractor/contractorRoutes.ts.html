@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>13/13</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>13/13</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -86,52 +86,52 @@
 <a name='L21'></a><a href='#L21'>21</a>
 <a name='L22'></a><a href='#L22'>22</a>
 <a name='L23'></a><a href='#L23'>23</a>
-<a name='L24'></a><a href='#L24'>24</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<a name='L24'></a><a href='#L24'>24</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { Router } from 'express';</span>
-<span class="cstat-no" title="statement not covered" >import { protect, AuthRequest } from '../../core/middleware/authMiddleware';</span>
-<span class="cstat-no" title="statement not covered" >import { requireRole } from '../../core/middleware/roleMiddleware';</span>
-<span class="cstat-no" title="statement not covered" >import { getContractors, getContractorById, getMyProfile, updateMyProfile, addReview, getAcceptedProjects } from './contractorController';</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Router } from 'express';
+import { protect, AuthRequest } from '../../core/middleware/authMiddleware';
+import { requireRole } from '../../core/middleware/roleMiddleware';
+import { getContractors, getContractorById, getMyProfile, updateMyProfile, addReview, getAcceptedProjects } from './contractorController';
 &nbsp;
 // UserRole importat din prisma după generate
-const UserRole = <span class="cstat-no" title="statement not covered" >{ CLIENT: 'CLIENT', CONTRACTOR: 'CONTRACTOR', ADMIN: 'ADMIN' } as const;</span>
+const UserRole = { CLIENT: 'CLIENT', CONTRACTOR: 'CONTRACTOR', ADMIN: 'ADMIN' } as const;
 &nbsp;
-const router = <span class="cstat-no" title="statement not covered" >Router();</span>
+const router = Router();
 &nbsp;
 // Rute publice (oricine logat)
-<span class="cstat-no" title="statement not covered" >router.get('/', protect, getContractors);</span>
+router.get('/', protect, getContractors);
 &nbsp;
 // IMPORTANT: /me/* trebuie să fie înainte de /:id ca să nu fie prins de params
-<span class="cstat-no" title="statement not covered" >router.get('/me/profile', protect, requireRole(UserRole.CONTRACTOR as any), getMyProfile);</span>
-<span class="cstat-no" title="statement not covered" >router.put('/me/profile', protect, requireRole(UserRole.CONTRACTOR as any), updateMyProfile);</span>
-<span class="cstat-no" title="statement not covered" >router.get('/me/accepted-projects', protect, requireRole(UserRole.CONTRACTOR as any), getAcceptedProjects);</span>
+router.get('/me/profile', protect, requireRole(UserRole.CONTRACTOR as any), getMyProfile);
+router.put('/me/profile', protect, requireRole(UserRole.CONTRACTOR as any), updateMyProfile);
+router.get('/me/accepted-projects', protect, requireRole(UserRole.CONTRACTOR as any), getAcceptedProjects);
 &nbsp;
 // Rute cu param
-<span class="cstat-no" title="statement not covered" >router.get('/:id', protect, getContractorById);</span>
-<span class="cstat-no" title="statement not covered" >router.post('/:id/reviews', protect, requireRole(UserRole.CLIENT as any), addReview);</span>
+router.get('/:id', protect, getContractorById);
+router.post('/:id/reviews', protect, requireRole(UserRole.CLIENT as any), addReview);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >export default router;</span>
+export default router;
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -139,7 +139,7 @@ const router = <span class="cstat-no" title="statement not covered" >Router();</
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-06T17:17:45.766Z
+                at 2026-06-07T13:53:16.339Z
             </div>
         <script src="../prettify.js"></script>
         <script>

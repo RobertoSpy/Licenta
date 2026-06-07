@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { generateBOM, updateMaterialOverride, bomAdvisorChat, getBOMIntro, getBOMPhaseState, confirmBOMPhase } from './bomController';
 import { protect } from '../../core/middleware/authMiddleware';
+import { tenantGuard } from '../../core/middleware/tenantGuard';
 
 const router = Router();
 
-// Toate rutele de BOM necesită autentificare
+// Toate rutele de BOM necesită autentificare și ownership pe proiect
 router.use(protect);
+router.use('/:projectId', tenantGuard);
 
 router.post('/:projectId/generate', generateBOM);
 router.patch('/:projectId/material', updateMaterialOverride);

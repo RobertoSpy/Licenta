@@ -67,6 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setAccessToken(null);
       setUser(null);
+      window.location.href = '/';
     }
   };
 

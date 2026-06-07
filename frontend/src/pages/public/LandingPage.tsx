@@ -95,7 +95,7 @@ export const LandingPage = () => {
           <div className="lg:col-span-7 flex flex-col items-start text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-100/70 border border-orange-200/50 text-orange-700 text-xs font-bold uppercase tracking-wider mb-6 animate-pulse">
               <Sparkles className="w-3.5 h-3.5" />
-              Prima platformă cu AI din România
+              Prima platformă in domeniul construcțiilor asistată de AI
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1] mb-6">

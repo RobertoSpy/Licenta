@@ -99,14 +99,17 @@ export const marketRepository = {
    * Garantează că există întotdeauna maxim un cache valid.
    */
   async upsertForecast(forecastJson: string, modelUsed: string) {
-    // Invalidăm cache-urile vechi
-    await prisma.marketForecastCache.updateMany({
-      where: { isValid: true },
-      data: { isValid: false },
-    });
+    return prisma.$transaction(async (tx) => {
+      // Invalidăm cache-urile vechi
+      await tx.marketForecastCache.updateMany({
+        where: { isValid: true },
+        data: { isValid: false },
+      });
 
-    return prisma.marketForecastCache.create({
-      data: { forecastJson, modelUsed, isValid: true },
+      // Creăm noul cache
+      return tx.marketForecastCache.create({
+        data: { forecastJson, modelUsed, isValid: true },
+      });
     });
   },
 };

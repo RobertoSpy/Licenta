@@ -3,7 +3,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import { authEmailLimiter } from '../../src/core/middleware/rateLimiter';
+import { authEmailLimiter } from '../middleware/rateLimiter';
 
 describe('Infrastructure & Security Shield (Integration)', () => {
   let app: express.Express;

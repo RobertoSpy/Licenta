@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>14/14</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>14/14</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -82,44 +82,50 @@
 <a name='L17'></a><a href='#L17'>17</a>
 <a name='L18'></a><a href='#L18'>18</a>
 <a name='L19'></a><a href='#L19'>19</a>
-<a name='L20'></a><a href='#L20'>20</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { Router } from 'express';</span>
-<span class="cstat-no" title="statement not covered" >import { generateBOM, updateMaterialOverride, bomAdvisorChat, getBOMIntro, getBOMPhaseState, confirmBOMPhase } from './bomController';</span>
-<span class="cstat-no" title="statement not covered" >import { protect } from '../../core/middleware/authMiddleware';</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Router } from 'express';
+import { generateBOM, updateMaterialOverride, bomAdvisorChat, getBOMIntro, getBOMPhaseState, confirmBOMPhase } from './bomController';
+import { protect } from '../../core/middleware/authMiddleware';
+import { tenantGuard } from '../../core/middleware/tenantGuard';
 &nbsp;
-const router = <span class="cstat-no" title="statement not covered" >Router();</span>
+const router = Router();
 &nbsp;
-// Toate rutele de BOM necesită autentificare
-<span class="cstat-no" title="statement not covered" >router.use(protect);</span>
+// Toate rutele de BOM necesită autentificare și ownership pe proiect
+router.use(protect);
+router.use('/:projectId', tenantGuard);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >router.post('/:projectId/generate', generateBOM);</span>
-<span class="cstat-no" title="statement not covered" >router.patch('/:projectId/material', updateMaterialOverride);</span>
-<span class="cstat-no" title="statement not covered" >router.get('/:projectId/intro', getBOMIntro);</span>
-<span class="cstat-no" title="statement not covered" >router.get('/:projectId/phase-state', getBOMPhaseState);</span>
-<span class="cstat-no" title="statement not covered" >router.post('/:projectId/phase-state/confirm', confirmBOMPhase);</span>
+router.post('/:projectId/generate', generateBOM);
+router.patch('/:projectId/material', updateMaterialOverride);
+router.get('/:projectId/intro', getBOMIntro);
+router.get('/:projectId/phase-state', getBOMPhaseState);
+router.post('/:projectId/phase-state/confirm', confirmBOMPhase);
 &nbsp;
 // POST /api/bom/:projectId/chat — Asistentul RAG conversațional pentru deviz (SSE)
-<span class="cstat-no" title="statement not covered" >router.post('/:projectId/chat', bomAdvisorChat);</span>
+router.post('/:projectId/chat', bomAdvisorChat);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >export default router;</span>
+export default router;
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -127,7 +133,7 @@ const router = <span class="cstat-no" title="statement not covered" >Router();</
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-06T17:17:45.766Z
+                at 2026-06-07T13:53:16.339Z
             </div>
         <script src="../prettify.js"></script>
         <script>

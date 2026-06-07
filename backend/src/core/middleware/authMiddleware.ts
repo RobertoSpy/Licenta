@@ -2,14 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 import { prisma } from '../../lib/prisma';
-import { UserRole } from '@prisma/client';
+import { UserRole, Project } from '@prisma/client';
 
 export interface AuthRequest extends Request {
   user?: {
     id: number;
     role: UserRole;
   };
-  project?: any;
+  project?: Project;
 }
 
 export const protect = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -21,7 +21,7 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
       
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
-        select: { id: true, role: true }
+        select: { id: true, role: true, email: true }
       });
 
       if (!user) {

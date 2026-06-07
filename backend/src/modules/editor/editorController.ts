@@ -10,10 +10,11 @@ import { conformityService } from '../../core/services/conformityService';
  */
 export const createSnapshot = async (req: Request, res: Response) => {
   try {
-    const { projectId, planJSON, floor, label } = req.body;
+    const projectId = parseInt(req.body.projectId);
+    const { planJSON, floor, label } = req.body;
 
-    if (!projectId || !planJSON) {
-      res.status(400).json({ message: 'projectId și planJSON sunt obligatorii.' });
+    if (isNaN(projectId) || !planJSON) {
+      res.status(400).json({ message: 'projectId valid și planJSON sunt obligatorii.' });
       return;
     }
 
@@ -35,6 +36,10 @@ export const createSnapshot = async (req: Request, res: Response) => {
 export const listSnapshots = async (req: Request, res: Response) => {
   try {
     const projectId = parseInt(req.params.projectId as string);
+    if (isNaN(projectId)) {
+      res.status(400).json({ message: 'projectId invalid.' });
+      return;
+    }
     const floor = req.query.floor as string | undefined;
     const validFloors = ['parter', 'etaj1'];
     const safeFloor = floor && validFloors.includes(floor) ? floor as 'parter' | 'etaj1' : undefined;
@@ -55,6 +60,10 @@ export const getSnapshot = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     const snapshotId = parseInt(req.params.id as string);
+    if (isNaN(snapshotId)) {
+      res.status(400).json({ message: 'snapshotId invalid.' });
+      return;
+    }
 
     if (!(await editorService.verifySnapshotOwnership(snapshotId, userId))) {
       res.status(403).json({ message: 'Acces interzis.' });
@@ -80,6 +89,10 @@ export const getSnapshot = async (req: Request, res: Response) => {
 export const getLatestSnapshot = async (req: Request, res: Response) => {
   try {
     const projectId = parseInt(req.params.projectId as string);
+    if (isNaN(projectId)) {
+      res.status(400).json({ message: 'projectId invalid.' });
+      return;
+    }
     const floor = req.query.floor as string | undefined;
     const validFloors = ['parter', 'etaj1'];
     const safeFloor = floor && validFloors.includes(floor) ? floor as 'parter' | 'etaj1' : undefined;
@@ -100,15 +113,20 @@ export const publishSnapshot = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     const snapshotId = parseInt(req.params.id as string);
-    const { projectId } = req.body;
+    const projectId = parseInt(req.body.projectId as string);
 
-    if (!projectId) {
-      res.status(400).json({ message: 'projectId este obligatoriu.' });
+    if (isNaN(snapshotId)) {
+      res.status(400).json({ message: 'snapshotId invalid.' });
       return;
     }
 
-    if (!(await editorService.verifySnapshotOwnership(snapshotId, userId))) {
-      res.status(403).json({ message: 'Acces interzis.' });
+    if (isNaN(projectId)) {
+      res.status(400).json({ message: 'projectId este obligatoriu și trebuie să fie număr.' });
+      return;
+    }
+
+    if (!(await editorService.verifySnapshotOwnership(snapshotId, userId, projectId))) {
+      res.status(403).json({ message: 'Acces interzis sau snapshot-ul nu aparține acestui proiect.' });
       return;
     }
 
@@ -128,6 +146,10 @@ export const deleteSnapshot = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     const snapshotId = parseInt(req.params.id as string);
+    if (isNaN(snapshotId)) {
+      res.status(400).json({ message: 'snapshotId invalid.' });
+      return;
+    }
 
     if (!(await editorService.verifySnapshotOwnership(snapshotId, userId))) {
       res.status(403).json({ message: 'Acces interzis.' });

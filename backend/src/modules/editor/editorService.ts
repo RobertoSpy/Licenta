@@ -27,10 +27,10 @@ export const editorService = {
   },
 
   /**
-   * Ownership check pentru snapshot (via proiect).
+   * Ownership check pentru snapshot (via proiect) cu extra layer anti-cross-project reference.
    */
-  async verifySnapshotOwnership(snapshotId: number, userId: number): Promise<boolean> {
-    return editorRepository.verifySnapshotOwnership(snapshotId, userId);
+  async verifySnapshotOwnership(snapshotId: number, userId: number, projectId?: number): Promise<boolean> {
+    return editorRepository.verifySnapshotOwnership(snapshotId, userId, projectId);
   },
 
   /**

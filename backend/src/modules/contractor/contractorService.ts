@@ -83,7 +83,16 @@ export const contractorService = {
       throw new Error('NOT_AUTHORIZED_OR_NO_ACCEPTED_QUOTE');
     }
 
-    // 2. Creăm recenzia
+    // 1.5. Verificam daca clientul a lasat deja o recenzie pentru acest proiect si constructor
+    const existingReview = await prisma.contractorReview.findFirst({
+      where: { contractorId, projectId, reviewerId }
+    });
+
+    if (existingReview) {
+      throw new Error('ALREADY_REVIEWED');
+    }
+
+    // 2. Cream recenzia
     const review = await prisma.contractorReview.create({
       data: {
         contractorId,
@@ -94,18 +103,19 @@ export const contractorService = {
       }
     });
 
-    // 3. Recalculăm media ratingului și numărul de proiecte
+    // 3. Recalculam media ratingului si numarul de proiecte
     const allReviews = await prisma.contractorReview.findMany({
       where: { contractorId }
     });
 
-    const avgRating = allReviews.reduce((acc, r) => acc + r.rating, 0) / allReviews.length;
+    const rawAvg = allReviews.reduce((acc, r) => acc + r.rating, 0) / allReviews.length;
+    const avgRating = Math.round(rawAvg * 100) / 100;
 
     await prisma.contractorProfile.update({
       where: { id: contractorId },
       data: { 
         avgRating,
-        completedProjects: { increment: 1 } // un review implică terminarea proiectului, deci incrementăm
+        completedProjects: { increment: 1 } // un review implica terminarea proiectului, deci incrementam
       }
     });
 

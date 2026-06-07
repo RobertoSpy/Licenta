@@ -2,10 +2,10 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/tests/**/*.spec.ts', '**/tests/**/*.test.ts'],
+  testMatch: ['**/__tests__/**/*.test.ts'],
   collectCoverageFrom: [
     'src/modules/**/*.ts',
-    '!src/modules/**/*.spec.ts',
+    '!src/modules/**/__tests__/**/*.test.ts',
     '!src/modules/**/index.ts',
     '!src/modules/**/schemas.ts'
   ],
@@ -21,5 +21,8 @@ module.exports = {
         tsconfig: 'tsconfig.json',
       },
     ],
+  },
+  moduleNameMapper: {
+    '^puppeteer$': '<rootDir>/tests/__mocks__/puppeteer.js',
   },
 };

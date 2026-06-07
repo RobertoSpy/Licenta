@@ -33,9 +33,9 @@ export const quoteService = {
   },
 
   async getQuotesForClient(projectId: number, userId: number) {
-    // Verificăm dacă proiectul aparține userului
     const project = await prisma.project.findUnique({ where: { id: projectId } });
-    if (!project || project.userId !== userId) {
+    if (!project) throw new Error('Project not found');
+    if (project.userId !== userId) {
       throw new Error('Unauthorized');
     }
 
@@ -70,12 +70,21 @@ export const quoteService = {
   },
 
   async submitQuote(quoteId: number, contractorUserId: number, data: { totalAmount: number, executionDays: number, message?: string, acceptsBOM: boolean, bomVariations?: any }) {
+    if (data.totalAmount === undefined || data.totalAmount <= 0) {
+      throw new Error('Validation: totalAmount trebuie să fie un număr pozitiv mai mare ca 0');
+    }
+
     const profile = await prisma.contractorProfile.findUnique({ where: { userId: contractorUserId } });
     if (!profile) throw new Error('Contractor profile not found');
 
     const quote = await prisma.contractorQuote.findUnique({ where: { id: quoteId } });
-    if (!quote || quote.contractorId !== profile.id) {
-      throw new Error('Unauthorized or not found');
+    if (!quote) throw new Error('Quote not found');
+    if (quote.contractorId !== profile.id) {
+      throw new Error('Unauthorized');
+    }
+
+    if (quote.status === QuoteStatus.ACCEPTED) {
+      throw new Error('Validation: Nu se poate retrimite o ofertă deja acceptată');
     }
 
     return prisma.contractorQuote.update({
@@ -97,25 +106,34 @@ export const quoteService = {
       include: { project: true }
     });
 
-    if (!quote || quote.project.userId !== userId) {
-      throw new Error('Unauthorized or not found');
+    if (!quote) throw new Error('Quote not found');
+    if (quote.project.userId !== userId) {
+      throw new Error('Unauthorized');
     }
 
-    // Marcați oferta ca acceptată
-    const acceptedQuote = await prisma.contractorQuote.update({
-      where: { id: quoteId },
-      data: { status: QuoteStatus.ACCEPTED }
-    });
+    if (quote.status === QuoteStatus.ACCEPTED) {
+      // Idempotency: dacă e deja acceptată, doar o returnăm, nu aruncăm eroare și nu refacem tranzacția inutil
+      return quote;
+    }
 
-    // Celelalte oferte pentru același proiect devin REJECTED
-    await prisma.contractorQuote.updateMany({
-      where: {
-        projectId: quote.projectId,
-        id: { not: quoteId }
-      },
-      data: { status: QuoteStatus.REJECTED }
-    });
+    // Marcați oferta ca acceptată și respingeți celelalte oferte atomically (sau in batch măcar)
+    return prisma.$transaction(async (tx) => {
+      const acceptedQuote = await tx.contractorQuote.update({
+        where: { id: quoteId },
+        data: { status: QuoteStatus.ACCEPTED }
+      });
 
-    return acceptedQuote;
+      // Celelalte oferte pentru același proiect devin REJECTED
+      await tx.contractorQuote.updateMany({
+        where: {
+          projectId: quote.projectId,
+          id: { not: quoteId },
+          status: { not: QuoteStatus.REJECTED } // optimizare
+        },
+        data: { status: QuoteStatus.REJECTED }
+      });
+
+      return acceptedQuote;
+    });
   }
 };

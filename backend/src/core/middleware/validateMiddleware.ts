@@ -114,8 +114,13 @@ export const validateConformitySchema = z.object({
 }).strip();
 
 export const explainConformitySchema = z.object({
-  ruleId: z.string(),
-  itemContext: z.any(),
+  violations: z.array(
+    z.object({
+      label: z.string(),
+      usableSqm: z.number().positive(),
+      minRequired: z.number().positive(),
+    })
+  ).min(1, 'At least one violation required'),
 }).strip();
 
 export const screen1Schema = z.object({

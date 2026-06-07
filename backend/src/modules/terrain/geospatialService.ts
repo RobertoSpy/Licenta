@@ -52,6 +52,10 @@ export const geospatialService = {
           return result;
         } catch (err: any) {
           lastErr = err;
+          if (err.response && err.response.status >= 400 && err.response.status < 500) {
+            console.error('Nominatim 4xx error, not retrying:', err.response.status);
+            break;
+          }
           attempt += 1;
           const delay = 200 * Math.pow(2, attempt);
           await new Promise(r => setTimeout(r, delay));

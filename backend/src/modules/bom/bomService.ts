@@ -73,7 +73,7 @@ export function calcFoundationSpec(
 // EVALUATOR DE FORMULE — injectează variabilele în formula din JSON
 // ─────────────────────────────────────────────────────────────────
 
-interface FormulaVariables {
+export interface FormulaVariables {
   perimeter_m: number;
   foundation_width_m: number;
   foundation_depth_m: number;
@@ -92,7 +92,7 @@ interface FormulaVariables {
   base_rebar_kg_per_mc: number;
 }
 
-function evaluateFormula(formulaStr: string, vars: FormulaVariables): number {
+export function evaluateFormula(formulaStr: string, vars: FormulaVariables): number {
   // Substituire ordonată: nume mai lungi înainte (evităm suprascrierea parțială)
   let expr = formulaStr
     .replace(/soil_concrete_multiplier/g, vars.soil_concrete_multiplier.toString())

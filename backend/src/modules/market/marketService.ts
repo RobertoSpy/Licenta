@@ -11,6 +11,7 @@
 import { marketRepository } from './marketRepository';
 import { GoogleGenAI } from '@google/genai';
 import { FALLBACK_MODELS_JSON } from '../ai/services/aiClient';
+import manualContext from '../../data/manual-market-context.json';
 
 // ─── Constante ─────────────────────────────────────────────────────────────
 
@@ -86,9 +87,9 @@ function monthLabel(year: number, month: number): string {
  *
  * @param values - Array de valori numerice (cronologic crescător)
  */
-function linearRegression(values: number[]): { slope: number; intercept: number; rmse: number } {
+export function linearRegression(values: number[]): { slope: number; intercept: number; rmse: number } {
   const n = values.length;
-  if (n < 2) return { slope: 0, intercept: values[0] ?? 0, rmse: 0 };
+  if (n < 2) throw new Error('Nu există suficiente date pentru regresie liniară (minim 2 puncte necesare).');
 
   // x = indexul timpului (0, 1, 2, ..., n-1)
   const xs = values.map((_, i) => i);
@@ -165,8 +166,14 @@ export const marketService = {
     const cached = await marketRepository.getLatestForecast();
     if (cached) {
       const age = Date.now() - new Date(cached.generatedAt).getTime();
+      // TTL calculation boundary: valid if age < TTL. If age == TTL, it's expired.
       if (age < FORECAST_CACHE_TTL_MS) {
-        return JSON.parse(cached.forecastJson) as MarketForecastResponse;
+        try {
+          return JSON.parse(cached.forecastJson) as MarketForecastResponse;
+        } catch (e) {
+          console.warn('[marketService.getForecast] Cache JSON corupt, regenerăm...');
+          // Fall through to regeneration
+        }
       }
     }
 
@@ -192,8 +199,15 @@ export const marketService = {
 
     const latestValues: MarketSummaryResponse['latestValues'] = {} as any;
 
-    for (const cat of categories) {
-      const points = await marketRepository.getByCategory(cat);
+    const [rezPoints, nerezPoints, cladiriPoints, materialePoints] = await Promise.all(
+      categories.map(cat => marketRepository.getByCategory(cat))
+    );
+
+    const pointsArray = [rezPoints, nerezPoints, cladiriPoints, materialePoints];
+
+    for (let i = 0; i < categories.length; i++) {
+      const cat = categories[i];
+      const points = pointsArray[i];
       const latest = points[points.length - 1];
       if (!latest) continue;
 
@@ -216,7 +230,7 @@ export const marketService = {
       `• Indice cost rezidențial ${MONTH_LABELS_RO[rezData?.month ?? 0]} ${rezData?.year}: ${rezData?.indexValue ?? 'N/A'} (față de baza 2005≈38; baza 2021=100)`,
       rezData?.yoyChange != null ? `• Variație YoY rezidențial: ${rezData.yoyChange > 0 ? '+' : ''}${rezData.yoyChange}%` : '',
       `• Indice cost materiale: ${matData?.indexValue ?? 'N/A'} (${matData?.yoyChange != null ? `${matData.yoyChange > 0 ? '+' : ''}${matData.yoyChange}% YoY` : 'N/A'})`,
-      `• Context: Inflație mar 2026 = 9,9% YoY; manoperă indice 189,67 (baza 2021); energie +57,2%`,
+      `• Context: Inflație = ${rezData?.yoyChange != null ? rezData.yoyChange + '%' : 'N/A'} YoY; Manoperă: +${manualContext.laborIndexVsBase2021}% (baza 2021); Energie: +${manualContext.energyIndexVsBase2021}% (baza 2021)`,
       `PROGNOZE AI (regresie liniară OLS pe ultimii 36 luni):`,
       ...forecast.years.map((f: ForecastYear) =>
         `• ${f.year}: indice estimat ${f.predictedIndex.toFixed(1)} (interval: ${f.lowerBound.toFixed(1)}–${f.upperBound.toFixed(1)}), YoY ${f.yoyChangePercent > 0 ? '+' : ''}${f.yoyChangePercent.toFixed(1)}%`
@@ -232,8 +246,14 @@ export const marketService = {
   async _generateForecast(): Promise<MarketForecastResponse> {
     // 1. Date pentru regresie — ultimele 36 luni rezidențiale
     const recentPoints = await marketRepository.getLastNPoints('rezidential', REGRESSION_WINDOW);
-    const values = recentPoints.map(p => p.indexValue);
+    const cladiriPoints = await marketRepository.getLastNPoints('total_cladiri', 13);
+    const materialePoints = await marketRepository.getLastNPoints('total_materiale', 1);
 
+    if (recentPoints.length < 2) {
+      throw new Error('NOT_ENOUGH_DATA');
+    }
+
+    const values = recentPoints.map(p => p.indexValue);
     const { slope, intercept, rmse } = linearRegression(values);
 
     // Ultimul punct cunoscut = baza de extrapolate
@@ -257,23 +277,41 @@ export const marketService = {
       // YoY față de anul anterior prognozat (sau ultimul an real)
       const prevYear = targetYear - 1;
       const prevMonthsAhead = (prevYear - lastYear) * 12 + (6 - lastMonth);
-      const prevPredicted = prevMonthsAhead < 0
-        ? (recentPoints[recentPoints.length + prevMonthsAhead]?.indexValue ?? predictedIndex / 1.05)
+      
+      const prevPredicted = prevMonthsAhead <= 0
+        ? (recentPoints.at(prevMonthsAhead) ?? recentPoints.at(-1))?.indexValue ?? predictedIndex
         : intercept + slope * (lastIdx + prevMonthsAhead);
 
-      const yoyChangePercent = ((predictedIndex - prevPredicted) / prevPredicted) * 100;
+      const yoyChangePercent = prevPredicted !== 0
+        ? ((predictedIndex - prevPredicted) / prevPredicted) * 100
+        : 0;
+
+      // Prevent negative prices/indices in absurd extrapolation scenarios
+      const safePredictedIndex = Math.max(0, predictedIndex);
+      const safeLowerBound = Math.max(0, predictedIndex - uncertainty);
+      const safeUpperBound = Math.max(0, predictedIndex + uncertainty);
 
       return {
         year: targetYear,
-        predictedIndex: Math.round(predictedIndex * 10) / 10,
-        lowerBound: Math.round((predictedIndex - uncertainty) * 10) / 10,
-        upperBound: Math.round((predictedIndex + uncertainty) * 10) / 10,
+        predictedIndex: Math.round(safePredictedIndex * 10) / 10,
+        lowerBound: Math.round(safeLowerBound * 10) / 10,
+        upperBound: Math.round(safeUpperBound * 10) / 10,
         yoyChangePercent: Math.round(yoyChangePercent * 10) / 10,
       };
     });
 
-    // 3. Generare verdict text via Gemini (scurt, non-streaming)
-    const verdictText = await this._generateVerdictText(forecastYears, lastPoint?.indexValue ?? 161);
+    // 3. Extragere macro context
+    const latestCladiri = cladiriPoints[cladiriPoints.length - 1];
+    const inflationYoY = latestCladiri ? computeYoY(cladiriPoints, latestCladiri.year, latestCladiri.month) : null;
+    
+    const latestMateriale = materialePoints[0]?.indexValue ?? 100;
+    const materialeBase2021 = latestMateriale - 100; // bază 2021=100
+
+    // 4. Generare verdict text via Gemini (scurt, non-streaming)
+    const verdictText = await this._generateVerdictText(forecastYears, lastPoint?.indexValue ?? 161, {
+      inflationYoY: inflationYoY !== null ? Math.round(inflationYoY * 10) / 10 : null,
+      materialeBase2021
+    });
     const verdictLevel = this._computeVerdictLevel(forecastYears);
 
     return {
@@ -285,13 +323,20 @@ export const marketService = {
     };
   },
 
-  async _generateVerdictText(forecasts: ForecastYear[], currentIndex: number): Promise<string> {
+  async _generateVerdictText(
+    forecasts: ForecastYear[],
+    currentIndex: number,
+    macroContext: { inflationYoY: number | null; materialeBase2021: number }
+  ): Promise<string> {
     const prompt = `Ești un analist financiar specializat pe piața construcțiilor din România.
 Pe baza datelor INSSE CNS107D:
 - Indice cost rezidențial actual: ${currentIndex} (baza 2021=100)
 - Prognoza 2027: ${forecasts[0]?.predictedIndex} (YoY: +${forecasts[0]?.yoyChangePercent}%)
 - Prognoza 2028: ${forecasts[1]?.predictedIndex} (YoY: +${forecasts[1]?.yoyChangePercent}%)
-- Context: inflația actuală în construcții ~9.9% YoY, manopera +89.67% față de 2021, materialele stabilizate la +42.7% față de 2021, energia electrică la niveluri ridicate (+57.2%)
+- Context macroeconomic: Inflația generală a construcțiilor este la ${macroContext.inflationYoY ? '+' + macroContext.inflationYoY : '~10'}% YoY. Materialele au atins pragul de +${macroContext.materialeBase2021.toFixed(1)}% față de 2021.
+- Manoperă în construcții: +${manualContext.laborIndexVsBase2021}% față de baza 2021
+- Energie: +${manualContext.energyIndexVsBase2021}% față de baza 2021
+  (Sursa date externe: ${manualContext._source}, ${manualContext._lastUpdated})
 
 Scrie UN SINGUR paragraf scurt (maxim 60 cuvinte) care explică utilizatorului dacă ACUM este un moment bun, moderat sau de așteptat pentru a începe construcția. Fii direct, bazat pe date, și menționează motivul principal.`;
 
@@ -304,7 +349,9 @@ Scrie UN SINGUR paragraf scurt (maxim 60 cuvinte) care explică utilizatorului d
             contents: prompt,
             config: { maxOutputTokens: 120, temperature: 0.3 },
           });
-          return result.text?.trim() ?? 'Momentul este moderat — costurile sunt ridicate dar stabile. Materialele s-au stabilizat, însă manopera continuă să crească.';
+          const text = result.text?.trim() || '';
+          if (text === '') throw new Error('Empty AI response');
+          return text;
         } catch {
           continue;
         }

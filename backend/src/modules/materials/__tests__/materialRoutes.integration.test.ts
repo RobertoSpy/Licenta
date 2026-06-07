@@ -1,13 +1,13 @@
 import request from 'supertest';
 import express from 'express';
-import { prismaMock } from '../setup';
-import materialRoutes from '../../src/modules/materials/materialRoutes';
+import { prismaMock } from '../../../../tests/setup';
+import materialRoutes from '../materialRoutes';
 
 const app = express();
 app.use(express.json());
 
 // Bypass la JWT pentru a mentine mediul de test curat si izolat
-jest.mock('../../src/core/middleware/authMiddleware', () => ({
+jest.mock('../../../core/middleware/authMiddleware', () => ({
   protect: (req: any, res: any, next: any) => {
     req.user = { id: 1, role: 'CLIENT' };
     next();

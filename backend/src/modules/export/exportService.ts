@@ -41,11 +41,40 @@ function pxToMeters(px: number): number {
   return px / PIXELS_PER_METER;
 }
 
-function computeUsableSqm(widthPx: number, heightPx: number, wallThicknessCm = 25): number {
-  const thicknessPx = (wallThicknessCm / 100) * PIXELS_PER_METER;
-  const usableWidthPx = Math.max(0, widthPx - 2 * thicknessPx);
-  const usableHeightPx = Math.max(0, heightPx - 2 * thicknessPx);
+function computeUsableSqm(
+  widthPx: number, 
+  heightPx: number, 
+  wallThicknessCm: number | { left: number; right: number; top: number; bottom: number } = 25
+): number {
+  let leftCm, rightCm, topCm, bottomCm;
+
+  if (typeof wallThicknessCm === 'number') {
+    leftCm = rightCm = topCm = bottomCm = wallThicknessCm;
+  } else {
+    leftCm = wallThicknessCm.left;
+    rightCm = wallThicknessCm.right;
+    topCm = wallThicknessCm.top;
+    bottomCm = wallThicknessCm.bottom;
+  }
+
+  const leftPx = (leftCm / 100) * PIXELS_PER_METER;
+  const rightPx = (rightCm / 100) * PIXELS_PER_METER;
+  const topPx = (topCm / 100) * PIXELS_PER_METER;
+  const bottomPx = (bottomCm / 100) * PIXELS_PER_METER;
+
+  const usableWidthPx = Math.max(0, widthPx - leftPx - rightPx);
+  const usableHeightPx = Math.max(0, heightPx - topPx - bottomPx);
   return parseFloat((pxToMeters(usableWidthPx) * pxToMeters(usableHeightPx)).toFixed(2));
+}
+
+function escapeHtml(unsafe: string | null | undefined): string {
+  if (!unsafe) return '';
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -61,6 +90,7 @@ function buildHtmlTemplate(
 ): string {
   const totalSqm = rooms.reduce((acc, r) => acc + r.usableSqm, 0).toFixed(1);
   const violationsCount = rooms.filter((r) => r.status === 'error').length;
+  const safeTitle = escapeHtml(project.title);
 
   const roomRows = rooms
     .map((r) => {
@@ -144,7 +174,7 @@ function buildHtmlTemplate(
     </div>
     <div class="cover-body">
       <div>
-        <div class="cover-title">${project.title}</div>
+        <div class="cover-title">${safeTitle}</div>
         <div class="cover-meta">
           <div class="cover-meta-row">
             <span class="cover-meta-label">📍 Locație</span>
@@ -190,7 +220,7 @@ function buildHtmlTemplate(
   <div class="plan-page">
     <div class="plan-header">
       <div>
-        <div class="plan-title">Plan Parter — ${project.title}</div>
+        <div class="plan-title">Plan Parter — ${safeTitle}</div>
         <div style="font-size:11px;color:#64748b;margin-top:3px">Scara: 1:100 · 1 celulă grid = 1m real</div>
       </div>
       <div class="plan-version">Versiunea ${snapshotVersion}</div>
@@ -247,6 +277,90 @@ function buildHtmlTemplate(
 }
 
 // ─────────────────────────────────────────────────────────────────
+// HTML TEMPLATE — Contractor PDF
+// ─────────────────────────────────────────────────────────────────
+function buildContractorHtmlTemplate(project: any, bom: any[], snapshot: any, planPngBase64: string | null): string {
+  const safeTitle = escapeHtml(project.title);
+  const generatedAt = new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' });
+  const snapshotVersion = snapshot ? snapshot.version : 1;
+
+  let bomRows = '<tr><td colspan="4" style="padding:10px;text-align:center;color:#94a3b8">Niciun material în BOM</td></tr>';
+  if (bom && bom.length > 0) {
+    bomRows = bom.map(item => `
+      <tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9">${item.phase}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9">${item.material?.name || 'Material'}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center">${item.quantity} ${item.material?.unit || 'buc'}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center">${item.formula || '-'}</td>
+      </tr>
+    `).join('');
+  }
+
+  return `<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; }
+    .page { width: 210mm; height: 297mm; display: flex; flex-direction: column; padding: 32px 40px; page-break-after: always; }
+    .header { font-size: 24px; font-weight: 900; color: #f97316; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 30px; }
+    .meta-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+    .meta-label { font-size: 11px; color: #64748b; }
+    .meta-value { font-size: 16px; font-weight: 700; color: #1e293b; margin-top: 4px; }
+    .plan-image { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+    .plan-image img { width: 100%; display: block; }
+    .table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .table th { background: #f8fafc; padding: 8px 10px; text-align: left; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; }
+    .table td { vertical-align: middle; }
+    @media print { @page { size: A4; margin: 0; } }
+  </style>
+</head>
+<body>
+  <!-- PAGINA 1: Date tehnice -->
+  <div class="page">
+    <div class="header">Proiect de execuție: ${safeTitle}</div>
+    <div class="meta-grid">
+      <div class="meta-box"><div class="meta-label">Locație</div><div class="meta-value">${escapeHtml(project.locality)}, ${escapeHtml(project.county)}</div></div>
+      <div class="meta-box"><div class="meta-label">Zonă Seismică</div><div class="meta-value">${escapeHtml(project.seismicZone) || '—'}</div></div>
+      <div class="meta-box"><div class="meta-label">Adâncime Îngheț</div><div class="meta-value">${project.frostDepthCm ? project.frostDepthCm + ' cm' : '—'}</div></div>
+      <div class="meta-box"><div class="meta-label">Regim Înălțime</div><div class="meta-value">P+${project.totalFloors ? project.totalFloors - 1 : 0}</div></div>
+    </div>
+    <p style="font-size:12px;color:#64748b">Document pentru contractor · Generat la ${generatedAt}</p>
+  </div>
+
+  <!-- PAGINA 2: Plan 2D -->
+  <div class="page">
+    <div class="header">Plan Arhitectural v${snapshotVersion}</div>
+    <div class="plan-image">
+      ${planPngBase64 ? `<img src="data:image/png;base64,${planPngBase64}" alt="Plan parter" />` : '<div style="padding:40px;text-align:center;color:#94a3b8">Imagine lipsă</div>'}
+    </div>
+  </div>
+
+  <!-- PAGINA 3+: Deviz BOM -->
+  <div class="page" style="page-break-after: auto;">
+    <div class="header">Deviz Cantități (BOM)</div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Faza</th>
+          <th>Material</th>
+          <th style="text-align:center">Cantitate</th>
+          <th style="text-align:center">Formulă</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${bomRows}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>`;
+}
+
+
+// ─────────────────────────────────────────────────────────────────
 // EXPORT SERVICE
 // ─────────────────────────────────────────────────────────────────
 
@@ -260,42 +374,15 @@ export const exportService = {
     projectId: number,
     planPngBase64: string | null
   ): Promise<{ buffer: Buffer; filename: string } | null> {
-    // 1. Fetch proiect + snapshot publicat
-    // Notă: select fără câmpuri Faza 2 (totalFloorAreaSqm etc.) deoarece
-    // Prisma client e stale — rulează `npx prisma generate` după migrație
     const project = await prisma.project.findUnique({
       where: { id: projectId },
     });
 
     if (!project) return null;
-
-    // Cast pentru câmpurile Faza 2 (există în DB dar Prisma client ncă le vede)
-    const proj = project as unknown as {
-      title: string;
-      county: string | null;
-      locality: string | null;
-      houseStyle: string | null;
-      totalFloors: number | null;
-      totalFloorAreaSqm: number | null;
-    };
-
-    // Caută snapshot publicat; fallback pe ultimul
-    // Notă: planSnapshot e model Faza 2 — Prisma client poate fi stale dacă
-    // migrarea nu a rulat. În producție, rulează: npx prisma migrate dev
-    const snapshots = await prisma.$queryRaw<Array<{
-      id: number;
-      version: number;
-      isPublished: boolean;
-      planJSON: unknown;
-    }>>`
-      SELECT id, version, "isPublished", "planJSON"
-      FROM "PlanSnapshot"
-      WHERE "projectId" = ${projectId}
-      ORDER BY "isPublished" DESC, version DESC
-      LIMIT 1
-    `;
-
-    const snapshot = snapshots[0] ?? null;
+    const snapshot = await prisma.planSnapshot.findFirst({
+      where: { projectId },
+      orderBy: [{ isPublished: 'desc' }, { version: 'desc' }],
+    });
 
     if (!snapshot) return null;
 
@@ -335,17 +422,17 @@ export const exportService = {
 
     const html = buildHtmlTemplate(
       {
-        title: proj.title,
-        county: proj.county,
-        locality: proj.locality,
-        houseType: proj.houseStyle ?? null,
-        floors: proj.totalFloors ?? null,
-        totalFloorAreaSqm: proj.totalFloorAreaSqm ?? null,
+        title: project.title,
+        county: project.county,
+        locality: project.locality,
+        houseType: project.houseStyle ?? null,
+        floors: project.totalFloors ?? null,
+        totalFloorAreaSqm: project.totalFloorAreaSqm ?? null,
       },
       planPngBase64,
       rooms,
       generatedAt,
-      (snapshot as unknown as { version: number }).version,
+      snapshot.version,
     );
 
     // 4. Puppeteer → PDF
@@ -374,4 +461,68 @@ export const exportService = {
       await browser.close();
     }
   },
+
+  /**
+   * Generează PDF de execuție pentru contractor pe baza unui Quote acceptat sau în așteptare.
+   */
+  async generateContractorPdf(
+    quoteId: number,
+    contractorId: number,
+    planPngBase64: string | null
+  ): Promise<{ buffer: Buffer; filename: string } | null> {
+    // 1. Verifică că quote-ul aparține contractorului
+    const quote = await prisma.contractorQuote.findFirst({
+      where: { id: quoteId, contractorId },
+      include: { project: true }
+    });
+
+    if (!quote) return null;
+
+    // 2. Ia BOM-ul proiectului
+    const bom = await prisma.projectBOM.findMany({
+      where: { projectId: quote.projectId },
+      include: { material: true },
+      orderBy: { phase: 'asc' },
+    });
+
+    // 3. Ia snapshot-ul publicat
+    const snapshot = await prisma.planSnapshot.findFirst({
+      where: { projectId: quote.projectId, isPublished: true },
+      orderBy: { version: 'desc' }
+    });
+
+    // 4. Generează HTML
+    const html = buildContractorHtmlTemplate(quote.project, bom, snapshot, planPngBase64);
+
+    // 5. Puppeteer → PDF
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'load' });
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      });
+
+      const slug = quote.project.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const filename = `proiect-executie-${slug}.pdf`;
+
+      return { buffer: Buffer.from(pdfBuffer), filename };
+    } finally {
+      await browser.close();
+    }
+  }
 };
+
+export const _testable = {
+  pxToMeters,
+  computeUsableSqm,
+  buildHtmlTemplate,
+  buildContractorHtmlTemplate,
+  escapeHtml
+} as const;

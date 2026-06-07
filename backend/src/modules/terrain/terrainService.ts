@@ -8,6 +8,9 @@ export const terrainService = {
     let locality = '';
 
     if (lat != null && lng != null) {
+      if (lat === 0 && lng === 0) {
+        throw new Error('Unable to determine county from coordinates: 0,0 (Null Island) is invalid.');
+      }
       const geoData = await geospatialService.reverseGeocode(Number(lat), Number(lng));
       if (geoData) {
         county = county || geoData.county;

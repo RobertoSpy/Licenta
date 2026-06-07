@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/15</span>
+                <span class='fraction'>17/17</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/20</span>
+                <span class='fraction'>24/24</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/15</span>
+                <span class='fraction'>17/17</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -95,63 +95,72 @@
 <a name='L30'></a><a href='#L30'>30</a>
 <a name='L31'></a><a href='#L31'>31</a>
 <a name='L32'></a><a href='#L32'>32</a>
-<a name='L33'></a><a href='#L33'>33</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { geospatialService } from './geospatialService';</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { geospatialService } from './geospatialService';
 import { terrainRepository } from './terrainRepository';
 &nbsp;
-export const <span class="cstat-no" title="statement not covered" >terrainService = {</span>
-  async <span class="fstat-no" title="function not covered" >analyzeLocation(</span>input: { lat?: number | null, lng?: number | null, county?: string | null }) {
-    const { lat, lng } = <span class="cstat-no" title="statement not covered" >input;</span>
-    let county = <span class="cstat-no" title="statement not covered" >input.county || '';</span>
-    let locality = <span class="cstat-no" title="statement not covered" >'';</span>
+export const terrainService = {
+  async analyzeLocation(input: { lat?: number | null, lng?: number | null, county?: string | null }) {
+    const { lat, lng } = input;
+    let county = input.county || '';
+    let locality = '';
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    if (lat != null &amp;&amp; lng != null) {</span>
-      const geoData = <span class="cstat-no" title="statement not covered" >await geospatialService.reverseGeocode(Number(lat), Number(lng));</span>
-<span class="cstat-no" title="statement not covered" >      if (geoData) {</span>
-<span class="cstat-no" title="statement not covered" >        county = county || geoData.county;</span>
-<span class="cstat-no" title="statement not covered" >        locality = geoData.locality;</span>
+    if (lat != null &amp;&amp; lng != null) {
+      if (lat === 0 &amp;&amp; lng === 0) {
+        throw new Error('Unable to determine county from coordinates: 0,0 (Null Island) is invalid.');
+      }
+      const geoData = await geospatialService.reverseGeocode(Number(lat), Number(lng));
+      if (geoData) {
+        county = county || geoData.county;
+        locality = geoData.locality;
       }
     }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    if (!county) {</span>
-<span class="cstat-no" title="statement not covered" >      throw new Error('Unable to determine county from coordinates or input.');</span>
+    if (!county) {
+      throw new Error('Unable to determine county from coordinates or input.');
     }
 &nbsp;
-    const seismic = <span class="cstat-no" title="statement not covered" >geospatialService.getSeismicZone(county);</span>
-    const frost = <span class="cstat-no" title="statement not covered" >geospatialService.getFrostDepth(county);</span>
+    const seismic = geospatialService.getSeismicZone(county);
+    const frost = geospatialService.getFrostDepth(county);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    return {</span>
+    return {
       county,
       locality,
       seismicZone: seismic?.ag || '0.20g',
@@ -166,7 +175,7 @@ export const <span class="cstat-no" title="statement not covered" >terrainServic
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-06T17:17:45.766Z
+                at 2026-06-07T13:53:16.339Z
             </div>
         <script src="../prettify.js"></script>
         <script>

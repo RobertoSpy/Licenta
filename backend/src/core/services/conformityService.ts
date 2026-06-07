@@ -121,8 +121,7 @@ function normalizeLabel(label?: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '')
-    .replace(/[^a-z0-9]/g, '');
+    .replace(/[^a-z]/g, '');
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -231,8 +230,21 @@ export const conformityService = {
     const roomResults = rooms.map(r => evaluateRoom(r, purpose));
     const extraIssues: ConformityRuleIssue[] = [];
 
-    // Reguli suplimentare din RAG (cached 6h)
-    const supplementalRules = await getSupplementalRules(purpose as any);
+    const corridorLabels = new Set(['hol', 'coridor', 'vestibul', 'circulatie', 'circulație']);
+    const hasCorridors = rooms.some(r => corridorLabels.has(normalizeLabel(r.label)));
+    const hasDoors = !!options?.doors?.length;
+
+    let supplementalRules: any[] = [];
+    
+    // RAG fallback & optimization
+    if (hasCorridors || hasDoors) {
+      try {
+        supplementalRules = await getSupplementalRules(purpose as any);
+      } catch (error) {
+        console.warn('[conformityService] RAG supplemental rules failed. Using deterministic fallback.', error);
+      }
+    }
+
     const corridorRuleRAG = supplementalRules.find((rule) => rule.code === 'CORRIDOR_MIN_WIDTH');
     const doorRuleRAG = supplementalRules.find((rule) => rule.code === 'DOOR_MIN_WIDTH');
 
@@ -244,7 +256,6 @@ export const conformityService = {
     const doorMinM = doorRuleRAG?.minValueM ?? doorRuleJSON?.value ?? 0.8;
 
     // Verificare lățime coridor
-    const corridorLabels = new Set(['hol', 'coridor', 'vestibul', 'circulatie', 'circulație']);
     for (const room of rooms) {
       const key = normalizeLabel(room.label);
       if (!corridorLabels.has(key)) continue;
@@ -267,7 +278,11 @@ export const conformityService = {
           sources: corridorRuleRAG?.sources,
         };
         const targetRoom = roomResults.find((r) => r.id === room.id);
-        if (targetRoom) targetRoom.issues.push(issue);
+        if (targetRoom) {
+          targetRoom.issues.push(issue);
+          if (issue.severity === 'error') targetRoom.status = 'error';
+          else if (issue.severity === 'warning' && targetRoom.status === 'ok') targetRoom.status = 'warning';
+        }
       }
     }
 

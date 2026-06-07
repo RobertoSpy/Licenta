@@ -47,14 +47,20 @@ export const editorRepository = {
   },
 
   /**
-   * Verifică dacă un snapshot aparține userului curent (via proiect).
+   * Verifică dacă un snapshot aparține userului curent (via proiect), 
+   * dar permite și injectarea de projectId pentru a asigura non-cross-project reference.
    */
-  async verifySnapshotOwnership(snapshotId: number, userId: number): Promise<boolean> {
+  async verifySnapshotOwnership(snapshotId: number, userId: number, projectId?: number): Promise<boolean> {
     const snapshot = await prisma.planSnapshot.findUnique({
       where: { id: snapshotId },
-      include: { project: { select: { userId: true } } },
+      include: { project: { select: { userId: true, id: true } } },
     });
-    return snapshot?.project.userId === userId;
+    
+    if (!snapshot) return false;
+    if (snapshot.project.userId !== userId) return false;
+    if (projectId && snapshot.project.id !== projectId) return false;
+
+    return true;
   },
 
   /**
@@ -71,6 +77,7 @@ export const editorRepository = {
   /**
    * Publică un snapshot — marchează ca versiunea oficială → input pentru Faza 3 (BOM).
    * Dezactivează flag-ul isPublished pe toate celelalte snapshot-uri ale proiectului.
+   * Invalidează BOM-ul existent (bomGeneratedAt = null) pentru a garanta sincronizarea.
    */
   async publishSnapshot(snapshotId: number, projectId: number) {
     await prisma.planSnapshot.updateMany({
@@ -85,7 +92,11 @@ export const editorRepository = {
 
     await prisma.project.update({
       where: { id: projectId },
-      data: { publishedSnapshotId: snapshotId, planStatus: 'published' },
+      data: { 
+        publishedSnapshotId: snapshotId, 
+        planStatus: 'published',
+        bomGeneratedAt: null // invalidate BOM
+      },
     });
 
     return published;
@@ -100,6 +111,7 @@ export const editorRepository = {
 
   /**
    * Auto-cleanup: păstrăm doar ultimele 20 snapshot-uri per (proiect, etaj).
+   * Snapshot-urile publicate nu sunt șterse niciodată (indiferent de createdAt).
    */
   async cleanupOldSnapshots(projectId: number, floor: FloorKey = 'parter') {
     const snapshots = await prisma.planSnapshot.findMany({
@@ -109,6 +121,7 @@ export const editorRepository = {
     });
 
     if (snapshots.length > 20) {
+      // păstrăm cele mai noi 20 (slice-ul sare peste primele 20 și le ia pe restul pentru ștergere)
       const toDelete = snapshots.slice(20).map((s) => s.id);
       await prisma.planSnapshot.deleteMany({ where: { id: { in: toDelete } } });
     }
