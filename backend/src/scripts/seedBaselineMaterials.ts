@@ -867,6 +867,42 @@ async function main() {
 
   console.log('='.repeat(60));
   console.log(`[seedBaselineMaterials] Finalizat DB upsert: ${created} create, ${updated} update.`);
+
+  // ── SETARE ALTERNATIVE MATERIALE ───────────────────────────────────────────────────
+  console.log(`\n[seedBaselineMaterials] Setare alternative pentru materiale...`);
+  const alternativeGroups = [
+    ['STANDARD_BETON_C20_25', 'STANDARD_BETON_C25_30', 'STANDARD_BETON_C30_37'],
+    ['STANDARD_FIER_10', 'STANDARD_FIER_12', 'STANDARD_FIER_14'],
+    ['STANDARD_BCA_25', 'CARAMIDA_25'],
+    ['STANDARD_BCA_12', 'CARAMIDA_12', 'GIPS_CARTON_12'],
+    ['polistiren-eps-10cm', 'POLISTIREN_GRAFITAT_10', 'VATA_MINERALA_EXT_10'],
+    ['STANDARD_TIGLA_CERAMICA', 'TIGLA_BETON_BRAMAC', 'TABLA_LINDAB'],
+    ['STANDARD_FEREASTRA_PVC', 'FEREASTRA_PVC_3K', 'FEREASTRA_ALUMINIU'],
+    ['PARCHET_8MM', 'PARCHET_12MM', 'PARCHET_MASIV'],
+    ['GRESIE_60', 'GRESIE_80'],
+    ['STANDARD_USA_INTERIOR', 'USA_INTERIOR_MASIV']
+  ];
+
+  for (const group of alternativeGroups) {
+    const materialsInDB = await prisma.material.findMany({
+      where: { internalCode: { in: group } }
+    });
+
+    for (const mat of materialsInDB) {
+      const others = materialsInDB.filter(m => m.id !== mat.id).map(m => ({ id: m.id }));
+      if (others.length > 0) {
+        await prisma.material.update({
+          where: { id: mat.id },
+          data: {
+            alternatives: {
+              connect: others
+            }
+          }
+        });
+      }
+    }
+  }
+  console.log(`[seedBaselineMaterials] Alternative setate cu succes!`);
   
   // Rulăm sincronizarea cu web scraper-ul automat
   console.log(`\n[seedBaselineMaterials] Rulare Web Scraper & Vectorizare...`);

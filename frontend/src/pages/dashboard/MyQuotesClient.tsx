@@ -1,20 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { CheckCircle, XCircle, FileText, Calendar, DollarSign, MessageSquare } from 'lucide-react';
-import { quoteApi, type Quote } from '../../api/quoteApi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle, XCircle, FileText, Calendar, DollarSign, MessageSquare, Phone, Mail, User, Building2, MapPin, Award } from 'lucide-react';
+import { apiPrivate } from '../../api/axios';
 import { useParams } from 'react-router-dom';
+
+interface MarketQuote {
+  id: number;
+  contractorId: number;
+  projectId: number;
+  status: 'PENDING' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'NEGOTIATING';
+  totalAmount: number | null;
+  executionDays: number | null;
+  message: string | null;
+  createdAt: string;
+  contractor?: {
+    companyName: string;
+    description: string | null;
+    yearsExperience: number | null;
+    completedProjects: number;
+    avgRating: number;
+    certifications: string[];
+    county: string;
+    coverageRadius: number;
+    user: {
+      name: string;
+      email: string;
+      phone: string;
+    }
+  };
+}
 
 export default function MyQuotesClient() {
   const { id } = useParams<{ id: string }>();
   const currentProjectId = id ? Number(id) : null;
-  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [quotes, setQuotes] = useState<MarketQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAccepting, setIsAccepting] = useState<number | null>(null);
 
-  // Review State
-  const [reviewQuoteId, setReviewQuoteId] = useState<number | null>(null);
-  const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
-  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  // Contractor Profile Modal State
+  const [selectedContractor, setSelectedContractor] = useState<MarketQuote['contractor'] | null>(null);
 
   useEffect(() => {
     if (currentProjectId) {
@@ -27,7 +51,7 @@ export default function MyQuotesClient() {
   const fetchQuotes = async () => {
     setLoading(true);
     try {
-      const data = await quoteApi.getClientQuotes(currentProjectId!);
+      const { data } = await apiPrivate.get(`/market/projects/${currentProjectId}/quotes`);
       setQuotes(data);
     } catch (err) {
       console.error(err);
@@ -41,31 +65,13 @@ export default function MyQuotesClient() {
     
     setIsAccepting(quoteId);
     try {
-      await quoteApi.acceptQuote(quoteId);
+      await apiPrivate.post(`/market/quotes/${quoteId}/accept`);
       await fetchQuotes();
     } catch (err) {
       console.error(err);
       alert('Eroare la acceptarea ofertei.');
     } finally {
       setIsAccepting(null);
-    }
-  };
-
-  const handleSubmitReview = async (contractorId: number) => {
-    if (!currentProjectId) return;
-    setIsSubmittingReview(true);
-    try {
-      // @ts-ignore
-      await quoteApi.addReview(contractorId, currentProjectId, reviewData.rating, reviewData.comment);
-      alert('Recenzie adăugată cu succes!');
-      setReviewQuoteId(null);
-      setReviewData({ rating: 5, comment: '' });
-      fetchQuotes(); // refresh
-    } catch (err: any) {
-      console.error(err);
-      alert(err.response?.data?.message || 'Eroare la adăugarea recenziei.');
-    } finally {
-      setIsSubmittingReview(false);
     }
   };
 
@@ -100,21 +106,38 @@ export default function MyQuotesClient() {
               className={`bg-white dark:bg-slate-800 rounded-2xl border-2 p-6 flex flex-col ${
                 q.status === 'ACCEPTED' ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/10' : 
                 q.status === 'REJECTED' ? 'border-red-200 opacity-60' :
-                'border-slate-200 dark:border-slate-700'
-              }`}
+                'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+              } transition-all`}
             >
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                  <h3 
+                    className="text-xl font-bold text-blue-600 hover:text-blue-700 cursor-pointer flex items-center gap-2 group"
+                    onClick={() => setSelectedContractor(q.contractor || null)}
+                  >
                     {q.contractor?.companyName || 'Constructor Necunoscut'}
+                    <User className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
                   </h3>
-                  <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold mt-2 ${
+                  
+                  {q.status === 'ACCEPTED' && q.contractor?.user && (
+                    <div className="mt-2 text-sm text-slate-600 flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-buildorange" />
+                        <a href={`tel:${q.contractor.user.phone}`} className="hover:underline">{q.contractor.user.phone}</a>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-buildorange" />
+                        <a href={`mailto:${q.contractor.user.email}`} className="hover:underline">{q.contractor.user.email}</a>
+                      </div>
+                    </div>
+                  )}
+                  <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold mt-3 ${
                     q.status === 'PENDING' ? 'bg-slate-100 text-slate-600' :
                     q.status === 'SENT' ? 'bg-blue-100 text-blue-700' :
                     q.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-700' :
                     'bg-red-100 text-red-700'
                   }`}>
-                    {q.status}
+                    {q.status === 'SENT' ? 'Ofertă Primită' : q.status === 'PENDING' ? 'În aşteptare' : q.status}
                   </span>
                 </div>
                 {q.status === 'ACCEPTED' && <CheckCircle className="h-8 w-8 text-emerald-500" />}
@@ -148,67 +171,11 @@ export default function MyQuotesClient() {
                     </div>
                   )}
 
-                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <span className="text-sm font-semibold block mb-2 text-slate-700 dark:text-slate-300">Variante deviz (BOM):</span>
-                    {q.acceptsBOM ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 text-sm flex items-center gap-1">
-                        <CheckCircle className="h-4 w-4" /> Constructorul acceptă integral devizul propus de Zidario.
-                      </span>
-                    ) : (
-                      <span className="text-amber-600 dark:text-amber-400 text-sm flex items-center gap-1">
-                        Constructorul a propus modificări (vezi detalii).
-                      </span>
-                    )}
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    <span className="text-emerald-600 text-sm flex items-center gap-1">
+                      <CheckCircle className="h-4 w-4" /> Oferta include materialele din deviz (BOM).
+                    </span>
                   </div>
-
-                  {/* Add Review section if ACCEPTED */}
-                  {q.status === 'ACCEPTED' && (
-                    <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
-                      {reviewQuoteId === q.id ? (
-                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                          <h4 className="font-bold text-slate-900 dark:text-white mb-3 text-sm">Lasă o recenzie constructorului</h4>
-                          <div className="mb-3">
-                            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Rating (1-5)</label>
-                            <input 
-                              type="number" min="1" max="5" 
-                              value={reviewData.rating} 
-                              onChange={e => setReviewData({...reviewData, rating: Number(e.target.value)})}
-                              className="w-full px-3 py-2 border border-slate-300 rounded-lg dark:bg-slate-800 dark:border-slate-600 text-sm" 
-                            />
-                          </div>
-                          <div className="mb-4">
-                            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Comentariu</label>
-                            <textarea 
-                              rows={3}
-                              value={reviewData.comment}
-                              onChange={e => setReviewData({...reviewData, comment: e.target.value})}
-                              className="w-full px-3 py-2 border border-slate-300 rounded-lg dark:bg-slate-800 dark:border-slate-600 text-sm"
-                              placeholder="Cum a decurs colaborarea?"
-                            ></textarea>
-                          </div>
-                          <div className="flex gap-2 justify-end">
-                            <button onClick={() => setReviewQuoteId(null)} className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors">
-                              Anulează
-                            </button>
-                            <button 
-                              onClick={() => handleSubmitReview(q.contractorId)}
-                              disabled={isSubmittingReview}
-                              className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
-                            >
-                              {isSubmittingReview ? 'Se trimite...' : 'Trimite Recenzia'}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setReviewQuoteId(q.id)}
-                          className="w-full py-3 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 font-bold rounded-xl transition-colors border border-blue-200 dark:border-blue-800/30"
-                        >
-                          Evaluează Constructorul
-                        </button>
-                      )}
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-slate-500">
@@ -221,9 +188,9 @@ export default function MyQuotesClient() {
                   <button
                     onClick={() => handleAccept(q.id)}
                     disabled={isAccepting === q.id}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50"
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    {isAccepting === q.id ? 'Se acceptă...' : 'Acceptă Oferta'}
+                    {isAccepting === q.id ? 'Se acceptă...' : <><CheckCircle className="w-5 h-5"/> Acceptă Oferta</>}
                   </button>
                 </div>
               )}
@@ -231,6 +198,85 @@ export default function MyQuotesClient() {
           ))}
         </div>
       )}
+
+      {/* MODAL PROFIL CONSTRUCTOR */}
+      <AnimatePresence>
+        {selectedContractor && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setSelectedContractor(null)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className="relative bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-8 max-w-lg w-full z-10"
+            >
+              <button 
+                onClick={() => setSelectedContractor(null)}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+                  <Building2 className="w-8 h-8" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900">{selectedContractor.companyName}</h2>
+                  <div className="flex items-center gap-1 text-slate-500 text-sm mt-1">
+                    <MapPin className="w-4 h-4" /> {selectedContractor.county} (Rază: {selectedContractor.coverageRadius} km)
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <div className="text-2xl font-bold text-slate-800">{selectedContractor.yearsExperience || '-'} ani</div>
+                  <div className="text-xs text-slate-500 font-medium">Experiență</div>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <div className="text-2xl font-bold text-slate-800">{selectedContractor.completedProjects || 0}</div>
+                  <div className="text-xs text-slate-500 font-medium">Proiecte finalizate</div>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 col-span-2 flex items-center gap-3">
+                  <div className="text-2xl font-bold text-amber-500 flex items-center gap-1">
+                    {selectedContractor.avgRating ? selectedContractor.avgRating.toFixed(1) : '-'} <span className="text-lg">★</span>
+                  </div>
+                  <div className="text-xs text-slate-500 font-medium">Rating mediu (recenzii)</div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> Despre firmă
+                  </h4>
+                  <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    {selectedContractor.description || 'Nicio descriere disponibilă.'}
+                  </p>
+                </div>
+
+                {selectedContractor.certifications && selectedContractor.certifications.length > 0 && (
+                  <div>
+                    <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
+                      <Award className="w-4 h-4" /> Certificări
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedContractor.certifications.map((cert, idx) => (
+                        <span key={idx} className="bg-purple-50 text-purple-700 text-xs font-bold px-3 py-1 rounded-full border border-purple-100">
+                          {cert}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

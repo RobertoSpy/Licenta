@@ -101,6 +101,7 @@ interface EditorStore {
 
   // Etaj activ
   activeFloor: FloorKey;
+  projectId: number | null;
 
   // Configurator state
   houseShape: 'rectangle' | 'l_shape' | 'u_shape' | 't_shape';
@@ -135,6 +136,7 @@ interface EditorStore {
   // Floor actions
   /** Setează etajul activ și încarcă elementele sale. Reseteză undo/redo. */
   switchFloor: (floor: FloorKey, elements: CanvasElement[]) => void;
+  setProjectId: (id: number) => void;
 
   // Configurator Actions
   setHouseShape: (shape: 'rectangle' | 'l_shape' | 'u_shape' | 't_shape') => void;
@@ -212,6 +214,7 @@ export const useEditorState = create<EditorStore>((set, get) => ({
 
   // Etaj activ — Parter by default
   activeFloor: 'parter',
+  projectId: null,
 
   // Configurator initial state
   houseShape: INITIAL_SHAPE,
@@ -245,6 +248,8 @@ export const useEditorState = create<EditorStore>((set, get) => ({
       userDeletedOpenings: [],
     });
   },
+
+  setProjectId: (id) => set({ projectId: id }),
 
   addElement: (el) => {
     get().pushToUndo();
@@ -482,9 +487,10 @@ export const useEditorState = create<EditorStore>((set, get) => ({
     }
     
     (window as any).layoutDebounceTimeout = setTimeout(async () => {
-      const { houseShape, dimensions, activeRooms, streetOrientation, userDeletedOpenings, addedOpenings } = get();
+      const { houseShape, dimensions, activeRooms, streetOrientation, userDeletedOpenings, addedOpenings, projectId } = get();
+      if (!projectId) return; // Cannot generate layout without projectId
       try {
-        let elements = await editorApi.generateConfiguratorLayout(houseShape, dimensions, activeRooms, streetOrientation);
+        let elements = await editorApi.generateConfiguratorLayout(projectId, houseShape, dimensions, activeRooms, streetOrientation);
 
         // Filter out deleted openings
         elements = elements.filter((el: CanvasElement) => {

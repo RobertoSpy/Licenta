@@ -23,12 +23,26 @@ enum QuoteStatus {
   NEGOTIATING
 }
 
+enum ContractorSpecialization {
+  FUNDATII
+  STRUCTURA
+  PLANSEU
+  ACOPERIS
+  TAMPLARIE
+  INSTALATII_ELECTRICE
+  INSTALATII_SANITARE
+  INSTALATII_TERMICE
+  FINISAJE
+  CONSTRUCTII_GENERALE
+}
+
 model User {
   id           Int       @id @default(autoincrement())
   email        String    @unique
   password     String
   name         String?
-  refreshToken String?   // SalveazÄƒ tokenul de refresh curent pentru securitate (opÈ›ional, dar recomandat pt validare la delogare)
+  phone        String?   // Adăugat pentru platforma de constructori
+  refreshToken String?   // Salvează tokenul de refresh curent pentru securitate (opțional, dar recomandat pt validare la delogare)
   passwordResetToken   String?
   passwordResetExpires DateTime?
   isVerified           Boolean   @default(false)
@@ -98,6 +112,7 @@ model Project {
   energyClass     String?   // "A" | "B" | "C" | "D" | "E" | "F" | "G"
   energyKwhYear   Float?    // consum estimat kWh/mp/an
   bomGeneratedAt  DateTime? // ultima generare BOM
+  isPublishedForBidding Boolean @default(false) // flag care indică dacă proiectul a fost postat pe Marketplace
   constructionPhases ConstructionPhase[]
   materialOverrides  ProjectMaterialOverride[]
   bomPhaseProgress   BomPhaseProgress?
@@ -351,7 +366,7 @@ model ContractorProfile {
   companyName    String
   cui            String?  // CUI firma
   description    String?  // despre firmă, experiență
-  specializations String[] // ["Fundații", "Structuri", "Finisaje", "La cheie"]
+  specializations ContractorSpecialization[]
   county         String   // județul de operare principal
   coverageRadius Int      @default(50) // km raza de acoperire
   

@@ -12,6 +12,7 @@ import { useBOMAdvisorChat } from '../../hooks/useBOMAdvisorChat';
 import { useScreenTutor } from '../../hooks/useScreenTutor';
 import { ConstructionStepTracker } from './ConstructionStepTracker';
 import { X, Send, Bot, RotateCcw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Renderer minimal pentru Markdown — fără librărie externă
 // Suportă: **bold**, bullet lists (-), paragrafe
@@ -66,7 +67,7 @@ interface BOMAdvisorChatProps {
 }
 
 export const BOMAdvisorChat = ({ projectId, isOpen, onClose, onUnreadChange, onCanGoNextChange }: BOMAdvisorChatProps) => {
-  const { messages, isLoading, sendMessage, clearHistory, activePhase, completedPhases, confirmPhase, addSystemMessage, unreadCount, markAsRead } = useBOMAdvisorChat(projectId);
+  const { messages, isLoading, sendMessage, clearHistory, activePhase, completedPhases, confirmPhase, addSystemMessage, addLocalUserMessage, unreadCount, markAsRead } = useBOMAdvisorChat(projectId);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -88,17 +89,21 @@ export const BOMAdvisorChat = ({ projectId, isOpen, onClose, onUnreadChange, onC
     }
   }, [canGoNext, onCanGoNextChange]);
 
-  const hasTriggeredQuestion = useRef(false);
+  const triggeredPhases = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!hasTriggeredQuestion.current && activePhase) {
-       hasTriggeredQuestion.current = true;
+    if (activePhase && !triggeredPhases.current.has(activePhase)) {
+       triggeredPhases.current.add(activePhase);
+       
+       const phaseNames = {
+          fundatie: 'Fundație', structura: 'Structură', planseu: 'Planșeu & Coroană',
+          termoizolatie: 'Termoizolație & Hidroizolație', acoperis: 'Acoperiș', tamplarie: 'Tâmplărie',
+          instalatii: 'Instalații', finisaje: 'Finisaje', exterior: 'Amenajări Exterioare'
+       };
+       const phaseName = phaseNames[activePhase as keyof typeof phaseNames] || activePhase;
+
        setTimeout(() => {
-         import('../../data/tutorialContent').then(({ SCREEN_TUTORIALS }) => {
-            if (SCREEN_TUTORIALS.bom.questionMessage) {
-               addSystemMessage(SCREEN_TUTORIALS.bom.questionMessage);
-            }
-         });
-       }, 2000);
+          addSystemMessage(`Suntem la etapa de **${phaseName}**. Ai nelămuriri sau vrei să discutăm despre materialele alese înainte să aprobi această etapă?`, true);
+       }, 500);
     }
   }, [activePhase, addSystemMessage]);
 
@@ -145,18 +150,27 @@ export const BOMAdvisorChat = ({ projectId, isOpen, onClose, onUnreadChange, onC
     'Ce materiale de acoperiș recomandați?',
   ];
 
-  if (!isOpen) return null;
-
   return (
-    <>
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
-        onClick={onClose}
-      />
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Overlay */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
+            onClick={onClose}
+          />
 
-      {/* Panou lateral */}
-      <div className="fixed top-0 right-0 h-full w-[460px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-100">
+          {/* Panou lateral */}
+          <motion.div 
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed top-0 right-0 h-full w-[460px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-100"
+          >
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800 shrink-0">
@@ -228,6 +242,19 @@ export const BOMAdvisorChat = ({ projectId, isOpen, onClose, onUnreadChange, onC
                     {msg.isStreaming && (
                       <span className="inline-block w-1.5 h-4 ml-0.5 bg-buildorange animate-pulse rounded-sm" />
                     )}
+                    {msg.isSystemInjection && msg.requiresAnswer && idx === messages.length - 1 && (
+                      <div className="mt-3 pt-3 border-t border-slate-200/60">
+                        <button
+                          onClick={() => {
+                            addLocalUserMessage('Nu, totul este clar. Aprobă etapa.');
+                            onClose();
+                          }}
+                          className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold rounded-lg transition-colors"
+                        >
+                          Nu am nelămuriri. Aprobă etapa.
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p>{msg.text}</p>
@@ -285,7 +312,9 @@ export const BOMAdvisorChat = ({ projectId, isOpen, onClose, onUnreadChange, onC
             Răspunsurile citează normativele tehnice din baza de date
           </p>
         </div>
-      </div>
+      </motion.div>
     </>
+    )}
+    </AnimatePresence>
   );
 };

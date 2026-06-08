@@ -1,14 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiPrivate } from '../api/axios';
 import type { ProjectFormData } from '../components/wizard/ProjectWizard';
 
 export const useProjectGuard = () => {
+  const initStarted = useRef(false);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [restoredData, setRestoredData] = useState<Partial<ProjectFormData> | null>(null);
   const [restoredStep, setRestoredStep] = useState<number | null>(null);
 
   useEffect(() => {
+    if (initStarted.current) return;
+    initStarted.current = true;
+
     const initializeProject = async () => {
       try {
         const savedId = localStorage.getItem('activeProjectId');

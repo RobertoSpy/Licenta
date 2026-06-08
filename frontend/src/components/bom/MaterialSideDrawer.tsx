@@ -82,64 +82,17 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
 
   const explainWithAI = async (alt: Alternative) => {
     if (!currentItem) return;
-    setAiExplanation('');
-    setActiveAltCode(alt.internalCode);
-    setIsAiLoading(true);
-    setAiNoSources(false);
+    
+    const currentName = currentItem.material.name;
+    const prompt = `Salut Zidario! Te rog să compari "${currentName}" (materialul meu curent din deviz) cu varianta "${alt.name}".
+Care sunt avantajele și dezavantajele pentru proiectul meu? E o alegere bună?`;
 
-    try {
-      const currentCode = (currentItem.material as any).internalCode as string | undefined;
-
-      // Use the rich POST endpoint if we have both codes (full project context)
-      let response: Response;
-      if (currentCode) {
-        response = await fetchWithAuth(`/api/ai/explain-material`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            projectId,
-            currentMaterialCode: currentCode,
-            alternativeMaterialCode: alt.internalCode,
-          }),
-        });
-      } else {
-        // Legacy fallback — no internalCode in BOMItem
-        const url = `/api/ai/explain-material?base=${encodeURIComponent(currentItem.material.name)}&alt=${encodeURIComponent(alt.name)}`;
-        response = await fetchWithAuth(url);
-      }
-
-      if (!response.body) throw new Error('No body');
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const chunkStr = decoder.decode(value, { stream: true });
-        const lines = chunkStr.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.replace('data: ', '').trim();
-            if (dataStr === '[DONE]') {
-              setIsAiLoading(false);
-              break;
-            }
-            try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed?.meta?.noSources) setAiNoSources(true);
-              if (parsed.text) setAiExplanation(prev => prev + parsed.text);
-            } catch(_) {}
-          }
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      setAiExplanation('Eroare la conectarea cu Zidario AI.');
-      setIsAiLoading(false);
-    }
+    // Trimite mesajul către chat-ul global
+    window.dispatchEvent(new CustomEvent('zidario-ask', { detail: { message: prompt } }));
+    
+    // Închidem drawer-ul pentru a lăsa utilizatorul să vadă chat-ul
+    onClose();
   };
-
 
   if (!isOpen || !currentItem) return null;
 
@@ -231,45 +184,20 @@ export const MaterialSideDrawer = ({ isOpen, onClose, currentItem, projectId, on
                     </div>
 
 
-                    {/* AI Section — explică alternativa */}
-                    {activeAltCode === alt.internalCode && (aiExplanation || isAiLoading) ? (
-                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 text-sm text-slate-700 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
-                        <p className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                          <span className="text-lg">🤖</span> Zidario AI
-                        </p>
-                        {aiNoSources && (
-                          <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
-                            Fără surse normative indexate. Răspuns orientativ.
-                          </div>
-                        )}
-                        <div className="leading-relaxed whitespace-pre-wrap">
-                          {aiExplanation}
-                          {isAiLoading && <span className="inline-block w-1.5 h-4 ml-1 bg-blue-500 animate-pulse" />}
-                        </div>
-                      </div>
-                    ) : (
-                      <button 
-                        onClick={() => explainWithAI(alt)}
-                        className="text-left flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium w-max px-2 py-1 -ml-2 rounded-lg hover:bg-blue-50 transition-colors"
-                      >
-                        🤖 Întreabă Zidario: Pro și Contra față de materialul curent
-                      </button>
-                    )}
+                    <button 
+                      onClick={() => explainWithAI(alt)}
+                      className="text-left flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium w-max px-2 py-1 -ml-2 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      🤖 Întreabă Zidario (în chat): Pro și Contra
+                    </button>
 
                     <button 
                       onClick={() => handleReplace(alt)}
                       disabled={replacingCode === alt.internalCode}
-                      className={`mt-2 w-full font-bold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                        activeAltCode === alt.internalCode && aiExplanation.includes('NU')
-                          ? 'bg-orange-100 hover:bg-orange-200 text-orange-700 border-2 border-orange-300'
-                          : 'bg-slate-900 hover:bg-slate-800 text-white'
-                      }`}
+                      className={`mt-2 w-full font-bold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800 text-white`}
                     >
                       {replacingCode === alt.internalCode
                         ? 'Se aplică...'
-                        : activeAltCode === alt.internalCode && aiExplanation.includes('NU')
-                        ? '⚠️ Aplică oricum (Posibil Neconform)'
                         : 'Aplică această alternativă'
                       }
                     </button>

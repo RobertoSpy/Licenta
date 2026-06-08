@@ -121,16 +121,26 @@ export async function suggestRoomProgram(input: SuggestRoomsInput): Promise<Room
 
 
   const purpose = (input.buildingPurpose as BuildingPurpose) ?? 'residential';
-  
-  const ragQuery = 'program functional plan compartimentare suprafata utila minima legala';
-  const activeAgents = await detectRequiredAgents(ragQuery, 'editor');
+
+  // Query-uri specifice per agent — semantic mai apropiat de chunks-urile indexate
+  const AGENT_QUERIES: Partial<Record<AgentType, string>> = {
+    legal:         'suprafata minima camera locuinta dormitor living bucatarie baie hol minim legal',
+    architectural: 'suprafata utila minima camera plan locuinta compartimentare zona zi noapte circulatie hol iluminare naturala NP057',
+    structural:    'structura rezistenta pereti portanti beton armat grosime planseu',
+    geotehnic:     'fundatie teren sol adancime fundare',
+    seismic:       'zona seismica etaje inaltime cladire regim inaltime',
+  };
+
+  // Agents mereu activi pentru planul functional
+  const activeAgents: AgentType[] = ['legal', 'architectural', 'structural', 'geotehnic', 'seismic'];
 
   const contextParts = await Promise.all(
     activeAgents.map(async agent => {
       const agentSources = AGENT_SOURCES_BY_PURPOSE[purpose]?.[agent] || [];
       if (agentSources.length === 0) return null;
 
-      const chunks = await searchHybrid(ragQuery, agent, 4, agentSources, purpose);
+      const query = AGENT_QUERIES[agent] ?? 'plan functional locuinta compartimentare';
+      const chunks = await searchHybrid(query, agent, 4, agentSources, purpose);
       if (chunks.length === 0) return null;
 
       const chunksText = chunks

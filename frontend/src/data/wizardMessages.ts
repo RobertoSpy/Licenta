@@ -31,16 +31,16 @@ export const WIZARD_MESSAGES: Record<string, WizardMessage> = {
   },
 
   screen3: {
-    text: `Pe baza locației și solului tău, calculez acum **reglementările aplicabile**.\n\nAceste date vin direct din normativele românești — nu sunt estimări:\n• **Numărul maxim de etaje** permis pe zona seismică\n• **Adâncimea minimă a fundației** conform NP112-2014\n• **Restricțiile de zonare** din PUG local\n\nDacă ai nelămuriri despre o reglementare specifică, întreabă-mă și îți explic articolul exact din normativ.`,
-    links: []
-  },
-
-  screen4: {
     text: `Alege **stilul arhitectural** al casei tale.\n\nStilul influențează costul finisajelor și complexitatea șarpantei, dar **nu afectează rezistența structurală** — aceasta este determinată de zona seismică și tipul de sol.\n\n💡 **Sfat:** Subsolul adaugă aprox. 30% la costul structurii.\n\nAi întrebări despre diferențele de cost între stiluri sau configurații? Scrie-mi mai jos.`,
     links: [
       { label: 'Case moderne — exemple reale', url: 'https://www.archdaily.com/tag/residential' },
       { label: 'Case clasice românești', url: 'https://igloo.ro' }
     ]
+  },
+
+  screen4: {
+    text: `Pe baza locației, a solului și a configurației casei tale, calculez acum **reglementările aplicabile**.\n\nAceste date vin direct din normativele românești — nu sunt estimări:\n• **Numărul maxim de etaje** permis pe zona seismică\n• **Adâncimea minimă a fundației** conform NP112-2014\n• **Restricțiile de zonare** din PUG local\n\nDacă ai nelămuriri despre o reglementare specifică, întreabă-mă și îți explic articolul exact din normativ.`,
+    links: []
   },
 
   // Mesaje pentru Faza 2+ (pregătite anticipat)

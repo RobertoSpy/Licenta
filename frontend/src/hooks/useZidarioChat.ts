@@ -251,6 +251,18 @@ export function useZidarioChat(
     summaryRef.current = null;
   }, []);
 
+  // ── Listener pentru cereri globale (ex: MaterialSideDrawer) ────────────────
+  useEffect(() => {
+    const handleAskEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ message: string }>;
+      if (customEvent.detail?.message) {
+        sendMessage(customEvent.detail.message);
+      }
+    };
+    window.addEventListener('zidario-ask', handleAskEvent);
+    return () => window.removeEventListener('zidario-ask', handleAskEvent);
+  }, [sendMessage]);
+
   return {
     messages,
     isStreaming,

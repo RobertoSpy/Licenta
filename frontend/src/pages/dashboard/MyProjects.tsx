@@ -4,7 +4,7 @@ import { apiPrivate } from '../../api/axios';
 import { Button } from '../../components/ui/Button';
 import {
   Plus, Building, FileText, CheckCircle2, Clock, ArrowRight,
-  Inbox, Send, AlertCircle, Building2, MapPin, Calendar, Users, XCircle
+  Inbox, Send, AlertCircle, Building2, MapPin, Calendar, Users, XCircle, MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProjectWizard } from '../../components/wizard/ProjectWizard';
@@ -23,6 +23,7 @@ interface Project {
   bomItems?: unknown[];
   planStatus?: string;
   bomGeneratedAt?: string;
+  isPublishedForBidding?: boolean;
 }
 
 interface AcceptedProject {
@@ -396,13 +397,54 @@ export const MyProjects = () => {
                   {!proj.county && !proj.houseStyle && <span>{new Date(proj.createdAt).toLocaleDateString('ro-RO')}</span>}
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="text-xs font-medium text-slate-400">
                     {new Date(proj.createdAt).toLocaleDateString('ro-RO', { day:'numeric', month:'short', year:'numeric' })}
                   </div>
-                  <div className="flex items-center gap-1 text-buildorange font-bold text-sm group-hover:gap-2 transition-all">
-                    {proj.isCompleted ? 'Detalii' : 'Continuă'} <ArrowRight className="w-4 h-4" />
-                  </div>
+                  
+                  {proj.isCompleted ? (
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        className="h-8 text-xs px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/dashboard/projects/${proj.id}/editor`);
+                        }}
+                      >
+                        Plan 2D
+                      </Button>
+                      
+                      {(proj.planStatus === 'published' || proj.bomGeneratedAt) && (
+                        <Button 
+                          className="h-8 text-xs px-3 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-none"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/dashboard/projects/${proj.id}/bom`);
+                          }}
+                        >
+                          Deviz (BOM)
+                        </Button>
+                      )}
+                      
+                      {proj.isPublishedForBidding && (
+                        <Button 
+                          className="h-8 text-xs px-3 bg-blue-50 text-blue-700 hover:bg-blue-100 border-none"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/dashboard/projects/${proj.id}/quotes`);
+                          }}
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                          Oferte
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-buildorange font-bold text-sm group-hover:gap-2 transition-all">
+                      Continuă <ArrowRight className="w-4 h-4" />
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>

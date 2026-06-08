@@ -8,7 +8,7 @@
     "dev": "nodemon -L src/index.ts",
     "test": "jest --runInBand",
     "seed:normatives": "ts-node -T src/scripts/seedNormatives.ts",
-    "seed:materials": "ts-node -T src/scripts/seedMaterials.ts",
+    "seed:materials": "ts-node -T src/scripts/seedBaselineMaterials.ts",
     "seed:market": "ts-node -T src/scripts/seedMarketData.ts"
   },
   "prisma": {

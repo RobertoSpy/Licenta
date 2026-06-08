@@ -4,8 +4,10 @@
 // Layout: bara de progres verticală (stânga) + BOMPhaseCard (dreapta).
 
 import { useState, useCallback } from 'react';
-import { CheckCircle2, Lock, Circle } from 'lucide-react';
+import { CheckCircle2, Lock, Circle, PartyPopper, Download, Home, Briefcase } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { api, apiPrivate } from '../../api/axios';
 import type { BOMItem } from '../../hooks/useBOMData';
 import { useBOMPhaseWizard, PHASE_CONFIG, type BomPhaseKey } from '../../hooks/useBOMPhaseWizard';
 import { BOMPhaseCard } from './BOMPhaseCard';
@@ -51,7 +53,39 @@ export const BOMPhaseWizard = ({
 
   // Faza vizuală locală — poate fi diferită de cea activă din DB
   // (utilizatorul poate naviga înapoi la etape confirmate)
-  const [localActivePhase, setLocalActivePhase] = useState<BomPhaseKey>(dbActivePhase);
+  const [localActivePhase, setLocalActivePhase] = useState<BomPhaseKey | null>(null);
+  const navigate = useNavigate();
+
+  const handleDownloadPDF = async () => {
+    try {
+      // Setăm buttonul ca loading (dacă era posibil), apoi folosim axios care atașează tokenul corect
+      const response = await apiPrivate.get(`/bom/${projectId}/export-pdf`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Deviz_Proiect_${projectId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Eroare descărcare PDF:', err);
+      alert('Eroare la descărcarea PDF-ului.');
+    }
+  };
+
+  const handlePublish = async () => {
+    try {
+      await apiPrivate.post(`/market/projects/${projectId}/publish`);
+      navigate(`/dashboard/projects/${projectId}/quotes`);
+    } catch (error) {
+      console.error('Eroare la publicarea proiectului:', error);
+      alert('A apărut o eroare la publicarea proiectului.');
+    }
+  };
+
   const [isConfirming, setIsConfirming] = useState(false);
 
   // Sincronizăm faza locală cu DB când se schimbă din exterior
@@ -112,9 +146,35 @@ export const BOMPhaseWizard = ({
           <p className="text-4xl font-black mt-4 mb-6">
             {new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON', maximumFractionDigits: 0 }).format(grandTotal)}
           </p>
-          <p className="text-xs text-emerald-200">
+          <p className="text-xs text-emerald-200 mb-8">
             Prețuri estimate din catalogul Dedeman · Actualizate periodic prin scraping automatizat
           </p>
+          
+          <div className="flex flex-col sm:flex-row justify-center gap-4 max-w-2xl mx-auto">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-emerald-700 hover:bg-emerald-50 font-bold rounded-xl transition-all shadow-md"
+            >
+              <Download className="w-5 h-5" />
+              Descarcă Deviz PDF
+            </button>
+            
+            <button
+              onClick={handlePublish}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white hover:bg-slate-800 font-bold rounded-xl transition-all shadow-md shadow-slate-900/20"
+            >
+              <Briefcase className="w-5 h-5" />
+              Caută Constructori (Publică)
+            </button>
+            
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-700 text-white hover:bg-emerald-800 font-bold rounded-xl transition-all"
+            >
+              <Home className="w-5 h-5" />
+              Acasă
+            </button>
+          </div>
         </motion.div>
 
         {/* Sumar pe etape */}

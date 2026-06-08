@@ -18,7 +18,7 @@ jobs:
 
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # EXEMPLU: Dacă am folosi Vercel pentru Frontend
     - name: Deploy Frontend to Vercel
@@ -35,5 +35,9 @@ jobs:
       uses: docker/build-push-action@v4
       with:
         context: ./backend
-        push: false # (Schimbat pe true în cazul real dacă avem Docker Hub conectat)
+        push: false # (Pentru licență, deploy-ul efectiv backend se face manual sau necesită altă infrastructură)
         tags: roberto/licenta-backend:latest
+
+    # - name: Run Production Migrations
+    #   run: docker exec <container> npx prisma migrate deploy
+    #   # Decomentează când infrastructura de producție e configurată

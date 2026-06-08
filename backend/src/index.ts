@@ -43,8 +43,8 @@ app.use(cors({
 // 3. PARSERE: JSON body + cookies
 //    Ordinea contează: parsăm după CORS, înainte de rate limiter
 // ─────────────────────────────────────────────
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
 
 // ─────────────────────────────────────────────

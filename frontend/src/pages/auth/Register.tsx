@@ -3,23 +3,28 @@ import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../api/axios';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Building2, Lock, Mail, User } from 'lucide-react';
+import { Building2, Lock, Mail, User, ChevronDown, MapPin, Phone } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { ContractorSpecialization, SPECIALIZATION_LABELS } from '../../types/contractor';
+import { ROMANIAN_COUNTIES } from '../../utils/romanianCounties';
 
 export const Register = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
     role: 'CLIENT', // 'CLIENT' | 'CONTRACTOR'
     companyName: '',
     cui: '',
-    county: ''
+    county: '',
+    specializations: [] as ContractorSpecialization[]
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isCountyOpen, setIsCountyOpen] = useState(false);
   const [acceptedGdpr, setAcceptedGdpr] = useState(false);
   const navigate = useNavigate();
 
@@ -92,6 +97,11 @@ export const Register = () => {
           setIsLoading(false);
           return;
         }
+        if (formData.specializations.length === 0) {
+          setError('Te rugăm să alegi cel puțin o specializare (filieră).');
+          setIsLoading(false);
+          return;
+        }
         await api.post('/auth/register-contractor', {
           name: formData.name,
           email: formData.email,
@@ -99,7 +109,7 @@ export const Register = () => {
           companyName: formData.companyName,
           cui: formData.cui,
           county: formData.county,
-          specializations: ['General'],
+          specializations: formData.specializations,
           coverageRadius: 50
         });
       } else {
@@ -212,6 +222,17 @@ export const Register = () => {
               required
             />
 
+            <Input
+              label="Număr Telefon"
+              name="phone"
+              type="tel"
+              icon={<Phone className="w-5 h-5" />}
+              placeholder="ex. 0722123456"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+            />
+
             {formData.role === 'CONTRACTOR' && (
               <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <h4 className="text-sm font-semibold text-slate-700">Detalii Firmă</h4>
@@ -237,20 +258,81 @@ export const Register = () => {
                   />
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Județ</label>
-                    <select
-                      name="county"
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-buildorange outline-none"
-                      value={formData.county}
-                      onChange={handleChange}
-                      required
+                    <div 
+                      className="relative"
+                      tabIndex={0}
+                      onBlur={(e) => {
+                        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                          setIsCountyOpen(false);
+                        }
+                      }}
                     >
-                      <option value="">Alege Județ</option>
-                      <option value="Bucuresti">București</option>
-                      <option value="Cluj">Cluj</option>
-                      <option value="Timis">Timiș</option>
-                      <option value="Iasi">Iași</option>
-                      <option value="Ilfov">Ilfov</option>
-                    </select>
+                      <div 
+                        onClick={() => setIsCountyOpen(!isCountyOpen)}
+                        className={`w-full px-4 py-[9px] border ${isCountyOpen ? 'border-buildorange ring-2 ring-buildorange/20' : 'border-slate-300'} rounded-lg flex items-center justify-between cursor-pointer hover:border-buildorange transition-all bg-white`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-slate-400" />
+                          <span className={formData.county ? "text-slate-900 text-sm" : "text-slate-400 text-sm"}>
+                            {formData.county || "Alege Județ"}
+                          </span>
+                        </div>
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isCountyOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                      
+                      {isCountyOpen && (
+                        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                          <div 
+                            onClick={() => {
+                              setFormData({...formData, county: ''});
+                              setIsCountyOpen(false);
+                            }}
+                            className={`px-4 py-2 cursor-pointer text-sm hover:bg-slate-50 transition-colors ${!formData.county ? 'bg-orange-50 text-buildorange font-medium' : 'text-slate-600'}`}
+                          >
+                            Alege Județ
+                          </div>
+                          {ROMANIAN_COUNTIES.map(county => (
+                            <div 
+                              key={county}
+                              onClick={() => {
+                                setFormData({...formData, county});
+                                setIsCountyOpen(false);
+                              }}
+                              className={`px-4 py-2 cursor-pointer text-sm hover:bg-slate-50 transition-colors border-t border-slate-50 ${formData.county === county ? 'bg-orange-50 text-buildorange font-medium' : 'text-slate-600'}`}
+                            >
+                              {county}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Specializări (poți alege mai multe)</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(SPECIALIZATION_LABELS).map(([enumValue, label]) => {
+                      const spec = enumValue as ContractorSpecialization;
+                      return (
+                        <label key={spec} className="flex items-center gap-2 cursor-pointer text-sm text-slate-600 hover:text-slate-900">
+                          <input 
+                            type="checkbox"
+                            className="rounded border-slate-300 text-buildorange focus:ring-buildorange"
+                            checked={formData.specializations.includes(spec)}
+                            onChange={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                specializations: prev.specializations.includes(spec)
+                                  ? prev.specializations.filter(s => s !== spec)
+                                  : [...prev.specializations, spec]
+                              }));
+                            }}
+                          />
+                          {label}
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

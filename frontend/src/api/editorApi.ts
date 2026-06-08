@@ -51,12 +51,14 @@ export const editorApi = {
    * Regenerează layout-ul configuratorului din backend folosind datele actualizate de la utilizator.
    */
   async generateConfiguratorLayout(
+    projectId: number,
     shape: 'rectangle' | 'l_shape' | 'u_shape' | 't_shape',
     dimensions: any,
     rooms: any[],
     streetOrientation: string
   ): Promise<CanvasElement[]> {
     const response = await apiPrivate.post('/editor/generate-configurator-layout', {
+      projectId,
       shape,
       dimensions,
       rooms,

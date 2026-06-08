@@ -37,8 +37,13 @@ export const tenantGuard = async (
   }
 
   if (project.userId !== req.user?.id) {
-    res.status(403).json({ message: 'Acces interzis.' });
-    return;
+    // Excepție: Constructorii pot accesa proiectele (ex: pentru PDF-uri) dacă acestea sunt publicate pe marketplace
+    if (req.user?.role === 'CONTRACTOR' && (project as any).isPublishedForBidding) {
+      // Permite accesul
+    } else {
+      res.status(403).json({ message: 'Acces interzis.' });
+      return;
+    }
   }
 
   // Atașăm proiectul verificat la request — controllere aval nu mai fac query duplicat

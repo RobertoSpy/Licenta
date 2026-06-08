@@ -5,6 +5,7 @@ import { agentOrchestrator } from '../ai/services/agentOrchestrator';
 import { bomPhaseProgressRepository, BomPhaseKey, BomPhaseState } from './bomPhaseProgressRepository';
 import { bomIntroCacheRepository } from './bomIntroCacheRepository';
 import { GoogleGenAI } from '@google/genai';
+import { pdfService } from './pdfService';
 
 const BOM_PHASE_ORDER: BomPhaseKey[] = [
   'fundatie',
@@ -313,17 +314,59 @@ export const confirmBOMPhase = async (req: Request, res: Response): Promise<void
     }
 
     const state = await loadPhaseState(projectId);
+    
+    // Asigură-te că adaugi faza în completedPhases dacă nu e deja
     if (!state.completedPhases.includes(state.activePhase)) {
       state.completedPhases = [...state.completedPhases, state.activePhase];
-      await savePhaseState(projectId, state);
     }
+    
+    // Indiferent dacă a fost abia acum completată sau mai devreme via chat,
+    // avansează automat activePhase la următoarea etapă nefinalizată.
+    let nextPhase = state.activePhase;
+    const currentIndex = BOM_PHASE_ORDER.indexOf(state.activePhase);
+    for (let i = currentIndex + 1; i < BOM_PHASE_ORDER.length; i++) {
+       if (!state.completedPhases.includes(BOM_PHASE_ORDER[i])) {
+          nextPhase = BOM_PHASE_ORDER[i];
+          break;
+       }
+    }
+    
+    // Salvăm doar dacă s-a schimbat ceva (fază completată sau faza activă s-a mutat)
+    state.activePhase = nextPhase;
+    await savePhaseState(projectId, state);
 
     res.json(state);
   } catch (error: any) {
-    console.error('[BOMController.confirmBOMPhase] Eroare:', error);
+    console.error('[bomController.confirmBOMPhase] Eroare:', error);
     res.status(500).json({ error: 'Eroare la confirmarea etapei' });
   }
 };
+
+/**
+ * GET /api/bom/:projectId/export-pdf
+ * Generează PDF-ul pentru proiectul specificat.
+ */
+export const exportPdf = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const projectId = parseInt(req.params.projectId as string, 10);
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'ID proiect invalid' });
+      return;
+    }
+
+    const pdfBuffer = await pdfService.generateBOMPdf(projectId);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=Deviz_Zidario_Proiect_${projectId}.pdf`);
+    
+    // Puppeteer Buffer poate fi trimis direct cu res.send
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    console.error('[bomController.exportPdf] Eroare:', error);
+    res.status(500).json({ error: 'Eroare la generarea PDF-ului' });
+  }
+};
+
 
 /**
  * POST /api/bom/:projectId/chat

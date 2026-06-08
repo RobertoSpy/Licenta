@@ -72,30 +72,18 @@ export const Step3Regulations = ({ data, updateData }: Props) => {
           'Authorization': `Bearer ${token}`
         },
 body: JSON.stringify({
-  message: `Oferă un rezumat detaliat și explicativ pentru reglementările tehnice ale terenului meu 
-    din ${data.locality || data.county || 'România'}, 
-    județul ${data.county}. 
-    Zona seismică este ${data.seismicZone} 
-    și adâncimea de îngheț este de ${data.frostDepthCm}cm. 
-    Explică de ce sunt importante aceste valori pentru fundație 
-    și câte etaje pot construi tehnic.
-    Menționează obligatoriu că limita tehnică națională este 
-    P+${data.maxAllowedFloors} dar că trebuie să obțin 
-    Certificatul de Urbanism de la Primăria ${data.locality} 
-    pentru a afla restricțiile locale exacte prin PUG, 
-    deoarece acestea pot fi mai stricte decât limita națională.
-    IMPORTANT: Acesta trebuie să fie doar un rezumat informativ și detaliat. NU îmi pune nicio întrebare la final și nu mă invita la dialog. Nu folosi expresii de genul "poți să-mi spui" sau "ce părere ai".
-    CRITIC: Bazează-te STRICT pe contextul furnizat și pe extrasele din baza ta de date vectorizată (RAG) pentru a identifica și aplica normativele tehnice naționale corecte. Nu inventa reguli, nu face presupuneri și menține un ton profesional de expert inginer structurist.`,
+  message: `Fă o sinteză tehnică, dar prietenoasă, a proiectului (max 5-6 rânduri) pentru un om non-tehnic. Ai datele: Județ ${data.county}, zonă seismică ${data.seismicZone}, adâncime îngheț ${data.frostDepthCm}cm. Casa are stil arhitectural ${data.houseStyle}, cu regim de înălțime P+${data.upperFloorsCount}${data.hasBasement ? ' și subsol' : ''}. Integrează aspecte despre arhitectură (cum influențează terenul și stilul ales structura de rezistență și compartimentarea), eficiență energetică (certificat energetic / norme NZEB) și un scurt sfat despre estimarea financiară/costul materialelor. Amintește-i că trebuie să ceară Certificatul de Urbanism de la primărie (maxim admis tehnic național: P+${data.maxAllowedFloors}). Nu pune întrebări la final.`,
+  screenContext: 'wizard',
   contextString: `
     Județ: ${data.county}
     Localitate: ${data.locality}
-    Suprafață teren: ${data.plotAreaSqm || 0} m²
     Zonă seismică: ${data.seismicZone}
     Adâncime îngheț: ${data.frostDepthCm}cm
-    Tip sol: ${data.soilType}
-    Note adiționale teren: ${data.soilNotes || 'Fără note'}
-    Maximum tehnic etaje (CR6+P100): P+${data.maxAllowedFloors}
-    Adâncime minimă fundație (NP112): ${data.minFoundationDepthCm}cm
+    Maximum tehnic etaje: P+${data.maxAllowedFloors}
+    Adâncime minimă fundație: ${data.minFoundationDepthCm}cm
+    Stil casă: ${data.houseStyle}
+    Subsol: ${data.hasBasement ? 'Da' : 'Nu'}
+    Etaje superioare: ${data.upperFloorsCount}
   `.trim()
 })
       });

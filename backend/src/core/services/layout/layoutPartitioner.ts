@@ -479,6 +479,20 @@ export function generateConfiguratorLayout(
   const doorSizePx = Math.round(ARCHITECTURAL_STANDARDS.DOOR.RESIDENTIAL_INTERIOR * PIXELS_PER_METER);
   const createdDoors = new Set<string>();
 
+  // Helper pt limita usi
+  const doorCounts: Record<string, number> = {};
+  for (const pr of partitionedRooms) { doorCounts[pr.id] = 0; }
+  
+  function canAddDoor(roomId: string): boolean {
+    const roomDef = indoorRooms.find(ar => ar.id === roomId);
+    if (roomDef?.isCirculation || roomDef?.zone === 'distributie') return true;
+    return (doorCounts[roomId] || 0) < 2;
+  }
+  function incrementDoor(r1: string, r2: string) {
+    if (doorCounts[r1] !== undefined) doorCounts[r1]++;
+    if (doorCounts[r2] !== undefined) doorCounts[r2]++;
+  }
+
   for (const room of indoorRooms) {
     if (!room.hasDoorTo || room.hasDoorTo.length === 0) continue;
     const roomP = partitionedRooms.find(r => r.id === room.id);
@@ -497,6 +511,9 @@ export function generateConfiguratorLayout(
 
       const pairId = [roomP.id, targetRoom.id].sort().join('-');
       if (createdDoors.has(pairId)) continue;
+      
+      // Limitare numar usi la 2 pt camere locuibile
+      if (!canAddDoor(roomP.id) || !canAddDoor(targetRoom.id)) continue;
 
       // Try vertical shared wall (rooms side-by-side)
       const xDiff = Math.abs(roomP.bbox.x + roomP.bbox.w - targetRoom.bbox.x);
@@ -517,6 +534,7 @@ export function generateConfiguratorLayout(
           rotation: 0,
         });
         createdDoors.add(pairId);
+        incrementDoor(roomP.id, targetRoom.id);
         continue;
       }
 
@@ -539,6 +557,7 @@ export function generateConfiguratorLayout(
           rotation: 0,
         });
         createdDoors.add(pairId);
+        incrementDoor(roomP.id, targetRoom.id);
       }
     }
   }
@@ -553,6 +572,9 @@ export function generateConfiguratorLayout(
     // Verificăm dacă a primit deja vreo ușă
     const hasAnyDoor = Array.from(createdDoors).some(pair => pair.includes(roomP.id));
     if (hasAnyDoor) continue;
+    
+    // Limitare
+    if (!canAddDoor(roomP.id)) continue;
 
     let bestNeighbor = null;
     let bestBoundary = null;
@@ -612,6 +634,7 @@ export function generateConfiguratorLayout(
         });
       }
       createdDoors.add([roomP.id, bestNeighbor.id].sort().join('-'));
+      incrementDoor(roomP.id, bestNeighbor.id);
     }
   }
 

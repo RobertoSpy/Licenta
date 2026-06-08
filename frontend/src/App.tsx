@@ -21,6 +21,7 @@ import ContractorDashboardLayout from './components/layout/ContractorDashboardLa
 import QuoteRequestsList from './pages/contractor/QuoteRequestsList';
 import ProfileEdit from './pages/contractor/ProfileEdit';
 import ContractorMarketView from './pages/contractor/ContractorMarketView';
+import ContractorFeed from './pages/contractor/ContractorFeed';
 
 import AdminDashboardLayout from './components/layout/AdminDashboardLayout';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -89,8 +90,9 @@ function App() {
         }
       >
         <Route index element={<Navigate to="quotes" replace />} />
+        <Route path="feed" element={<ContractorFeed />} />
         <Route path="quotes" element={<QuoteRequestsList />} />
-        <Route path="market" element={<ContractorMarketView />} />
+        <Route path="market" element={<MarketAnalysis />} />
         <Route path="profile" element={<ProfileEdit />} />
       </Route>
 

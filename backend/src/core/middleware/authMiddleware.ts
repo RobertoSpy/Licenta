@@ -14,6 +14,7 @@ export interface AuthRequest extends Request {
 
 export const protect = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   let token;
+  console.log(`[protect] ${req.method} ${req.originalUrl} - Auth Header:`, req.headers.authorization ? 'PRESENT' : 'MISSING');
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];

@@ -14,6 +14,8 @@ interface AutoFixProps {
   updateElement: (id: string, changes: Partial<CanvasElement>) => void;
   updateRoomRatio: (id: string, ratioValue: number) => void;
   regenerateLayout: () => void;
+  addManualOpening: (roomId: string, type: 'door' | 'window', side: 'top' | 'bottom' | 'left' | 'right') => void;
+  deleteElement: (id: string) => void;
 }
 
 export function useAutoFix({
@@ -26,6 +28,8 @@ export function useAutoFix({
   updateElement,
   updateRoomRatio,
   regenerateLayout,
+  addManualOpening,
+  deleteElement,
 }: AutoFixProps) {
   const [previewModal, setPreviewModal] = useState<{ affectedRooms: string[], message: string, onConfirm: () => void, onCancel: () => void } | null>(null);
 
@@ -42,11 +46,11 @@ export function useAutoFix({
       // Find all windows touching this room
       const currentWindows = elements.filter(e => {
         if (e.type !== 'window') return false;
-        const cx = e.x + e.width / 2;
-        const cy = e.y + e.height / 2;
         return (
-          cx >= room.x - 15 && cx <= room.x + room.width + 15 &&
-          cy >= room.y - 15 && cy <= room.y + room.height + 15
+          e.x <= room.x + room.width + 100 &&
+          e.x + e.width >= room.x - 100 &&
+          e.y <= room.y + room.height + 100 &&
+          e.y + e.height >= room.y - 100
         );
       });
 
@@ -90,6 +94,41 @@ export function useAutoFix({
           fixesCount += currentWindows.length;
         }
       }
+    }
+
+    // 2. Fix TOO_MANY_DOORS
+    const tooManyDoorsFixes = warningIssues.filter(v => v.code === 'TOO_MANY_DOORS');
+    for (const v of tooManyDoorsFixes) {
+      const room = elements.find(e => e.id === v.targetId && e.type === 'room');
+      if (!room) continue;
+
+      const currentDoors = elements.filter(e => {
+        if (e.type !== 'door') return false;
+        return (
+          e.x <= room.x + room.width + 100 &&
+          e.x + e.width >= room.x - 100 &&
+          e.y <= room.y + room.height + 100 &&
+          e.y + e.height >= room.y - 100
+        );
+      });
+
+      if (currentDoors.length > 2) {
+        for (let i = 2; i < currentDoors.length; i++) {
+          deleteElement(currentDoors[i].id);
+          fixesCount++;
+        }
+      }
+    }
+
+    // 3. Fix NO_WINDOW
+    const noWindowFixes = warningIssues.filter(v => v.code === 'NO_WINDOW');
+    for (const v of noWindowFixes) {
+      const room = elements.find(e => e.id === v.targetId && e.type === 'room');
+      if (!room) continue;
+
+      // Ensure we add a window on an edge
+      addManualOpening(room.id, 'window', 'top');
+      fixesCount++;
     }
 
     // 2. Destructive Fixes (Rooms)

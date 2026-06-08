@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { generateBOM, updateMaterialOverride, bomAdvisorChat, getBOMIntro, getBOMPhaseState, confirmBOMPhase } from './bomController';
+import { generateBOM, updateMaterialOverride, bomAdvisorChat, getBOMIntro, getBOMPhaseState, confirmBOMPhase, exportPdf } from './bomController';
 import { protect } from '../../core/middleware/authMiddleware';
 import { tenantGuard } from '../../core/middleware/tenantGuard';
 
@@ -17,5 +17,8 @@ router.post('/:projectId/phase-state/confirm', confirmBOMPhase);
 
 // POST /api/bom/:projectId/chat — Asistentul RAG conversațional pentru deviz (SSE)
 router.post('/:projectId/chat', bomAdvisorChat);
+
+// Export PDF
+router.get('/:projectId/export-pdf', exportPdf);
 
 export default router;

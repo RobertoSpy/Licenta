@@ -67,8 +67,8 @@ const initialData: ProjectFormData = {
 const steps = [
   { id: 1, title: 'Date de Bază', icon: <MapPin className="w-5 h-5" /> },
   { id: 2, title: 'Parametrii Teren', icon: <Maximize2 className="w-5 h-5" /> },
-  { id: 3, title: 'Reglementări', icon: <CheckCircle2 className="w-5 h-5" /> },
-  { id: 4, title: 'Viziune Casă', icon: <Home className="w-5 h-5" /> },
+  { id: 3, title: 'Viziune Casă', icon: <Home className="w-5 h-5" /> },
+  { id: 4, title: 'Reglementări & Analiză', icon: <CheckCircle2 className="w-5 h-5" /> },
 ];
 
 interface ProjectWizardProps {
@@ -115,9 +115,7 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
     if (currentStep === 1) {
       return formData.lat !== null && formData.lng !== null && !!formData.seismicZone;
     }
-    if (currentStep === 3) {
-      return !!formData.zoningRestrictions;
-    }
+    // Reglementări (fostul pas 3, acum pasul 4) nu mai blochează butonul.
     return true;
   }, [messages, currentStep, formData.lat, formData.lng, formData.seismicZone, formData.zoningRestrictions]);
 
@@ -241,8 +239,8 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
           >
             {currentStep === 1 && <Step1Location data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
             {currentStep === 2 && <Step2Terrain data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
-            {currentStep === 3 && <Step3Regulations data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
-            {currentStep === 4 && <Step4HouseType data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
+            {currentStep === 3 && <Step4HouseType data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
+            {currentStep === 4 && <Step3Regulations data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
           </motion.div>
         </AnimatePresence>
       </div>

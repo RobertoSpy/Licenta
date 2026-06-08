@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Request, Response, NextFunction } from 'express';
+import { ContractorSpecialization } from '@prisma/client';
 
 export const validateRequest = (schema: z.ZodTypeAny) => {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -36,7 +37,7 @@ export const registerContractorSchema = z.object({
   companyName: z.string().min(2),
   cui: z.string().min(5),
   county: z.string().min(2),
-  specializations: z.array(z.string()).min(1),
+  specializations: z.array(z.nativeEnum(ContractorSpecialization)).min(1),
   coverageRadius: z.number().min(5).max(1000).optional(),
 }).strip();
 

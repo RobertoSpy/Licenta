@@ -9,7 +9,8 @@ import {
   resetPassword,
   verifyEmail,
   resendVerification,
-  deleteAccount
+  deleteAccount,
+  updateProfile
 } from './authController';
 import { protect } from '../../core/middleware/authMiddleware';
 import { authEmailLimiter, authIpLimiter } from '../../core/middleware/rateLimiter';
@@ -45,5 +46,8 @@ router.post('/logout', logout);
 
 // GDPR: Ștergere cont (necesită autentificare + parolă confirmare)
 router.delete('/account', protect, deleteAccount);
+
+// Actualizare profil bază (nume, parolă)
+router.put('/profile', protect, updateProfile);
 
 export default router;

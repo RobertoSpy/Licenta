@@ -44,6 +44,10 @@ export function useBOMAdvisorChat(projectId: string) {
     setUnreadCount(prev => prev + 1);
   }, []);
 
+  const addLocalUserMessage = useCallback((text: string) => {
+    setMessages(prev => [...prev, { role: 'user', text }]);
+  }, []);
+
   const markAsRead = useCallback(() => {
     setUnreadCount(0);
   }, []);
@@ -185,6 +189,18 @@ export function useBOMAdvisorChat(projectId: string) {
     }]);
   }, []);
 
+  // ── Listener pentru cereri globale (ex: MaterialSideDrawer) ────────────────
+  useEffect(() => {
+    const handleAskEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ message: string }>;
+      if (customEvent.detail?.message) {
+        sendMessage(customEvent.detail.message);
+      }
+    };
+    window.addEventListener('zidario-ask', handleAskEvent);
+    return () => window.removeEventListener('zidario-ask', handleAskEvent);
+  }, [sendMessage]);
+
   const confirmPhase = useCallback(async () => {
     try {
       const response = await apiPrivate.post(`/bom/${projectId}/phase-state/confirm`);
@@ -207,6 +223,7 @@ export function useBOMAdvisorChat(projectId: string) {
     completedPhases,
     confirmPhase,
     addSystemMessage,
+    addLocalUserMessage,
     unreadCount,
     markAsRead
   };

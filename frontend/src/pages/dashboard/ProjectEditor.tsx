@@ -106,7 +106,8 @@ export const ProjectEditor: React.FC = () => {
   const { 
     elements, updateElement, markClean, isDirty, undo, redo, deleteSelected, 
     setTool, setZoom, initializeFromProject, activeFloor, switchFloor,
-    activeRooms, dimensions, houseShape, updateRoomRatio, regenerateLayout 
+    activeRooms, dimensions, houseShape, updateRoomRatio, regenerateLayout, setProjectId,
+    addManualOpening, deleteElement
   } = useEditorState();
   const rooms = useRoomCalculator(elements);
   const doors = elements
@@ -136,7 +137,9 @@ export const ProjectEditor: React.FC = () => {
     houseShape,
     updateElement,
     updateRoomRatio,
-    regenerateLayout
+    regenerateLayout,
+    addManualOpening,
+    deleteElement
   });
 
   // Auto-save
@@ -188,6 +191,7 @@ export const ProjectEditor: React.FC = () => {
         const { data: project } = await apiPrivate.get(`/projects/${projectId}`);
         setProjectData(project);
         setProjectTitle(project.title ?? 'Proiect');
+        setProjectId(projectId);
 
         // Îrcărcăm planul parterului din DB
         const parterElements = await editorApi.loadFloor(projectId, 'parter');

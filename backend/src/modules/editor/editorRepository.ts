@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { extractMetricsFromSnapshot } from '../../lib/planMetricsExtractor';
 
 export type FloorKey = 'parter' | 'etaj1';
 
@@ -88,14 +89,27 @@ export const editorRepository = {
     const published = await prisma.planSnapshot.update({
       where: { id: snapshotId },
       data: { isPublished: true },
+      include: { project: { select: { totalFloors: true } } }
     });
+
+    let totalArea: number | null = null;
+    try {
+      const floorsCount = published.project.totalFloors || 1;
+      const res = extractMetricsFromSnapshot(published.planJSON, floorsCount, 0.9, 0.5);
+      if (res.fromSnapshot) {
+        totalArea = res.metrics.totalFloorAreaSqm;
+      }
+    } catch (e) {
+      console.error('[publishSnapshot] Eroare extragere suprafata:', e);
+    }
 
     await prisma.project.update({
       where: { id: projectId },
       data: { 
         publishedSnapshotId: snapshotId, 
         planStatus: 'published',
-        bomGeneratedAt: null // invalidate BOM
+        bomGeneratedAt: null, // invalidate BOM
+        ...(totalArea ? { totalFloorAreaSqm: totalArea } : {})
       },
     });
 

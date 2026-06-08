@@ -144,11 +144,11 @@ function computeOpeningIssues(
     if (!roomEl) continue;
 
     const adjacentWindows = windows.filter(win => {
-      const cx = win.x + win.width / 2;
-      const cy = win.y + win.height / 2;
       return (
-        cx >= roomEl.x - 15 && cx <= roomEl.x + roomEl.width + 15 &&
-        cy >= roomEl.y - 15 && cy <= roomEl.y + roomEl.height + 15
+        win.x <= roomEl.x + roomEl.width + 30 &&
+        win.x + win.width >= roomEl.x - 30 &&
+        win.y <= roomEl.y + roomEl.height + 30 &&
+        win.y + win.height >= roomEl.y - 30
       );
     });
 
@@ -195,7 +195,8 @@ export function useConformityCheck(
   // Stable keys for effect dependencies
   const roomsKey = rooms.map((r) => `${r.id}:${r.usableSqm}:${r.label ?? ''}`).join('|');
   const doorsKey = (doors ?? []).map((d) => `${d.id}:${d.widthM}`).join('|');
-  const validationKey = `${roomsKey}::${doorsKey}::${buildingPurpose ?? 'residential'}`;
+  const windowsKey = (elements ?? []).filter(e => e.type === 'window').map(w => `${w.id}:${w.width}:${w.height}:${w.x}:${w.y}`).join('|');
+  const validationKey = `${roomsKey}::${doorsKey}::${windowsKey}::${buildingPurpose ?? 'residential'}`;
 
   // ── Backend conformity check (debounced 2s) ───────────────────────
   useEffect(() => {
@@ -224,21 +225,25 @@ export function useConformityCheck(
           const roomEl = elements?.find(el => el.id === r.id);
           if (roomEl) {
             const adjacentWindows = windows.filter(win => {
-              const cx = win.x + win.width / 2;
-              const cy = win.y + win.height / 2;
+              // Folosim intersecția de tip Bounding Box (AABB) cu o marjă generoasă de 100px
               return (
-                cx >= roomEl.x - 15 && cx <= roomEl.x + roomEl.width + 15 &&
-                cy >= roomEl.y - 15 && cy <= roomEl.y + roomEl.height + 15
+                win.x <= roomEl.x + roomEl.width + 100 &&
+                win.x + win.width >= roomEl.x - 100 &&
+                win.y <= roomEl.y + roomEl.height + 100 &&
+                win.y + win.height >= roomEl.y - 100
               );
             });
             
             // PxToMeters conversion logic is usually room.widthM / roomEl.width
             // Or we just calculate meters directly. We assume standard window height 1.5m
             for (const win of adjacentWindows) {
-              const scale = r.widthM! / roomEl.width; // pixels to meters scale for this room
-              const winWidthM = Math.max(win.width, win.height) * scale;
-              windowAreaSqm += winWidthM * 1.5; // WINDOW_STANDARD_HEIGHT_M = 1.5
+              const scale = (r.widthM || 1) / (roomEl.width || 1); // pixels to meters scale for this room
+              const winWidthM = Math.max(win.width || 0, win.height || 0) * scale;
+              if (!Number.isNaN(winWidthM)) {
+                windowAreaSqm += winWidthM * 1.5; // WINDOW_STANDARD_HEIGHT_M = 1.5
+              }
             }
+            if (Number.isNaN(windowAreaSqm)) windowAreaSqm = 0;
             
             // Verificăm dacă are acces la exterior (atinge o fereastră sau o ușă de exterior)
             const adjacentDoors = elements?.filter(e => e.type === 'door').filter(doorEl => {

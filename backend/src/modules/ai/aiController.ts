@@ -114,6 +114,11 @@ export const aiController = {
               county: true, locality: true, seismicZone: true,
               frostDepthCm: true, soilType: true, houseStyle: true,
               totalFloors: true, buildingPurpose: true,
+              chatSummaries: true,
+              planSnapshots: {
+                orderBy: { createdAt: 'desc' },
+                take: 1
+              }
             },
           }),
           prisma.material.findUnique({ where: { internalCode: currentMaterialCode } }),
@@ -164,6 +169,13 @@ CONTEXT AMPLASAMENT:
 - Tip sol: ${project.soilType ?? 'necunoscut'}
 - Stil casă: ${project.houseStyle ?? 'nespecificat'}, ${project.totalFloors ?? 1} etaje
 - Destinație: ${project.buildingPurpose ?? 'rezidențial'}
+
+ISTORIC CONVERSAȚII ȘI PREFERINȚE UTILIZATOR:
+${(project as any).chatSummaries?.map((s: any) => `- ${s.phase}: ${s.summary}`).join('\n') || 'Niciun rezumat disponibil.'}
+
+METRICI PLAN 2D:
+${(project as any).planSnapshots?.[0] ? `- Perimetru: ${(project as any).planSnapshots[0].planJSON?.metrics?.perimeterM || '?'}m\n- Suprafață utilă aprox: ${(project as any).planSnapshots[0].planJSON?.metrics?.totalFloorAreaSqm || '?'}mp\n- Număr uși/ferestre extrase din plan: Da` : 'Niciun plan 2D salvat.'}
+
 
 MATERIAL CURENT ÎN DEVIZ:
 - Cod: ${currentMat.internalCode}

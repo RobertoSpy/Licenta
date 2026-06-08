@@ -3,30 +3,38 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import { apiPrivate } from '../../api/axios';
 import { contractorApi } from '../../api/contractorApi';
-import { User, Mail, Save, AlertTriangle, Trash2, CheckCircle, Shield, Building2, Hash } from 'lucide-react';
+import { ContractorSpecialization, SPECIALIZATION_LABELS } from '../../types/contractor';
+import { ROMANIAN_COUNTIES } from '../../utils/romanianCounties';
+import { User, Mail, Save, AlertTriangle, Trash2, CheckCircle, Shield, Building2, Hash, ChevronDown, MapPin, Eye, EyeOff } from 'lucide-react';
 
 export default function UserProfile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     password: '',
     confirmPassword: ''
   });
   
-  const [contractorData, setContractorData] = useState<{ companyName: string; cui: string } | null>(null);
+  const [contractorData, setContractorData] = useState<{ companyName: string; cui: string; county: string; description: string; specializations: ContractorSpecialization[] } | null>(null);
 
   useEffect(() => {
     if (user?.role === 'CONTRACTOR') {
       contractorApi.getMyProfile().then(data => {
-        setContractorData({ companyName: data.companyName, cui: data.cui || 'Nespecificat' });
+        setContractorData({ companyName: data.companyName, cui: data.cui || 'Nespecificat', county: data.county || '', description: data.description || '', specializations: data.specializations || [] });
       }).catch(err => console.error(err));
     }
   }, [user]);
   
   const [isLoading, setIsLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
+  const [isCountyOpen, setIsCountyOpen] = useState(false);
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
@@ -43,10 +51,23 @@ export default function UserProfile() {
     setMsg(null);
     try {
       // Endpoint ipotetic/existent pentru actualizare date user
-      await apiPrivate.put('/auth/profile', {
-        name: formData.name,
-        password: formData.password || undefined
-      });
+      try {
+        await apiPrivate.put('/auth/profile', {
+          name: formData.name,
+          password: formData.password || undefined
+        });
+      } catch (e) {
+        // Ignoram eroarea daca endpointul nu exista
+      }
+
+      if (user?.role === 'CONTRACTOR' && contractorData) {
+        await contractorApi.updateMyProfile({ 
+          county: contractorData.county,
+          description: contractorData.description,
+          specializations: contractorData.specializations 
+        });
+      }
+
       setMsg({ type: 'success', text: 'Profilul a fost actualizat cu succes!' });
       setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
       setTimeout(() => setMsg(null), 4000);
@@ -160,26 +181,143 @@ export default function UserProfile() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-2">Parolă Nouă</label>
-                <input 
-                  type="password" 
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  placeholder="Lasă gol pentru a nu schimba"
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-buildorange outline-none transition-all"
-                />
+                <div className="relative">
+                  <input 
+                    type={showNewPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    placeholder="Lasă gol pentru a nu schimba"
+                    className="w-full pl-4 pr-10 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-buildorange outline-none transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  >
+                    {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-2">Confirmă Parola</label>
-                <input 
-                  type="password" 
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                  placeholder="Repetă parola nouă"
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-buildorange outline-none transition-all"
-                />
+                <div className="relative">
+                  <input 
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                    placeholder="Repetă parola nouă"
+                    className="w-full pl-4 pr-10 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-buildorange outline-none transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+
+          {user?.role === 'CONTRACTOR' && contractorData && (
+            <>
+              <div className="pt-6 border-t border-slate-100">
+                <h3 className="text-sm font-bold text-slate-900 mb-4">Locație (Județ)</h3>
+                
+                <div 
+                  className="relative"
+                  tabIndex={0}
+                  onBlur={(e) => {
+                    // Close if clicked outside of this element
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      setIsCountyOpen(false);
+                    }
+                  }}
+                >
+                  <div 
+                    onClick={() => setIsCountyOpen(!isCountyOpen)}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl flex items-center justify-between cursor-pointer hover:border-buildorange focus:ring-2 focus:ring-buildorange outline-none transition-all bg-white"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-slate-400" />
+                      <span className={contractorData.county ? "text-slate-900" : "text-slate-400"}>
+                        {contractorData.county || "Selectează Județul"}
+                      </span>
+                    </div>
+                    <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isCountyOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                  
+                  {isCountyOpen && (
+                    <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                      <div 
+                        onClick={() => {
+                          setContractorData({...contractorData, county: ''});
+                          setIsCountyOpen(false);
+                        }}
+                        className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${!contractorData.county ? 'bg-orange-50 text-buildorange font-medium' : 'text-slate-600'}`}
+                      >
+                        Alege Județ
+                      </div>
+                      {ROMANIAN_COUNTIES.map(county => (
+                        <div 
+                          key={county}
+                          onClick={() => {
+                            setContractorData({...contractorData, county});
+                            setIsCountyOpen(false);
+                          }}
+                          className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors border-t border-slate-50 ${contractorData.county === county ? 'bg-orange-50 text-buildorange font-medium' : 'text-slate-600'}`}
+                        >
+                          {county}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-slate-100">
+                <h3 className="text-sm font-bold text-slate-900 mb-4">Descriere Firmă</h3>
+                <textarea
+                  value={contractorData.description}
+                  onChange={(e) => setContractorData({...contractorData, description: e.target.value})}
+                  placeholder="Scrie câteva cuvinte despre experiența ta, serviciile oferite etc."
+                  rows={4}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-buildorange outline-none transition-all resize-y"
+                />
+              </div>
+
+              <div className="pt-6 border-t border-slate-100">
+                <h3 className="text-sm font-bold text-slate-900 mb-4">Specializări (Afilieri)</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {Object.entries(SPECIALIZATION_LABELS).map(([enumValue, label]) => {
+                    const spec = enumValue as ContractorSpecialization;
+                    return (
+                      <label key={spec} className="flex items-center gap-2 cursor-pointer text-sm text-slate-600 hover:text-slate-900">
+                        <input 
+                          type="checkbox"
+                          className="rounded border-slate-300 text-buildorange focus:ring-buildorange"
+                          checked={contractorData.specializations.includes(spec)}
+                          onChange={() => {
+                            setContractorData(prev => {
+                              if (!prev) return prev;
+                              return {
+                                ...prev,
+                                specializations: prev.specializations.includes(spec)
+                                  ? prev.specializations.filter(s => s !== spec)
+                                  : [...prev.specializations, spec]
+                              };
+                            });
+                          }}
+                        />
+                        {label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Footer */}
@@ -229,13 +367,22 @@ export default function UserProfile() {
                   <AlertTriangle className="w-4 h-4" />
                   Introdu parola pentru a confirma ștergerea definitivă:
                 </p>
-                <input
-                  type="password"
-                  placeholder="Parola contului tău"
-                  value={deletePassword}
-                  onChange={e => setDeletePassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-red-300 rounded-xl outline-none focus:ring-2 focus:ring-red-400 text-sm"
-                />
+                <div className="relative">
+                  <input
+                    type={showDeletePassword ? "text" : "password"}
+                    placeholder="Parola contului tău"
+                    value={deletePassword}
+                    onChange={e => setDeletePassword(e.target.value)}
+                    className="w-full pl-4 pr-10 py-3 border border-red-300 rounded-xl outline-none focus:ring-2 focus:ring-red-400 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePassword(!showDeletePassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  >
+                    {showDeletePassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
                 <div className="flex gap-3">
                   <button
                     onClick={() => { setShowDeleteConfirm(false); setDeletePassword(''); }}

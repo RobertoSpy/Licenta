@@ -12,7 +12,7 @@ import { useAuth } from '../../context/useAuth';
 import { apiPrivate } from '../../api/axios';
 import {
   Building2, Save, CheckCircle, Shield, MapPin, Hash,
-  AlertTriangle, Trash2, Star, Phone, Globe, Award, Lock
+  AlertTriangle, Trash2, Star, Phone, Globe, Award, Lock, Eye, EyeOff
 } from 'lucide-react';
 
 export default function ProfileEdit() {
@@ -24,6 +24,7 @@ export default function ProfileEdit() {
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
@@ -272,13 +273,22 @@ export default function ProfileEdit() {
                   <AlertTriangle className="w-4 h-4" />
                   Introdu parola pentru a confirma ștergerea definitivă:
                 </p>
-                <input
-                  type="password"
-                  placeholder="Parola contului tău"
-                  value={deletePassword}
-                  onChange={e => setDeletePassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-red-300 rounded-xl outline-none focus:ring-2 focus:ring-red-400 text-sm"
-                />
+                <div className="relative">
+                  <input
+                    type={showDeletePassword ? "text" : "password"}
+                    placeholder="Parola contului tău"
+                    value={deletePassword}
+                    onChange={e => setDeletePassword(e.target.value)}
+                    className="w-full pl-4 pr-10 py-3 border border-red-300 rounded-xl outline-none focus:ring-2 focus:ring-red-400 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePassword(!showDeletePassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  >
+                    {showDeletePassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
                 <div className="flex gap-3">
                   <button
                     onClick={() => { setShowDeleteConfirm(false); setDeletePassword(''); }}

@@ -3,17 +3,29 @@
  * Layout-ul portalului de constructor — stil alb cu portocaliu (brand consistent).
  */
 
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
-import { HardHat, Inbox, UserCircle, Star, LogOut, BarChart3, TrendingUp } from 'lucide-react';
+import { HardHat, Inbox, UserCircle, Star, LogOut, BarChart3, TrendingUp, AlertTriangle, Briefcase, Activity, User } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
+import { contractorApi } from '../../api/contractorApi';
 
 export default function ContractorDashboardLayout() {
   const { logout, user } = useAuth();
+  const [isVerified, setIsVerified] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (user?.role === 'CONTRACTOR') {
+      contractorApi.getMyProfile()
+        .then(profile => setIsVerified(profile.isVerified))
+        .catch(err => console.error('Eroare la preluarea profilului:', err));
+    }
+  }, [user]);
 
   const menuItems = [
     { name: 'Cereri & Oferte', path: '/contractor/quotes', icon: <Inbox className="w-5 h-5" /> },
-    { name: 'Concurență & Piață', path: '/contractor/market', icon: <TrendingUp className="w-5 h-5" /> },
-    { name: 'Profil Firmă', path: '/contractor/profile', icon: <UserCircle className="w-5 h-5" /> },
+    { name: 'Piață / Feed Proiecte', path: '/contractor/feed', icon: <Briefcase className="w-5 h-5" /> },
+    { name: 'Piață & Analize', path: '/contractor/market', icon: <Activity className="w-5 h-5" /> },
+    { name: 'Profil', path: '/contractor/profile', icon: <User className="w-5 h-5" /> },
   ];
 
   return (
@@ -76,6 +88,15 @@ export default function ContractorDashboardLayout() {
           </span>
         </header>
 
+        {isVerified === false && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-start sm:items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5 sm:mt-0" />
+            <p className="text-sm text-amber-800 font-medium leading-tight">
+              Contul tău este în curs de validare de către un administrator. Până la aprobare, funcția de trimitere oferte și datele de contact ale clienților sunt restricționate.
+            </p>
+          </div>
+        )}
+
         {/* Mobile header */}
         <header className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-50">
           <div className="flex items-center gap-2">
@@ -90,7 +111,7 @@ export default function ContractorDashboardLayout() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <Outlet />
+          <Outlet context={{ isVerified }} />
         </main>
       </div>
     </div>

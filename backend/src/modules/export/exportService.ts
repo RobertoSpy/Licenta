@@ -27,6 +27,19 @@ export interface ExportProjectData {
   houseType: string | null;
   floors: number | null;
   totalFloorAreaSqm: number | null;
+  // Terrain & Regulations
+  plotAreaSqm: number | null;
+  soilType: string | null;
+  slopePercent: number | null;
+  streetOrientation: string | null;
+  soilNotes: string | null;
+  maxAllowedFloors: number | null;
+  minFoundationDepthCm: number | null;
+  zoningRestrictions: string | null;
+  // Architecture
+  buildingPurpose: string | null;
+  budgetCategory: string | null;
+  chatSummaries: Array<{ phase: string; screen: string | null; summary: string }>;
 }
 
 interface RoomRow {
@@ -159,6 +172,18 @@ function buildHtmlTemplate(
     .rooms-table td { vertical-align: middle; }
     .violations-note { margin-top: 12px; padding: 10px 14px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 11px; color: #b91c1c; }
 
+    /* ── Stiluri Comune Pagini Noi ── */
+    .content-page { width: 210mm; min-height: 297mm; padding: 48px; page-break-after: always; }
+    .page-header { border-bottom: 2px solid #f97316; padding-bottom: 12px; margin-bottom: 32px; }
+    .page-title { font-size: 24px; font-weight: 900; color: #1e293b; }
+    .section-title { font-size: 16px; font-weight: 700; color: #334155; margin-bottom: 16px; margin-top: 32px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .data-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .data-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+    .data-value { font-size: 15px; font-weight: 700; color: #1e293b; }
+    .chat-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #22c55e; border-radius: 8px; padding: 20px; margin-top: 24px; font-size: 13px; line-height: 1.6; color: #166534; }
+    .chat-title { font-size: 12px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; color: #15803d; display: flex; align-items: center; gap: 6px; }
+
     @media print {
       @page { size: A4; margin: 0; }
     }
@@ -216,7 +241,91 @@ function buildHtmlTemplate(
     </div>
   </div>
 
-  <!-- ══ PAGINA 2: PLAN PARTER ══════════════════════════════════ -->
+  <!-- ══ PAGINA 2: DATE TEREN ȘI REGLEMENTĂRI ════════════════════ -->
+  <div class="content-page">
+    <div class="page-header">
+      <div class="page-title">I. Analiza Terenului și Reglementări</div>
+    </div>
+
+    <div class="section-title">Date Geotehnice și Topografice</div>
+    <div class="data-grid">
+      <div class="data-box">
+        <div class="data-label">Suprafață Teren</div>
+        <div class="data-value">${project.plotAreaSqm ? project.plotAreaSqm.toFixed(1) + ' mp' : 'Nespecificat'}</div>
+      </div>
+      <div class="data-box">
+        <div class="data-label">Tipul Solului</div>
+        <div class="data-value">${project.soilType ?? 'Nespecificat'}</div>
+      </div>
+      <div class="data-box">
+        <div class="data-label">Înclinare (Panta)</div>
+        <div class="data-value">${project.slopePercent !== null ? project.slopePercent + '%' : 'Plat'}</div>
+      </div>
+      <div class="data-box">
+        <div class="data-label">Orientare Stradală</div>
+        <div class="data-value">${project.streetOrientation ?? 'Nespecificat'}</div>
+      </div>
+    </div>
+
+    <div class="section-title">Reglementări Urbanistice Locale</div>
+    <div class="data-grid">
+      <div class="data-box">
+        <div class="data-label">Regim Maxim Permis</div>
+        <div class="data-value">${project.maxAllowedFloors ? 'P+' + (project.maxAllowedFloors - 1) : 'Nespecificat'}</div>
+      </div>
+      <div class="data-box">
+        <div class="data-label">Adâncime Fundație (Îngheț)</div>
+        <div class="data-value">${project.minFoundationDepthCm ? project.minFoundationDepthCm + ' cm' : 'Nespecificat'}</div>
+      </div>
+      <div class="data-box" style="grid-column: 1 / -1;">
+        <div class="data-label">Restricții Zonale / Note</div>
+        <div class="data-value" style="font-size: 13px; font-weight: normal; margin-top: 8px;">${project.zoningRestrictions || project.soilNotes || 'Nu au fost identificate restricții speciale.'}</div>
+      </div>
+    </div>
+
+    ${project.chatSummaries.find(s => s.phase === 'faza1') ? `
+    <div class="section-title" style="margin-top: 48px;">Concluziile Agenților AI (Faza 1)</div>
+    <div class="chat-box">
+      <div class="chat-title">✦ Rezumat Geotehnic & Urbanistic</div>
+      <div>${escapeHtml(project.chatSummaries.find(s => s.phase === 'faza1')?.summary).replace(/\\n/g, '<br/>')}</div>
+    </div>` : ''}
+  </div>
+
+  <!-- ══ PAGINA 3: CONCEPT ARHITECTURAL ══════════════════════════ -->
+  <div class="content-page">
+    <div class="page-header">
+      <div class="page-title">II. Concept Arhitectural</div>
+    </div>
+
+    <div class="section-title">Parametri Generali</div>
+    <div class="data-grid">
+      <div class="data-box">
+        <div class="data-label">Stil Arhitectural</div>
+        <div class="data-value">${project.houseType ?? 'Standard'}</div>
+      </div>
+      <div class="data-box">
+        <div class="data-label">Tip Construcție</div>
+        <div class="data-value">${project.buildingPurpose === 'commercial' ? 'Comercial' : project.buildingPurpose === 'mixed' ? 'Mixt' : 'Rezidențial'}</div>
+      </div>
+      <div class="data-box">
+        <div class="data-label">Categorie Buget</div>
+        <div class="data-value" style="text-transform: capitalize;">${project.budgetCategory ?? 'Mediu'}</div>
+      </div>
+      <div class="data-box">
+        <div class="data-label">Regim Înălțime Final</div>
+        <div class="data-value">${project.floors !== null ? 'P+' + (project.floors - 1) : 'Parter'}</div>
+      </div>
+    </div>
+
+    ${project.chatSummaries.find(s => s.phase === 'faza2') ? `
+    <div class="section-title" style="margin-top: 48px;">Consultant AI Arhitectural (Faza 2)</div>
+    <div class="chat-box" style="background: #eff6ff; border-color: #bfdbfe; border-left-color: #3b82f6; color: #1e40af;">
+      <div class="chat-title" style="color: #1d4ed8;">✦ Note Arhitect & Layout</div>
+      <div>${escapeHtml(project.chatSummaries.find(s => s.phase === 'faza2')?.summary).replace(/\\n/g, '<br/>')}</div>
+    </div>` : ''}
+  </div>
+
+  <!-- ══ PAGINA 4: PLAN PARTER ══════════════════════════════════ -->
   <div class="plan-page">
     <div class="plan-header">
       <div>
@@ -376,6 +485,9 @@ export const exportService = {
   ): Promise<{ buffer: Buffer; filename: string } | null> {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
+      include: {
+        chatSummaries: true
+      }
     });
 
     if (!project) return null;
@@ -428,6 +540,21 @@ export const exportService = {
         houseType: project.houseStyle ?? null,
         floors: project.totalFloors ?? null,
         totalFloorAreaSqm: project.totalFloorAreaSqm ?? null,
+        plotAreaSqm: project.plotAreaSqm ?? null,
+        soilType: project.soilType ?? null,
+        slopePercent: project.slopePercent ?? null,
+        streetOrientation: project.streetOrientation ?? null,
+        soilNotes: project.soilNotes ?? null,
+        maxAllowedFloors: project.maxAllowedFloors ?? null,
+        minFoundationDepthCm: project.minFoundationDepthCm ?? null,
+        zoningRestrictions: project.zoningRestrictions ?? null,
+        buildingPurpose: project.buildingPurpose ?? null,
+        budgetCategory: project.budgetCategory ?? null,
+        chatSummaries: project.chatSummaries.map(s => ({
+          phase: s.phase,
+          screen: s.screen,
+          summary: s.summary
+        }))
       },
       planPngBase64,
       rooms,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiPrivate } from '../../api/axios';
-import { PackageSearch, Search, SlidersHorizontal, RefreshCw, CheckCircle2, XCircle, Plus } from 'lucide-react';
+import { PackageSearch, Search, SlidersHorizontal, RefreshCw, CheckCircle2, XCircle, Plus, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/useAuth';
 
@@ -18,6 +18,7 @@ interface Material {
   minSeismicZone?: number;
   maxFloors?: number;
   normativeCode?: string;
+  storeUrl?: string;
 }
 
 export const Materials = () => {
@@ -203,15 +204,17 @@ export const Materials = () => {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3, delay: i * 0.05 }}
               key={mat.id}
-              className="group bg-white border border-slate-200 p-6 rounded-2xl hover:border-buildorange/50 hover:shadow-lg transition-all flex flex-col h-full"
+              onClick={() => { if(mat.storeUrl) window.open(mat.storeUrl, '_blank') }}
+              className={`group bg-white border border-slate-200 p-6 rounded-2xl hover:border-buildorange/50 hover:shadow-lg transition-all flex flex-col h-full ${mat.storeUrl ? 'cursor-pointer' : ''}`}
             >
               <div className="flex justify-between items-start mb-4">
                 <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold uppercase tracking-wider rounded-full truncate max-w-full">
                   {mat.category}
                 </span>
               </div>
-              <h3 className="font-bold text-slate-800 text-lg leading-tight mb-2">
+              <h3 className="font-bold text-slate-800 text-lg leading-tight mb-2 group-hover:text-buildorange transition-colors flex items-start gap-2">
                 {mat.name}
+                {mat.storeUrl && <ExternalLink className="w-4 h-4 text-slate-400 shrink-0 mt-1" />}
               </h3>
               
               {mat.description && (

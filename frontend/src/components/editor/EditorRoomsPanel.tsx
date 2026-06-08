@@ -169,23 +169,30 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
             Sugestie AI Camere
           </button>
           <div className="grid grid-cols-2 gap-2">
-            {ALL_AVAILABLE_ROOMS.map((roomLabel) => {
-              const isChecked = activeRooms.some((r) => r.label === roomLabel);
-              return (
-                <button
-                  key={roomLabel}
-                  onClick={() => toggleRoom(roomLabel, !isChecked)}
-                  className={`flex items-center gap-2 px-3 py-2 text-left rounded-xl border transition-all text-xs font-semibold ${
-                    isChecked
-                      ? 'border-orange-200 bg-orange-50/50 text-slate-800'
-                      : 'border-slate-100 hover:bg-slate-50 text-slate-500 bg-slate-50/20'
-                  }`}
-                >
-                  <SquareDot className={`w-3.5 h-3.5 shrink-0 ${isChecked ? 'text-orange-500' : 'text-slate-300'}`} />
-                  <span className="truncate">{roomLabel}</span>
-                </button>
-              );
-            })}
+            {(() => {
+              const dynamicRooms = activeRooms
+                .map((r) => r.label)
+                .filter((label) => !ALL_AVAILABLE_ROOMS.includes(label));
+              const combinedRooms = [...ALL_AVAILABLE_ROOMS, ...Array.from(new Set(dynamicRooms))];
+              
+              return combinedRooms.map((roomLabel) => {
+                const isChecked = activeRooms.some((r) => r.label === roomLabel);
+                return (
+                  <button
+                    key={roomLabel}
+                    onClick={() => toggleRoom(roomLabel, !isChecked)}
+                    className={`flex items-center gap-2 px-3 py-2 text-left rounded-xl border transition-all text-xs font-semibold ${
+                      isChecked
+                        ? 'border-orange-200 bg-orange-50/50 text-slate-800'
+                        : 'border-slate-100 hover:bg-slate-50 text-slate-500 bg-slate-50/20'
+                    }`}
+                  >
+                    <SquareDot className={`w-3.5 h-3.5 shrink-0 ${isChecked ? 'text-orange-500' : 'text-slate-300'}`} />
+                    <span className="truncate">{roomLabel}</span>
+                  </button>
+                );
+              });
+            })()}
           </div>
         </div>
 
@@ -195,20 +202,28 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
             <Settings className="w-3.5 h-3.5 text-slate-400" /> 4. Status Proiect
           </h3>
           <div className="bg-slate-50/50 rounded-2xl p-3 border border-slate-100 text-xs space-y-1.5 font-semibold text-slate-600">
+            {Number(projectData?.totalFloors || 1) > 1 && (
+              <div className="flex justify-between text-indigo-600 pb-1 border-b border-indigo-100/50 mb-1.5">
+                <span>Total Construit (P+{Number(projectData?.totalFloors || 1) - 1}):</span>
+                <span className="font-bold">
+                  ~{(calculateShapeArea(houseShape, dimensions) * Number(projectData?.totalFloors || 1)).toFixed(1)} m²
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
-              <span>Suprafață Amprentă:</span>
+              <span>Amprentă (Etaj Curent):</span>
               <span className="text-slate-800 font-bold">
                 {calculateShapeArea(houseShape, dimensions).toFixed(1)} m²
               </span>
             </div>
             <div className="flex justify-between">
-              <span>Suprafață Utilă:</span>
+              <span>Util (Etaj Curent):</span>
               <span className="text-slate-800 font-bold">{totalUsable.toFixed(1)} m²</span>
             </div>
             {violations.length > 0 && (
               <div className="pt-1.5 text-red-600 text-[10px] font-black flex items-center gap-1">
                 <XCircle className="w-3 h-3 text-red-500 shrink-0" />
-                {violations.length} {violations.length === 1 ? 'încălcare legală' : 'încălcări legale'}
+                {violations.length} {violations.length === 1 ? 'încălcare legală' : 'încălcări legale'} pe etaj
               </div>
             )}
           </div>

@@ -139,7 +139,7 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
           mustAdjacentTo:  r.mustAdjacentTo  ?? [],
         }));
 
-        const floorElements = await editorApi.generateConfiguratorLayout(houseShape, dims, configRooms, streetOrientation);
+        const floorElements = await editorApi.generateConfiguratorLayout(projectId, houseShape, dims, configRooms, streetOrientation);
         await editorApi.saveFloor(projectId, floorKey, floorElements, `AI — ${floorKey}`);
       }
 
@@ -172,7 +172,7 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
         maxSqm:          r.maxSqm          ?? undefined,
         mustAdjacentTo:  r.mustAdjacentTo  ?? [],
       }));
-      const parterElements = await editorApi.generateConfiguratorLayout(houseShape, dims, parterConfigRooms, streetOrientation);
+      const parterElements = await editorApi.generateConfiguratorLayout(projectId, houseShape, dims, parterConfigRooms, streetOrientation);
       switchFloor('parter', parterElements);
       setActiveRooms(parterRooms);
 

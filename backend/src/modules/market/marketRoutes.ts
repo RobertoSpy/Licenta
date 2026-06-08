@@ -1,22 +1,25 @@
-/**
- * backend/src/modules/market/marketRoutes.ts
- *
- * Rute Market Intelligence — toate protejate cu middleware `protect`.
- */
-
 import { Router } from 'express';
 import { protect } from '../../core/middleware/authMiddleware';
-import { marketController } from './marketController';
+import {
+  publishProject,
+  getFeed,
+  submitQuote,
+  getProjectQuotes,
+  acceptQuote
+} from './marketController';
 
 const router = Router();
 
-// GET /api/market/history — toate punctele CNS107D (pentru grafice)
-router.get('/history', protect, marketController.getHistory);
+// Toate rutele de market necesită autentificare
+router.use(protect);
 
-// GET /api/market/forecast — prognoze AI 2027 / 2028 (cu cache 30 zile)
-router.get('/forecast', protect, marketController.getForecast);
+// Rute Client
+router.post('/projects/:id/publish', publishProject);
+router.get('/projects/:id/quotes', getProjectQuotes);
+router.post('/quotes/:quoteId/accept', acceptQuote);
 
-// GET /api/market/summary — rezumat compact pentru chat agent financiar
-router.get('/summary', protect, marketController.getSummary);
+// Rute Constructor
+router.get('/projects/feed', getFeed);
+router.post('/projects/:id/quotes', submitQuote);
 
 export default router;

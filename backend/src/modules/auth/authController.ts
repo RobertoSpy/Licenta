@@ -14,7 +14,7 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, phone } = req.body;
 
     if (!email || !password) {
       res.status(400).json({ message: 'Email și parola sunt obligatorii' });
@@ -44,6 +44,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       email,
       password: hashedPassword,
       name,
+      phone,
       isVerified: false
     });
 
@@ -71,7 +72,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
 export const registerContractor = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, name, companyName, cui, county, specializations, coverageRadius } = req.body;
+    const { email, password, name, phone, companyName, cui, county, specializations, coverageRadius } = req.body;
 
     if (!email || !password || !companyName || !cui || !county) {
       res.status(400).json({ message: 'Toate câmpurile esențiale sunt obligatorii' });
@@ -103,6 +104,7 @@ export const registerContractor = async (req: Request, res: Response): Promise<v
           email,
           password: hashedPassword,
           name,
+          phone,
           role: 'CONTRACTOR' as any,
           isVerified: false // Verificare email normală
         }
@@ -434,5 +436,39 @@ export const deleteAccount = async (req: AuthRequest, res: Response): Promise<vo
   } catch (error) {
     console.error('deleteAccount error:', error);
     res.status(500).json({ message: 'Eroare la ștergerea contului.' });
+  }
+};
+
+export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { name, password } = req.body;
+
+    const updateData: any = {};
+    if (name) updateData.name = name;
+
+    if (password) {
+      const isStrongPassword = password.length >= 8 &&
+        /[A-Z]/.test(password) &&
+        /[0-9]/.test(password) &&
+        /[^A-Za-z0-9]/.test(password);
+
+      if (!isStrongPassword) {
+        res.status(400).json({ message: 'Parola nu este suficient de puternică.' });
+        return;
+      }
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: { id: true, email: true, name: true, role: true }
+    });
+
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.error('updateProfile error:', error);
+    res.status(500).json({ message: 'Eroare la actualizarea profilului.' });
   }
 };

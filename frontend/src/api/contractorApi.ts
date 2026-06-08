@@ -1,4 +1,5 @@
 import { apiPrivate } from './axios';
+import { ContractorSpecialization } from '../types/contractor';
 
 export interface ContractorProfile {
   id: number;
@@ -6,7 +7,7 @@ export interface ContractorProfile {
   companyName: string;
   cui: string | null;
   description: string | null;
-  specializations: string[];
+  specializations: ContractorSpecialization[];
   county: string;
   coverageRadius: number;
   yearsExperience: number | null;
@@ -24,7 +25,7 @@ export interface ContractorProfile {
 
 export const contractorApi = {
   // Pentru clienți
-  getContractors: async (county?: string, specializations?: string[]): Promise<ContractorProfile[]> => {
+  getContractors: async (county?: string, specializations?: ContractorSpecialization[]): Promise<ContractorProfile[]> => {
     const params = new URLSearchParams();
     if (county) params.append('county', county);
     if (specializations && specializations.length > 0) params.append('specializations', specializations.join(','));

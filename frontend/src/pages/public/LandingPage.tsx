@@ -200,7 +200,7 @@ export const LandingPage = () => {
                 <div className="bg-orange-50 border border-orange-100 rounded-xl p-3.5 flex gap-2">
                   <Sparkles className="w-4 h-4 text-buildorange shrink-0 mt-0.5" />
                   <div className="text-[11px] text-orange-900 leading-normal">
-                    <strong className="font-bold">Recomandare AI:</strong> U-Value pereți exteriori este 0.22 W/m²K. Corespunde normativului MC001 pentru clădiri nZEB.
+                    <strong className="font-bold">Recomandare AI:</strong> U-Value pereți exteriori este 0.22 W/m²K. Corespunde normativului MC001 privind eficiența energetică.
                   </div>
                 </div>
 
@@ -294,9 +294,9 @@ export const LandingPage = () => {
                 <Sparkles className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="text-lg font-bold text-slate-900 mb-2">Estimator AI & nZEB Compliance</h4>
+                <h4 className="text-lg font-bold text-slate-900 mb-2">Estimator AI</h4>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  Introduci datele casei sau schița 2D, iar motorul nostru AI calculează necesarul brut de materiale. Mai mult, sistemul verifică dacă proiectul tău respectă normele europene de eficiență energetică (nZEB).
+                  Introduci datele casei sau schița 2D, iar motorul nostru AI calculează necesarul brut de materiale. Mai mult, sistemul verifică dacă proiectul tău respectă normele europene de eficiență energetică.
                 </p>
               </div>
             </div>
@@ -461,7 +461,7 @@ export const LandingPage = () => {
                         : 'border-slate-200 hover:bg-slate-50 text-slate-600'
                     }`}
                   >
-                    Premium (nZEB / Eficient)
+                    Premium (Eficient)
                   </button>
                 </div>
               </div>
@@ -540,10 +540,6 @@ export const LandingPage = () => {
               {
                 q: 'Cum este asigurată seriozitatea constructorilor în marketplace?',
                 a: 'Fiecare constructor care dorește să trimită oferte în marketplace trebuie să trimită documente doveditoare (CUI, certificat constatator). Recenziile sunt permise doar utilizatorilor care au acceptat oferte oficiale prin intermediul platformei, evitând recenziile false.'
-              },
-              {
-                q: 'Ce înseamnă nZEB și cum mă ajută AI-ul din platformă?',
-                a: 'nZEB (nearly Zero-Energy Building) reprezintă standardul obligatoriu în UE pentru clădirile noi (consum de energie aproape de zero). Asistentul AI din Zidario analizează automat materialele alese (exemplu: grosimea polistirenului, tipul de cărămidă) pentru a-ți spune dacă proiectul tău atinge standardele legale de izolare termică.'
               }
             ].map((item, idx) => (
               <div key={idx} className="border border-slate-200/80 rounded-2xl p-6 hover:shadow-sm transition-shadow">
@@ -600,7 +596,7 @@ export const LandingPage = () => {
               <span className="font-bold text-white text-base">Zidario</span>
             </div>
             <p className="max-w-sm text-slate-500 leading-relaxed text-xs">
-              Prima platformă inteligentă din România pentru planificarea, auditarea nZEB și protecția financiară a proprietarilor în relația cu constructorii.
+              Prima platformă inteligentă din România pentru planificarea, auditarea energetică și protecția financiară a proprietarilor în relația cu constructorii.
             </p>
           </div>
 

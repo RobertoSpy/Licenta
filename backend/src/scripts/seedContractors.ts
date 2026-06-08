@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, UserRole, ContractorSpecialization } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -27,7 +27,7 @@ async function main() {
           cui: 'RO12345678',
           county: 'București',
           coverageRadius: 100,
-          specializations: ['La cheie', 'Structuri', 'Fundații'],
+          specializations: [ContractorSpecialization.CONSTRUCTII_GENERALE, ContractorSpecialization.STRUCTURA, ContractorSpecialization.FUNDATII],
           description: 'Experiență de peste 10 ani în construcții rezidențiale. Oferim calitate și seriozitate.',
           isVerified: true,
           isActive: true,
@@ -54,7 +54,7 @@ async function main() {
           cui: 'RO87654321',
           county: 'Ilfov',
           coverageRadius: 50,
-          specializations: ['Finisaje', 'Instalații'],
+          specializations: [ContractorSpecialization.FINISAJE, ContractorSpecialization.INSTALATII_ELECTRICE, ContractorSpecialization.INSTALATII_SANITARE, ContractorSpecialization.INSTALATII_TERMICE],
           description: 'Specialiști în finisaje interioare și exterioare. Executăm lucrări de calitate.',
           isVerified: true,
           isActive: true,
@@ -81,7 +81,7 @@ async function main() {
           cui: 'RO99999999',
           county: 'București',
           coverageRadius: 200,
-          specializations: ['La cheie', 'Structuri', 'Finisaje', 'Instalații'],
+          specializations: [ContractorSpecialization.CONSTRUCTII_GENERALE, ContractorSpecialization.STRUCTURA, ContractorSpecialization.FINISAJE, ContractorSpecialization.INSTALATII_ELECTRICE, ContractorSpecialization.INSTALATII_SANITARE, ContractorSpecialization.INSTALATII_TERMICE],
           description: 'Constructor premium full-service. Execut lucrări de calitate.',
           isVerified: true,
           isActive: true,

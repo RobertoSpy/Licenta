@@ -4,7 +4,7 @@
 // Mod implicit: Wizard etapă-cu-etapă.
 // Toggle în header: Wizard | Tabel Complet.
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Bot, LayoutList, Wand2 } from 'lucide-react';
@@ -25,6 +25,19 @@ export const ProjectBOM = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [canGoNext, setCanGoNext] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('wizard');
+
+  useEffect(() => {
+    const handleAskEvent = () => setIsChatOpen(true);
+    const handleOpenEvent = () => setIsChatOpen(true);
+    
+    window.addEventListener('zidario-ask', handleAskEvent);
+    window.addEventListener('zidario-open', handleOpenEvent);
+    
+    return () => {
+      window.removeEventListener('zidario-ask', handleAskEvent);
+      window.removeEventListener('zidario-open', handleOpenEvent);
+    };
+  }, []);
 
   if (isLoading) {
     return (

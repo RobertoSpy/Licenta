@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Inbox, Clock, CheckCircle, FileText, XCircle, Send } from 'lucide-react';
+import { Inbox, Clock, CheckCircle, FileText, XCircle, Send, Lock } from 'lucide-react';
 import { quoteApi, type Quote } from '../../api/quoteApi';
+import { apiPrivate } from '../../api/axios';
+import { useOutletContext } from 'react-router-dom';
 
 export default function QuoteRequestsList() {
+  const { isVerified } = useOutletContext<{ isVerified: boolean | null }>();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
@@ -104,7 +107,9 @@ export default function QuoteRequestsList() {
                   <Clock className="w-3 h-3" />
                   {new Date(q.createdAt).toLocaleDateString()}
                 </p>
-                <p className="text-sm font-medium mt-2">Client: {q.project?.user?.name || 'Anonim'}</p>
+                <p className="text-sm font-medium mt-2">
+                  Client: {isVerified === false ? '[Ascuns - Necesită Validare]' : q.project?.user?.name || 'Anonim'}
+                </p>
               </div>
             ))}
           </div>
@@ -131,7 +136,7 @@ export default function QuoteRequestsList() {
                     <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl">
                       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Date Generale</h4>
                       <ul className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
-                        <li><strong>Client:</strong> {selectedQuote.project?.user?.name}</li>
+                        <li><strong>Client:</strong> {isVerified === false ? '[Ascuns]' : selectedQuote.project?.user?.name}</li>
                         <li><strong>Județ:</strong> {selectedQuote.project?.county || 'Nespecificat'}</li>
                         <li><strong>Tip construcție:</strong> {selectedQuote.project?.buildingPurpose || 'Rezidențial'}</li>
                         <li><strong>Zonă seismică:</strong> {selectedQuote.project?.seismicZone || '?'}</li>
@@ -143,15 +148,51 @@ export default function QuoteRequestsList() {
                       <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
                         {selectedQuote.project?.bomItems?.length || 0} Materiale în Deviz (BOM)
                       </p>
-                      <button className="text-blue-600 text-xs font-semibold mt-1 hover:underline">
-                        Descarcă Deviz PDF
-                      </button>
+                      <div className="flex flex-col gap-2 w-full mt-3">
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const res = await apiPrivate.post(`/export/plan-pdf/${selectedQuote.projectId}`, {}, { responseType: 'blob' });
+                              const url = window.URL.createObjectURL(new Blob([res.data]));
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.setAttribute('download', `Plan2D_${selectedQuote.projectId}.pdf`);
+                              document.body.appendChild(link);
+                              link.click();
+                            } catch (e) {
+                              alert('Eroare la descărcarea planului 2D. Este posibil să nu existe.');
+                            }
+                          }}
+                          className="w-full text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 py-2 rounded-lg transition-colors"
+                        >
+                          Descarcă Plan 2D (PDF)
+                        </button>
+                        
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const res = await apiPrivate.get(`/bom/${selectedQuote.projectId}/export-pdf`, { responseType: 'blob' });
+                              const url = window.URL.createObjectURL(new Blob([res.data]));
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.setAttribute('download', `DevizBOM_${selectedQuote.projectId}.pdf`);
+                              document.body.appendChild(link);
+                              link.click();
+                            } catch (e) {
+                              alert('Eroare la descărcarea Devizului. Este posibil să nu fie generat.');
+                            }
+                          }}
+                          className="w-full text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 py-2 rounded-lg transition-colors"
+                        >
+                          Descarcă Deviz BOM (PDF)
+                        </button>
+                      </div>
                     </div>
                   </div>
 
                   <hr className="border-slate-100 dark:border-slate-700 mb-8" />
 
-                  {selectedQuote.status === 'PENDING' ? (
+                  {selectedQuote.status === 'PENDING' && isVerified !== false ? (
                     <form onSubmit={handleSubmitQuote} className="space-y-6">
                       <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Trimite Oferta Ta</h3>
                       
@@ -209,6 +250,14 @@ export default function QuoteRequestsList() {
                         </button>
                       </div>
                     </form>
+                  ) : selectedQuote.status === 'PENDING' && isVerified === false ? (
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-6 rounded-xl text-center">
+                      <Lock className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+                      <h3 className="text-lg font-bold text-amber-900 dark:text-amber-500 mb-2">Contul tău necesită validare</h3>
+                      <p className="text-amber-700 dark:text-amber-600 text-sm">
+                        Funcția de ofertare și vizualizarea detaliilor clienților vor deveni active după ce contul tău va fi aprobat de un administrator. Momentan poți doar vizualiza proiectele disponibile pe piață.
+                      </p>
+                    </div>
                   ) : (
                     <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                       <h3 className="text-lg font-bold mb-4">Oferta Trimisă</h3>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star, MapPin, Building2, ShieldCheck, Mail, Calendar, CheckCircle2 } from 'lucide-react';
 import { contractorApi, type ContractorProfile } from '../../api/contractorApi';
+import { SPECIALIZATION_LABELS } from '../../types/contractor';
 
 interface ContractorProfileModalProps {
   contractorId: number | null;
@@ -81,7 +82,6 @@ export const ContractorProfileModal: React.FC<ContractorProfileModalProps> = ({ 
                     <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {profile.county} ({profile.coverageRadius} km)</span>
                     <span className="flex items-center gap-1.5"><Star className="w-4 h-4 text-amber-500 fill-current" /> {profile.avgRating.toFixed(1)} Rating</span>
                     <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-blue-500" /> {profile.completedProjects} Lucrări</span>
-                    <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {profile.yearsExperience || 'N/A'} ani experiență</span>
                   </div>
                 </div>
               </div>
@@ -108,7 +108,7 @@ export const ContractorProfileModal: React.FC<ContractorProfileModalProps> = ({ 
                   <div className="flex flex-wrap gap-2">
                     {profile.specializations.map((spec, idx) => (
                       <span key={idx} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium border border-slate-200 dark:border-slate-600">
-                        {spec}
+                        {SPECIALIZATION_LABELS[spec] || spec}
                       </span>
                     ))}
                   </div>

@@ -33,7 +33,11 @@ export const getAccessToken = () => {
 apiPrivate.interceptors.request.use(
   (config) => {
     if (accessToken && config.headers) {
-      config.headers['Authorization'] = `Bearer ${accessToken}`;
+      if (typeof config.headers.set === 'function') {
+        config.headers.set('Authorization', `Bearer ${accessToken}`);
+      } else {
+        config.headers['Authorization'] = `Bearer ${accessToken}`;
+      }
     }
     return config;
   },
@@ -54,7 +58,11 @@ apiPrivate.interceptors.response.use(
         setAccessToken(newAccessToken);
 
         // Re-trimitem cererea originală cu noul token
-        prevRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+        if (typeof prevRequest.headers.set === 'function') {
+          prevRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
+        } else {
+          prevRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+        }
         return apiPrivate(prevRequest);
       } catch (err) {
         // Dacă refresh-ul eșuează (ex. refresh token expirat 7 zile)

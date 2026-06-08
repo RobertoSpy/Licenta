@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react';
 import { HardHat, Star, MapPin, CheckCircle2, ShieldCheck, Search, Filter } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { contractorApi, type ContractorProfile } from '../../api/contractorApi';
+import { ContractorSpecialization, SPECIALIZATION_LABELS } from '../../types/contractor';
 import { motion } from 'framer-motion';
 
 export const Experts = () => {
   const [contractors, setContractors] = useState<ContractorProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [countyFilter, setCountyFilter] = useState('');
-  const [specFilter, setSpecFilter] = useState('');
-
-  const specializationsList = ['La cheie', 'La roșu', 'Structuri', 'Fundații', 'Finisaje', 'Instalații'];
+  const [selectedSpecialization, setSelectedSpecialization] = useState<ContractorSpecialization | ''>('');
 
   useEffect(() => {
     const fetchContractors = async () => {
@@ -18,7 +17,7 @@ export const Experts = () => {
       try {
         const data = await contractorApi.getContractors(
           countyFilter || undefined,
-          specFilter ? [specFilter] : undefined
+          selectedSpecialization ? [selectedSpecialization] : undefined
         );
         setContractors(data);
       } catch (err) {
@@ -29,7 +28,7 @@ export const Experts = () => {
     };
 
     fetchContractors();
-  }, [countyFilter, specFilter]);
+  }, [countyFilter, selectedSpecialization]);
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -62,11 +61,13 @@ export const Experts = () => {
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
             <select
               className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-buildorange appearance-none outline-none"
-              value={specFilter}
-              onChange={(e) => setSpecFilter(e.target.value)}
+              value={selectedSpecialization}
+              onChange={(e) => setSelectedSpecialization(e.target.value as ContractorSpecialization | '')}
             >
               <option value="">Toate specializările</option>
-              {specializationsList.map(s => <option key={s} value={s}>{s}</option>)}
+              {Object.entries(SPECIALIZATION_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -121,8 +122,8 @@ export const Experts = () => {
 
               <div className="flex flex-wrap gap-2 mb-6">
                 {expert.specializations.map(tag => (
-                  <span key={tag} className="px-3 py-1 bg-slate-50 border border-slate-100 text-slate-600 text-xs font-semibold rounded-full">
-                    {tag}
+                  <span key={tag} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100">
+                    {SPECIALIZATION_LABELS[tag] || tag}
                   </span>
                 ))}
               </div>
