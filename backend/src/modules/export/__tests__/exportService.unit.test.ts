@@ -54,7 +54,7 @@ describe('exportService (unit)', () => {
     describe('buildHtmlTemplate', () => {
       it('renders fallback message when base64 image is null or empty string', () => {
         const html = _testable.buildHtmlTemplate(
-          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null },
+          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null } as any,
           null, // null image
           [],
           '1 Jan 2026',
@@ -65,7 +65,7 @@ describe('exportService (unit)', () => {
 
       it('includes all room labels in generated HTML', () => {
         const html = _testable.buildHtmlTemplate(
-          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null },
+          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null } as any,
           'data',
           [{ label: 'Bucatarie', status: 'ok', usableSqm: 10 }, { label: 'Baie secreta', status: 'error', usableSqm: 2 }],
           '1 Jan 2026',
@@ -77,7 +77,7 @@ describe('exportService (unit)', () => {
 
       it('generated HTML is parseable (no unclosed tags)', () => {
         const html = _testable.buildHtmlTemplate(
-          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null },
+          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null } as any,
           'data',
           [],
           '1 Jan 2026',
