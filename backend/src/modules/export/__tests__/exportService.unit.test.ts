@@ -54,7 +54,7 @@ describe('exportService (unit)', () => {
     describe('buildHtmlTemplate', () => {
       it('renders fallback message when base64 image is null or empty string', () => {
         const html = _testable.buildHtmlTemplate(
-          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null } as any,
+          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null, chatSummaries: [] } as any,
           null, // null image
           [],
           '1 Jan 2026',
@@ -65,7 +65,7 @@ describe('exportService (unit)', () => {
 
       it('includes all room labels in generated HTML', () => {
         const html = _testable.buildHtmlTemplate(
-          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null } as any,
+          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null, chatSummaries: [] } as any,
           'data',
           [{ label: 'Bucatarie', status: 'ok', usableSqm: 10 }, { label: 'Baie secreta', status: 'error', usableSqm: 2 }],
           '1 Jan 2026',
@@ -77,7 +77,7 @@ describe('exportService (unit)', () => {
 
       it('generated HTML is parseable (no unclosed tags)', () => {
         const html = _testable.buildHtmlTemplate(
-          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null } as any,
+          { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null, chatSummaries: [] } as any,
           'data',
           [],
           '1 Jan 2026',
@@ -122,7 +122,7 @@ describe('exportService (unit)', () => {
     });
 
     it('calls browser.close() even when page.pdf() throws (finally block)', async () => {
-      prismaMock.project.findUnique.mockResolvedValue({ id: 1, title: 'Casa', county: null, locality: null, houseStyle: null, totalFloors: null, totalFloorAreaSqm: null } as any);
+      prismaMock.project.findUnique.mockResolvedValue({ id: 1, title: 'Casa', county: null, locality: null, houseStyle: null, totalFloors: null, totalFloorAreaSqm: null, chatSummaries: [] } as any);
       prismaMock.planSnapshot.findFirst.mockResolvedValue({ id: 1, version: 1, planJSON: {} } as any);
       mockPage.pdf.mockRejectedValue(new Error('Puppeteer error'));
 

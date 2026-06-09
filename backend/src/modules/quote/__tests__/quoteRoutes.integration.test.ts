@@ -74,6 +74,11 @@ describe('Quote API Routes (Integration)', () => {
 
   describe('Client Routes', () => {
     it('POST /api/quotes/request - returns 201 when quotes are created', async () => {
+      prismaMock.project.findUnique.mockResolvedValue({ id: 1, constructionPhases: [{ name: 'Fundatie' }] } as any);
+      prismaMock.contractorProfile.findMany.mockResolvedValue([
+        { id: 50, specializations: ['STRUCTURA', 'FUNDATII', 'CONSTRUCTII_GENERALE'] },
+        { id: 51, specializations: ['STRUCTURA', 'FUNDATII', 'CONSTRUCTII_GENERALE'] }
+      ] as any);
       prismaMock.contractorQuote.findMany.mockResolvedValue([]);
       prismaMock.contractorQuote.createMany.mockResolvedValue({ count: 2 } as any);
 
@@ -104,7 +109,8 @@ describe('Quote API Routes (Integration)', () => {
       prismaMock.contractorQuote.findUnique.mockResolvedValue({
         id: 1,
         projectId: 1,
-        project: { userId: 100 }
+        project: { userId: 100 },
+        phases: [{ id: 101 }]
       } as any);
 
       prismaMock.$transaction.mockImplementation(async (cb) => {

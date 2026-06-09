@@ -50,14 +50,14 @@ describe('ContractorService', () => {
 
   describe('addReview', () => {
     it('throws if no accepted quote exists', async () => {
-      prismaMock.contractorQuote.findUnique.mockResolvedValue(null);
+      prismaMock.contractorQuote.findFirst.mockResolvedValue(null);
       await expect(
         contractorService.addReview(1, 10, 5, 'Great', 100)
       ).rejects.toThrow('NOT_AUTHORIZED_OR_NO_ACCEPTED_QUOTE');
     });
 
     it('blocks same client reviewing same contractor for same project twice', async () => {
-      prismaMock.contractorQuote.findUnique.mockResolvedValue({ id: 1 } as any);
+      prismaMock.contractorQuote.findFirst.mockResolvedValue({ id: 1, status: 'ACCEPTED' } as any);
       prismaMock.contractorReview.findFirst.mockResolvedValue({ id: 1 } as any);
 
       await expect(
@@ -66,7 +66,7 @@ describe('ContractorService', () => {
     });
 
     it('avgRating correct for first review (was 0/null previously)', async () => {
-      prismaMock.contractorQuote.findUnique.mockResolvedValue({ id: 1 } as any);
+      prismaMock.contractorQuote.findFirst.mockResolvedValue({ id: 1, status: 'ACCEPTED' } as any);
       prismaMock.contractorReview.findFirst.mockResolvedValue(null);
       
       const newReview = { id: 1, rating: 4 } as any;
@@ -87,7 +87,7 @@ describe('ContractorService', () => {
     });
 
     it('avgRating correct when adding to existing reviews and rounds to 2 decimal places', async () => {
-      prismaMock.contractorQuote.findUnique.mockResolvedValue({ id: 1 } as any);
+      prismaMock.contractorQuote.findFirst.mockResolvedValue({ id: 1, status: 'ACCEPTED' } as any);
       prismaMock.contractorReview.findFirst.mockResolvedValue(null);
       
       const newReview = { id: 2, rating: 5 } as any;

@@ -9,66 +9,81 @@ describe('Quote Service Unit Tests', () => {
 
   describe('requestQuotes', () => {
     it('creates new quotes for contractors without existing quotes', async () => {
-      prismaMock.contractorQuote.findMany.mockResolvedValue([]);
-      prismaMock.contractorQuote.createMany.mockResolvedValue({ count: 2 } as any);
+      prismaMock.project.findUnique.mockResolvedValue({ id: 1, constructionPhases: [{ name: 'Fundatie' }] } as any);
+      prismaMock.contractorProfile.findMany.mockResolvedValue([
+        { id: 10, specializations: ['STRUCTURA', 'FUNDATII', 'CONSTRUCTII_GENERALE'] },
+        { id: 11, specializations: ['STRUCTURA', 'FUNDATII', 'CONSTRUCTII_GENERALE'] }
+      ] as any);
+      prismaMock.contractorQuote.findUnique.mockResolvedValue(null);
+      prismaMock.contractorQuote.create.mockResolvedValue({} as any);
 
       const result = await quoteService.requestQuotes(1, [10, 11], 'Message');
 
       expect(result.count).toBe(2);
-      expect(prismaMock.contractorQuote.createMany).toHaveBeenCalledWith({
-        data: [
-          { projectId: 1, contractorId: 10, message: 'Message', status: QuoteStatus.PENDING },
-          { projectId: 1, contractorId: 11, message: 'Message', status: QuoteStatus.PENDING }
-        ]
-      });
+      expect(prismaMock.contractorQuote.create).toHaveBeenCalledTimes(2);
+      expect(prismaMock.contractorQuote.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ contractorId: 10, projectId: 1 })
+      }));
     });
 
     it('does not create duplicate quote if contractor already has PENDING quote for project', async () => {
-      // PENDING e by default acoperit de findMany fără filtrare pe status
-      prismaMock.contractorQuote.findMany.mockResolvedValue([
-        { contractorId: 10, status: QuoteStatus.PENDING } as any
-      ]);
-      prismaMock.contractorQuote.createMany.mockResolvedValue({ count: 1 } as any);
+      prismaMock.project.findUnique.mockResolvedValue({ id: 1, constructionPhases: [{ name: 'Fundatie' }] } as any);
+      prismaMock.contractorProfile.findMany.mockResolvedValue([
+        { id: 10, specializations: ['STRUCTURA', 'FUNDATII', 'CONSTRUCTII_GENERALE'] },
+        { id: 11, specializations: ['STRUCTURA', 'FUNDATII', 'CONSTRUCTII_GENERALE'] }
+      ] as any);
+      prismaMock.contractorQuote.findUnique.mockImplementation((async (args: any) => {
+        if (args.where?.contractorId_projectId?.contractorId === 10) return { id: 99, phases: [] } as any;
+        return null;
+      }) as any);
+      prismaMock.contractorQuote.create.mockResolvedValue({} as any);
+      prismaMock.contractorQuote.update.mockResolvedValue({} as any);
 
       const result = await quoteService.requestQuotes(1, [10, 11], 'Message');
 
       expect(result.count).toBe(1);
-      expect(prismaMock.contractorQuote.createMany).toHaveBeenCalledWith({
-        data: [
-          { projectId: 1, contractorId: 11, message: 'Message', status: QuoteStatus.PENDING }
-        ]
-      });
+      expect(prismaMock.contractorQuote.create).toHaveBeenCalledTimes(1);
+      expect(prismaMock.contractorQuote.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ contractorId: 11 })
+      }));
     });
 
     it('creates new quote if previous quote was REJECTED (contractor can be re-invited) - Behavior defined as blocked', async () => {
       // Currently, the implementation blocks any existing quote regardless of status.
       // So if it was REJECTED, they cannot be re-invited unless the code changes.
       // The user asked to explicitly document this behavior in the test.
-      prismaMock.contractorQuote.findMany.mockResolvedValue([
-        { contractorId: 10, status: QuoteStatus.REJECTED } as any
-      ]);
-      prismaMock.contractorQuote.createMany.mockResolvedValue({ count: 1 } as any);
+      prismaMock.project.findUnique.mockResolvedValue({ id: 1, constructionPhases: [{ name: 'Fundatie' }] } as any);
+      prismaMock.contractorProfile.findMany.mockResolvedValue([
+        { id: 10, specializations: ['STRUCTURA', 'FUNDATII', 'CONSTRUCTII_GENERALE'] },
+        { id: 11, specializations: ['STRUCTURA', 'FUNDATII', 'CONSTRUCTII_GENERALE'] }
+      ] as any);
+      prismaMock.contractorQuote.findUnique.mockImplementation((async (args: any) => {
+        if (args.where?.contractorId_projectId?.contractorId === 10) return { id: 99, status: QuoteStatus.REJECTED, phases: [] } as any;
+        return null;
+      }) as any);
+      prismaMock.contractorQuote.create.mockResolvedValue({} as any);
+      prismaMock.contractorQuote.update.mockResolvedValue({} as any);
 
       const result = await quoteService.requestQuotes(1, [10, 11], 'Message');
 
-      expect(result.count).toBe(1); // Only contractor 11 gets a quote
-      expect(prismaMock.contractorQuote.createMany).toHaveBeenCalledWith({
-        data: expect.arrayContaining([
-          expect.objectContaining({ contractorId: 11 })
-        ])
-      });
+      expect(result.count).toBe(1); // Only contractor 11 gets a new quote, 10 gets updated
+      expect(prismaMock.contractorQuote.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ contractorId: 11 })
+      }));
     });
 
     it('returns count=0 with descriptive message when all contractors already have quotes', async () => {
-      prismaMock.contractorQuote.findMany.mockResolvedValue([
-        { contractorId: 10 } as any,
-        { contractorId: 11 } as any
-      ]);
+      prismaMock.project.findUnique.mockResolvedValue({ id: 1, constructionPhases: [{ name: 'Fundatie' }] } as any);
+      prismaMock.contractorProfile.findMany.mockResolvedValue([
+        { id: 10, specializations: ['STRUCTURA', 'FUNDATII', 'CONSTRUCTII_GENERALE'] },
+        { id: 11, specializations: ['STRUCTURA', 'FUNDATII', 'CONSTRUCTII_GENERALE'] }
+      ] as any);
+      prismaMock.contractorQuote.findUnique.mockResolvedValue({ id: 99, phases: [{ id: 'phase1' }] } as any);
 
       const result = await quoteService.requestQuotes(1, [10, 11]);
 
-      expect(result).toEqual({ count: 0, message: 'Cererile au fost deja trimise către acești constructori.' });
-      expect(prismaMock.contractorQuote.createMany).not.toHaveBeenCalled();
+      expect(result).toEqual({ count: 0, message: 'Nu s-au putut crea cereri noi. Posibil nepotriviri de specializare sau cereri deja trimise.' });
+      expect(prismaMock.contractorQuote.create).not.toHaveBeenCalled();
     });
   });
 
@@ -170,7 +185,8 @@ describe('Quote Service Unit Tests', () => {
         id: 1,
         projectId: 5,
         status: QuoteStatus.SENT,
-        project: { userId: 100 }
+        project: { userId: 100 },
+        phases: [{ id: 101 }]
       } as any);
 
       // Mocam transaction-ul astfel încât să execute callback-ul intern (tx va fi prismaMock)
@@ -190,11 +206,14 @@ describe('Quote Service Unit Tests', () => {
 
       expect(prismaMock.contractorQuote.updateMany).toHaveBeenCalledWith({
         where: {
-          projectId: 5,
           id: { not: 1 },
-          status: { not: QuoteStatus.REJECTED }
+          phases: { some: { id: { in: [101] } } },
+          status: { in: [QuoteStatus.PENDING, QuoteStatus.SENT, QuoteStatus.NEGOTIATING] }
         },
-        data: { status: QuoteStatus.REJECTED }
+        data: { 
+          status: QuoteStatus.REJECTED,
+          clientMessage: 'Etapele au fost atribuite altei firme.'
+        }
       });
 
       expect(result.status).toBe(QuoteStatus.ACCEPTED);
@@ -206,7 +225,8 @@ describe('Quote Service Unit Tests', () => {
         id: 1,
         projectId: 5,
         status: QuoteStatus.SENT,
-        project: { userId: 100 }
+        project: { userId: 100 },
+        phases: [{ id: 101 }]
       } as any);
 
       prismaMock.$transaction.mockImplementation(async (callback) => await callback(prismaMock));
@@ -214,8 +234,8 @@ describe('Quote Service Unit Tests', () => {
       await quoteService.acceptQuote(1, 100);
 
       const updateManyCallArgs = prismaMock.contractorQuote.updateMany.mock.calls[0][0];
-      // Verificăm că filterează strict pe projectId = 5
-      expect(updateManyCallArgs.where?.projectId).toBe(5);
+      // Verificăm că filterează strict pe faza 101
+      expect(((updateManyCallArgs.where as any)?.phases?.some?.id as any)?.in).toContain(101);
     });
   });
 

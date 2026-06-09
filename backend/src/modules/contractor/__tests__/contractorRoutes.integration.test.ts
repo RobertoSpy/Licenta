@@ -132,7 +132,7 @@ describe('Contractor Routes (Integration)', () => {
 
     it('POST /:id/reviews returns 200 on success', async () => {
       // Mock quote checking
-      prismaMock.contractorQuote.findUnique.mockResolvedValue({ id: 1 } as any);
+      prismaMock.contractorQuote.findFirst.mockResolvedValue({ id: 1, status: 'ACCEPTED' } as any);
       // Mock duplicate checking
       prismaMock.contractorReview.findFirst.mockResolvedValue(null);
       // Mock review creation

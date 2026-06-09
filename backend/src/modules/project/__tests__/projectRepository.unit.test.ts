@@ -52,7 +52,7 @@ describe('Project Repository', () => {
 
       const result = await projectRepository.create({ title: 'New' });
 
-      expect(prismaMock.project.create).toHaveBeenCalledWith({ data: { title: 'New' } });
+      expect(prismaMock.project.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ title: 'New' }) }));
       expect(result).toEqual(mockProject);
     });
   });
