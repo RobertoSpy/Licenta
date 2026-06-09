@@ -6,7 +6,7 @@ import { quoteApi } from '../../api/quoteApi';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ContractorSpecialization, SPECIALIZATION_LABELS } from '../../types/contractor';
 import { ContractorProfileModal } from '../../components/contractors/ContractorProfileModal';
-
+import { apiPrivate } from '../../api/axios';
 
 export default function ContractorsMarketplace() {
   const [contractors, setContractors] = useState<ContractorProfile[]>([]);
@@ -21,6 +21,17 @@ export default function ContractorsMarketplace() {
   const { id } = useParams<{ id: string }>();
   const currentProjectId = id ? Number(id) : null;
   const navigate = useNavigate();
+
+  const [userProjects, setUserProjects] = useState<{ id: number, title: string }[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(currentProjectId);
+
+  useEffect(() => {
+    if (!currentProjectId) {
+      apiPrivate.get('/projects').then(res => {
+        setUserProjects(res.data);
+      }).catch(console.error);
+    }
+  }, [currentProjectId]);
 
   const fetchContractors = async () => {
     setLoading(true);
@@ -48,8 +59,9 @@ export default function ContractorsMarketplace() {
   };
 
   const handleRequestQuotes = async () => {
-    if (!currentProjectId) {
-      alert('Te rugăm să selectezi un proiect activ din dashboard mai întâi!');
+    const projectIdToSend = currentProjectId || selectedProjectId;
+    if (!projectIdToSend) {
+      alert('Te rugăm să selectezi un proiect activ pentru care dorești ofertă!');
       return;
     }
     if (selectedIds.length === 0) return;
@@ -57,9 +69,9 @@ export default function ContractorsMarketplace() {
     setIsSending(true);
     try {
       await quoteApi.requestQuotes({
-        projectId: currentProjectId,
+        projectId: projectIdToSend,
         contractorIds: selectedIds,
-        message: 'Aș dori o ofertă pentru construcția casei mele.'
+        message: 'Aș dori o ofertă pentru construcția mea.'
       });
       setSuccessMsg('Cererile de ofertă au fost trimise cu succes!');
       setSelectedIds([]);
@@ -126,17 +138,31 @@ export default function ContractorsMarketplace() {
       </div>
 
       {/* Action Bar */}
-      <div className="flex justify-between items-center bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800 gap-4">
         <span className="text-blue-800 dark:text-blue-300 font-medium">
           {selectedIds.length} constructori selectați
         </span>
-        <button
-          onClick={handleRequestQuotes}
-          disabled={selectedIds.length === 0 || isSending}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-medium rounded-lg transition-colors shadow-sm"
-        >
-          {isSending ? 'Se trimite...' : 'Cere Ofertă Multiplă'}
-        </button>
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          {!currentProjectId && userProjects.length > 0 && (
+            <select
+              className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 w-full sm:w-auto focus:ring-2 focus:ring-blue-500"
+              value={selectedProjectId || ''}
+              onChange={(e) => setSelectedProjectId(Number(e.target.value) || null)}
+            >
+              <option value="">-- Alege un proiect --</option>
+              {userProjects.map(p => (
+                <option key={p.id} value={p.id}>{p.title || `Proiect #${p.id}`}</option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={handleRequestQuotes}
+            disabled={selectedIds.length === 0 || isSending || (!currentProjectId && !selectedProjectId)}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors shadow-sm w-full sm:w-auto whitespace-nowrap"
+          >
+            {isSending ? 'Se trimite...' : 'Cere Ofertă Multiplă'}
+          </button>
+        </div>
       </div>
 
       {/* Grid */}

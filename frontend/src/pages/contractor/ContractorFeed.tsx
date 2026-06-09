@@ -17,6 +17,13 @@ interface FeedProject {
     email: string;
     phone?: string;
   };
+  constructionPhases?: {
+    id: number;
+    name: string;
+    phaseOrder: number;
+    contractorId: number | null;
+    contractor?: { companyName: string } | null;
+  }[];
 }
 
 export default function ContractorFeed() {
@@ -28,6 +35,7 @@ export default function ContractorFeed() {
   const [totalAmount, setTotalAmount] = useState<string>('');
   const [executionDays, setExecutionDays] = useState<string>('');
   const [message, setMessage] = useState('');
+  const [selectedPhases, setSelectedPhases] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -50,18 +58,26 @@ export default function ContractorFeed() {
     e.preventDefault();
     if (!selectedProject) return;
 
+    if (selectedProject.constructionPhases && selectedProject.constructionPhases.length > 0 && selectedPhases.length === 0) {
+      alert('Te rugăm să selectezi cel puțin o etapă pentru care ofertezi.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await apiPrivate.post(`/market/projects/${selectedProject.id}/quotes`, {
         totalAmount: Number(totalAmount),
         executionDays: Number(executionDays),
         message,
+        selectedPhases
       });
       alert('Oferta a fost trimisă cu succes!');
       setSelectedProject(null);
       setTotalAmount('');
       setExecutionDays('');
       setMessage('');
+      setSelectedPhases([]);
+      fetchFeed();
     } catch (err) {
       console.error(err);
       alert('Eroare la trimiterea ofertei.');
@@ -145,6 +161,28 @@ export default function ContractorFeed() {
                         <li><strong>Tip construcție:</strong> {selectedProject.buildingPurpose || 'Nespecificat'}</li>
                         <li><strong>Suprafață:</strong> {selectedProject.totalFloorAreaSqm ? `${selectedProject.totalFloorAreaSqm.toFixed(2)} mp` : 'Nespecificat'}</li>
                       </ul>
+                      
+                      {selectedProject.constructionPhases && selectedProject.constructionPhases.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-slate-200">
+                          <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Etape Licitate</h5>
+                          <ul className="space-y-2">
+                            {selectedProject.constructionPhases.map(phase => (
+                              <li key={phase.id} className="text-sm flex justify-between items-center bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                <span className="font-medium text-slate-700">{phase.name}</span>
+                                {phase.contractorId ? (
+                                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
+                                    Câștigat: {phase.contractor?.companyName || 'Firmă'}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                                    Deschis
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
 
                     <div className="bg-slate-50 p-4 rounded-xl flex flex-col items-center justify-center text-center">
@@ -232,6 +270,39 @@ export default function ContractorFeed() {
                           value={message} onChange={e => setMessage(e.target.value)}
                         />
                       </div>
+
+                      {selectedProject.constructionPhases && selectedProject.constructionPhases.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Alege Etapele Ofertate</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {selectedProject.constructionPhases.map(phase => {
+                              const isWon = !!phase.contractorId;
+                              return (
+                                <div key={phase.id} className={`flex items-center gap-3 p-3 rounded-xl border ${isWon ? 'bg-slate-100 border-slate-200 opacity-60' : 'bg-white border-slate-200 hover:border-buildorange cursor-pointer'}`}>
+                                  <input 
+                                    type="checkbox" 
+                                    id={`phase-${phase.id}`}
+                                    disabled={isWon}
+                                    checked={selectedPhases.includes(phase.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedPhases(prev => [...prev, phase.id]);
+                                      } else {
+                                        setSelectedPhases(prev => prev.filter(id => id !== phase.id));
+                                      }
+                                    }}
+                                    className="w-5 h-5 rounded border-slate-300 text-buildorange focus:ring-buildorange disabled:opacity-50"
+                                  />
+                                  <label htmlFor={`phase-${phase.id}`} className={`text-sm font-medium flex-1 ${isWon ? 'text-slate-500' : 'text-slate-700 cursor-pointer'}`}>
+                                    {phase.name}
+                                    {isWon && <span className="block text-xs text-slate-400 font-normal">Câștigat de altă firmă</span>}
+                                  </label>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="pt-4 flex justify-end">
                         <button

@@ -32,6 +32,7 @@ enum ContractorSpecialization {
   INSTALATII_ELECTRICE
   INSTALATII_SANITARE
   INSTALATII_TERMICE
+  IZOLATII
   FINISAJE
   CONSTRUCTII_GENERALE
 }
@@ -241,6 +242,12 @@ model ConstructionPhase {
   isCompleted Boolean  @default(false) // utilizatorul poate bifa etapele completate
   completedAt DateTime?
   notes       String?  // note ale utilizatorului per etapă
+  contractorId Int?
+  contractor   ContractorProfile? @relation(fields: [contractorId], references: [id])
+  quoteId      Int?               @unique
+  quote        ContractorQuote?   @relation("WonQuote", fields: [quoteId], references: [id])
+
+  quotes       ContractorQuote[]  @relation("PhaseQuotes")
 
   @@index([projectId])
   @@unique([projectId, phaseOrder])
@@ -379,8 +386,8 @@ model ContractorProfile {
   
   isVerified     Boolean  @default(false) // verificat de admin (b2b onboarding)
   isActive       Boolean  @default(true)
-  
   quotes         ContractorQuote[]
+  wonPhases      ConstructionPhase[]
   reviews        ContractorReview[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -393,11 +400,15 @@ model ContractorQuote {
   projectId       Int
   project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
+  phases          ConstructionPhase[] @relation("PhaseQuotes")
+  wonPhases       ConstructionPhase[] @relation("WonQuote")
+  
   status          QuoteStatus @default(PENDING)
   
   totalAmount     Float?   // oferta financiară
   executionDays   Int?     // durata estimată în zile
   message         String?  // mesajul constructorului
+  clientMessage   String?  // mesajul clientului (ex: la refuz)
   
   // Constructorul poate accepta BOM-ul sau propune variații
   acceptsBOM      Boolean  @default(false)

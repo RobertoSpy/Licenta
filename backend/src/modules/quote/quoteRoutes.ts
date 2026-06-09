@@ -13,6 +13,7 @@ router.post('/:id/accept', protect, requireRole(UserRole.CLIENT), acceptQuote);
 
 // Rute pentru CONSTRUCTORI
 router.get('/contractor', protect, requireRole(UserRole.CONTRACTOR), getContractorQuotes);
+router.post('/submit', protect, requireRole(UserRole.CONTRACTOR), submitQuote);
 router.post('/:id/submit', protect, requireRole(UserRole.CONTRACTOR), submitQuote);
 
 export default router;

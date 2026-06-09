@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { AuthRequest } from '../../core/middleware/authMiddleware';
+import { marketService } from './marketService';
 
 /**
  * Client: Publică proiectul pentru licitație (bidding)
@@ -67,6 +68,10 @@ export const getFeed = async (req: AuthRequest, res: Response): Promise<void> =>
       include: {
         user: {
           select: { name: true, email: true, phone: true }
+        },
+        constructionPhases: {
+          orderBy: { phaseOrder: 'asc' },
+          include: { contractor: { select: { companyName: true } } }
         }
       },
       orderBy: { updatedAt: 'desc' }
@@ -106,9 +111,9 @@ export const submitQuote = async (req: AuthRequest, res: Response): Promise<void
   try {
     const projectId = parseInt(req.params.id as string, 10);
     const userId = req.user?.id;
-    const { totalAmount, executionDays, message } = req.body;
+    const { totalAmount, executionDays, message, selectedPhases } = req.body;
 
-    if (!userId || isNaN(projectId)) {
+    if (!userId || isNaN(projectId) || !selectedPhases || !Array.isArray(selectedPhases)) {
       res.status(400).json({ error: 'Date invalide' });
       return;
     }
@@ -139,7 +144,10 @@ export const submitQuote = async (req: AuthRequest, res: Response): Promise<void
         totalAmount,
         executionDays,
         message,
-        status: 'SENT'
+        status: 'SENT',
+        phases: {
+          set: selectedPhases.map((id: number) => ({ id }))
+        }
       },
       create: {
         contractorId: contractor.id,
@@ -147,7 +155,10 @@ export const submitQuote = async (req: AuthRequest, res: Response): Promise<void
         totalAmount,
         executionDays,
         message,
-        status: 'SENT'
+        status: 'SENT',
+        phases: {
+          connect: selectedPhases.map((id: number) => ({ id }))
+        }
       }
     });
 
@@ -216,7 +227,7 @@ export const acceptQuote = async (req: AuthRequest, res: Response): Promise<void
 
     const quote = await prisma.contractorQuote.findUnique({
       where: { id: quoteId },
-      include: { project: true }
+      include: { project: true, phases: true }
     });
 
     if (!quote || quote.project.userId !== userId) {
@@ -225,23 +236,114 @@ export const acceptQuote = async (req: AuthRequest, res: Response): Promise<void
     }
 
     // Acceptăm oferta curentă
-    await prisma.contractorQuote.update({
+    const acceptedQuote = await prisma.contractorQuote.update({
       where: { id: quoteId },
       data: { status: 'ACCEPTED' }
     });
 
-    // Opțional: Putem respinge celelalte oferte pentru același proiect
-    await prisma.contractorQuote.updateMany({
-      where: { 
-        projectId: quote.projectId,
-        id: { not: quoteId }
-      },
-      data: { status: 'REJECTED' }
-    });
+    // Actualizăm fazele selectate
+    if (quote.phases && quote.phases.length > 0) {
+      await prisma.constructionPhase.updateMany({
+        where: {
+          id: { in: quote.phases.map((p: any) => p.id) },
+          projectId: quote.projectId
+        },
+        data: {
+          contractorId: quote.contractorId,
+          quoteId: quote.id
+        }
+      });
+    }
+
+    // Nu mai respingem automat toate celelalte oferte
+    // Opțional, aici s-ar putea face logica pentru a respinge ofertele care concurează EXACT pe aceleași etape
+    // dar deocamdată o să le lăsăm ca atare, oferind flexibilitate clientului.
 
     res.json({ message: 'Ofertă acceptată cu succes.' });
   } catch (error) {
     console.error('[marketController.acceptQuote] Eroare:', error);
     res.status(500).json({ error: 'Eroare internă de server' });
+  }
+};
+
+/**
+ * Client: Refuză o ofertă (cu mesaj opțional)
+ * POST /api/market/quotes/:quoteId/reject
+ */
+export const rejectQuote = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const quoteId = parseInt(req.params.quoteId as string, 10);
+    const userId = req.user?.id;
+    const { clientMessage } = req.body;
+
+    if (!userId || isNaN(quoteId)) {
+      res.status(400).json({ error: 'Date invalide' });
+      return;
+    }
+
+    const quote = await prisma.contractorQuote.findUnique({
+      where: { id: quoteId },
+      include: { project: true }
+    });
+
+    if (!quote || quote.project.userId !== userId) {
+      res.status(403).json({ error: 'Acces interzis' });
+      return;
+    }
+
+    await prisma.contractorQuote.update({
+      where: { id: quoteId },
+      data: { 
+        status: 'REJECTED',
+        clientMessage: clientMessage || null
+      }
+    });
+
+    res.json({ message: 'Ofertă refuzată cu succes.' });
+  } catch (error) {
+    console.error('[marketController.rejectQuote] Eroare:', error);
+    res.status(500).json({ error: 'Eroare internă de server' });
+  }
+};
+
+/**
+ * Returnează datele istorice INSSE CNS107D
+ * GET /api/market/history
+ */
+export const getHistory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const data = await marketService.getIndexHistory();
+    res.json({ data });
+  } catch (error) {
+    console.error('[marketController.getHistory] Eroare:', error);
+    res.status(500).json({ error: 'Eroare la returnarea datelor istorice.' });
+  }
+};
+
+/**
+ * Returnează prognoza AI
+ * GET /api/market/forecast
+ */
+export const getForecast = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const forecast = await marketService.getForecast();
+    res.json(forecast);
+  } catch (error) {
+    console.error('[marketController.getForecast] Eroare:', error);
+    res.status(500).json({ error: 'Eroare la generarea prognozei.' });
+  }
+};
+
+/**
+ * Returnează rezumatul pieței
+ * GET /api/market/summary
+ */
+export const getSummary = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const summary = await marketService.getSummary();
+    res.json(summary);
+  } catch (error) {
+    console.error('[marketController.getSummary] Eroare:', error);
+    res.status(500).json({ error: 'Eroare la generarea rezumatului.' });
   }
 };

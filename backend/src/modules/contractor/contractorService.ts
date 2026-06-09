@@ -69,9 +69,10 @@ export const contractorService = {
 
   async addReview(contractorId: number, reviewerId: number, rating: number, comment: string, projectId: number) {
     // 1. Verificăm dacă există o ofertă ACCEPTED între acest client și acest constructor pentru proiectul dat
-    const quote = await prisma.contractorQuote.findUnique({
+    const quote = await prisma.contractorQuote.findFirst({
       where: {
-        contractorId_projectId: { contractorId, projectId },
+        contractorId,
+        projectId,
         project: {
           userId: reviewerId
         },

@@ -11,16 +11,19 @@ export interface Quote {
   id: number;
   contractorId: number;
   projectId: number;
+  phases?: any[];
   status: 'PENDING' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'NEGOTIATING';
   totalAmount: number | null;
   executionDays: number | null;
   message: string | null;
+  clientMessage?: string | null;
   acceptsBOM: boolean;
   bomVariations: any | null;
   createdAt: string;
   updatedAt: string;
   contractor?: ContractorProfile;
-  project?: any; // Puteți tipiza mai specific
+  project?: any;
+  // phase?: any; - scos
 }
 
 export const quoteApi = {
@@ -46,8 +49,10 @@ export const quoteApi = {
     return data;
   },
 
-  submitQuote: async (quoteId: number, payload: { totalAmount: number, executionDays: number, message?: string, acceptsBOM: boolean, bomVariations?: any }): Promise<Quote> => {
-    const { data } = await apiPrivate.post(`/quotes/${quoteId}/submit`, payload);
+  submitQuote: async (quoteId: number | undefined, payload: { projectId?: number, selectedPhases?: number[], totalAmount: number, executionDays: number, message?: string, acceptsBOM: boolean, bomVariations?: any, selfInitiated?: boolean }): Promise<Quote> => {
+    // Dacă e selfInitiated, folosim ruta /submit (fără ID)
+    const url = quoteId ? `/quotes/${quoteId}/submit` : '/quotes/submit';
+    const { data } = await apiPrivate.post(url, payload);
     return data;
   }
 };

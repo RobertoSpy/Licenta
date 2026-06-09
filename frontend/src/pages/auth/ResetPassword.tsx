@@ -189,7 +189,10 @@ export const ResetPassword = () => {
       </div>
 
       {/* Panoul drept */}
-      <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-24 xl:px-32 bg-white">
+      <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-24 xl:px-32 bg-white relative">
+        <Link to="/" className="absolute top-8 left-8 sm:left-16 lg:left-24 xl:left-32 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-buildorange transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Înapoi acasă
+        </Link>
         <div className="w-full max-w-md mx-auto">
           <div className="mb-8 lg:hidden">
             <Building2 className="w-12 h-12 text-buildorange mb-4" />

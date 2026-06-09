@@ -226,6 +226,7 @@ function ContractorProjectsView() {
                   <div>
                     <h3 className="font-bold text-slate-900">
                       Proiect #{q.projectId}
+                      {q.phase?.name && <span className="text-buildorange ml-1">- {q.phase.name}</span>}
                       {q.project?.user?.name && (
                         <span className="text-slate-500 font-normal"> · {q.project.user.name}</span>
                       )}

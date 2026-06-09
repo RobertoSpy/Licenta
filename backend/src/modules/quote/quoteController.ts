@@ -50,7 +50,7 @@ export const getContractorQuotes = async (req: AuthRequest, res: Response) => {
 
 export const submitQuote = async (req: AuthRequest, res: Response) => {
   try {
-    const quoteId = Number(req.params.id);
+    const quoteId = req.params.id ? Number(req.params.id) : undefined;
     const userId = req.user!.id;
     const result = await quoteService.submitQuote(quoteId, userId, req.body);
     res.json(result);

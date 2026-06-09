@@ -20,6 +20,7 @@ export interface ContractorProfile {
   user: {
     name: string | null;
     email: string;
+    phone?: string;
   };
 }
 

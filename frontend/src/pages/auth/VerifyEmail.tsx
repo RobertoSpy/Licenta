@@ -3,7 +3,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../api/axios';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Building2, KeyRound } from 'lucide-react';
+import { Building2, KeyRound, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/useAuth';
 
@@ -109,6 +109,9 @@ export const VerifyEmail = () => {
 
       {/* Partea dreaptă - Formularul de Verificare OTP */}
       <div className="flex-1 flex flex-col justify-center py-12 px-8 sm:px-16 lg:px-24 xl:px-32 bg-white relative">
+        <Link to="/" className="absolute top-8 left-8 sm:left-16 lg:left-24 xl:left-32 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-buildorange transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Înapoi acasă
+        </Link>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

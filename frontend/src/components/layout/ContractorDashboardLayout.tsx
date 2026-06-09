@@ -12,6 +12,7 @@ import { contractorApi } from '../../api/contractorApi';
 export default function ContractorDashboardLayout() {
   const { logout, user } = useAuth();
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'CONTRACTOR') {
@@ -100,7 +101,10 @@ export default function ContractorDashboardLayout() {
         {/* Mobile header */}
         <header className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-50">
           <div className="flex items-center gap-2">
-            <div className="bg-buildorange p-1.5 rounded-lg">
+            <button onClick={() => setIsMobileMenuOpen(true)} className="p-1 -ml-1 text-slate-500 hover:text-slate-900">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            <div className="bg-buildorange p-1.5 rounded-lg ml-1">
               <HardHat className="w-5 h-5 text-white" />
             </div>
             <span className="font-bold text-slate-900">Zidario Contractor</span>
@@ -109,6 +113,52 @@ export default function ContractorDashboardLayout() {
             <LogOut className="w-5 h-5" />
           </button>
         </header>
+
+        {/* Mobile Sidebar Overlay */}
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-[60] md:hidden flex">
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+            
+            {/* Sidebar content */}
+            <div className="relative w-64 max-w-sm bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-left">
+              <div className="p-4 flex items-center justify-between border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="bg-buildorange p-1.5 rounded-lg">
+                    <HardHat className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="font-bold text-slate-900">Zidario</span>
+                </div>
+                <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 text-slate-400 hover:text-slate-900">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+
+              <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+                {menuItems.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${
+                        isActive
+                          ? 'bg-buildorange/10 text-buildorange'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      }`
+                    }
+                  >
+                    {item.icon}
+                    {item.name}
+                  </NavLink>
+                ))}
+              </nav>
+            </div>
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <Outlet context={{ isVerified }} />
