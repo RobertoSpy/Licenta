@@ -1,0 +1,79 @@
+[
+  {
+    "order": 1,
+    "name": "Fundație",
+    "description": "Săpătură, cofraje, armare, turnare beton, hidroizolație fundație",
+    "durationDays": 14,
+    "categories": ["Fundație"],
+    "requiredPreviousPhase": null,
+    "minimumIdle": 7,
+    "idleNote": "7 zile maturare beton înainte de a ridica pereții"
+  },
+  {
+    "order": 2,
+    "name": "Structură",
+    "description": "Ridicarea pereților exteriori și interiori din BCA / cărămidă, buiandrugi, stâlpișori",
+    "durationDays": 21,
+    "categories": ["Structură"],
+    "requiredPreviousPhase": "Fundație"
+  },
+  {
+    "order": 3,
+    "name": "Planșeu & Coroană",
+    "description": "Coroana de beton armat pe conturul clădirii, planșeul dintre etaje (dacă e P+1 sau mai mult)",
+    "durationDays": 10,
+    "categories": ["Planșeu"],
+    "requiredPreviousPhase": "Structură",
+    "minimumIdle": 14,
+    "idleNote": "14 zile maturare planșeu beton armat"
+  },
+  {
+    "order": 4,
+    "name": "Termoizolație & Hidroizolație",
+    "description": "Izolație termică pereți exteriori (EIF/polistiren/vată), hidroizolație fundație și subsol, barieră vapori",
+    "durationDays": 14,
+    "categories": ["Izolație", "Termoizolație"],
+    "requiredPreviousPhase": "Structură"
+  },
+  {
+    "order": 5,
+    "name": "Acoperiș",
+    "description": "Șarpantă lemn, folie anticondens, pazie, jgheaburi, învelitoare (țiglă/tablă)",
+    "durationDays": 14,
+    "categories": ["Acoperiș"],
+    "requiredPreviousPhase": "Planșeu & Coroană"
+  },
+  {
+    "order": 6,
+    "name": "Tâmplărie",
+    "description": "Montaj ferestre PVC, ușă intrare principală, glafuri exterioare",
+    "durationDays": 5,
+    "categories": ["Tâmplărie"],
+    "requiredPreviousPhase": "Acoperiș",
+    "note": "Casa devine 'la roșu' după această etapă — se poate lucra pe orice vreme"
+  },
+  {
+    "order": 7,
+    "name": "Instalații",
+    "description": "Instalații electrice (cablare), sanitare (țevi), termice, șapă, tencuieli, glet",
+    "durationDays": 30,
+    "categories": ["Finisaje Brute"],
+    "requiredPreviousPhase": "Tâmplărie"
+  },
+  {
+    "order": 8,
+    "name": "Finisaje",
+    "description": "Vopsele, gresie, faianță, parchet, uși interior, corpuri iluminat, sanitare montaj",
+    "durationDays": 30,
+    "categories": ["Finisaje Fine"],
+    "requiredPreviousPhase": "Instalații"
+  },
+  {
+    "order": 9,
+    "name": "Amenajări Exterioare",
+    "description": "Trotuar, borduri, intrare auto, gard, pavaj curte",
+    "durationDays": 10,
+    "categories": ["Exterior"],
+    "requiredPreviousPhase": "Finisaje"
+  }
+]

@@ -1,0 +1,27 @@
+Sursă: INSSE-BSP-03-2026 | Secțiune: Indicii de cost în construcții și IPPI
+Perioadă: Martie 2026 | An de bază de referință: 2021=100
+
+CONTEXT MACROECONOMIC MARTIE 2026:
+Rata inflației în luna martie 2026 comparativ cu luna martie 2025 a fost de 9,9%. Prețurile mărfurilor nealimentare au crescut cu 10,9%, creștere determinată puternic de evoluția prețurilor la energia electrică (+57,2%, pe fondul încetării schemelor de sprijin și plafonare din OUG) și energie termică (+13,4%). Prețurile producției industriale (IPPI) pe total au înregistrat o creștere de 1,3% față de luna februarie 2026.
+
+EVOLUȚIA PREȚURILOR INDUSTRIALE ( Bunuri Intermediare ):
+La nivelul marilor grupe industriale, comparativ cu luna martie 2025, se observă o stabilizare dar la un nivel ridicat a costurilor de producție:
+- Industria energetică: +11,7%
+- Industria bunurilor intermediare (categoria ce include ciment, BCA, cărămidă, oțel structural): +5,5%
+
+INDICII DE COST ÎN CONSTRUCȚII — MARTIE 2026 (Tabelul 15, Baza 2021=100):
+- CONSTRUCȚII - TOTAL: 161,5 (reprezintă o creștere structurală de 61,5% a costurilor totale de șantier față de anul 2021)
+- Clădiri rezidențiale (Total cost compozit): 161,3
+- Costul pur al materialelor de construcții: 142,7 (platou stabilizat, materiale cu +42,7% mai scumpe față de media anului 2021)
+- Clădiri nerezidențiale: 160,0
+- Construcții inginerești: 162,6
+
+ELEMENTE DE COST SEMNIFICATIVE JURIDIC (Tabelul 15B):
+- Forța de muncă în construcții (manoperă/salarii brute): 189,67 (valoare înregistrată în februarie 2026, indicând o explozie de +89,67% a costului cu ziua-muncă față de 2021)
+- Coeficient combustibili: 142,54
+- Coeficient energie electrică: 314,42 (vârf masiv de cost industrial)
+- Coeficient energie electrică + gaze: 299,57
+
+CAUZALITATE ȘI INTERPRETARE PENTRU AGENTUL FINANCIAR ZIDARIO:
+În primăvara anului 2026, dinamica devizelor în România arată o schimbare radicală de paradigmă față de criza din 2022. Inflația pe materiale (bunuri intermediare) s-a temperat la +5,5% anual, însă indicele materialelor rămâne blocat la un nivel ridicat (142,7 față de baza 2021). Adevăratul vector de presiune financiară în 2026 este reprezentat dual de energie electrică (+57,2% din cauza eliminării plafoanelor guvernamentale) și de forța de muncă (indice istoric de 189,67). 
+Pentru algoritmul predictiv de buget pe orizontul 2030, acest chunk învață AI-ul că optimizarea costurilor nu se mai face prin căutarea de materiale alternative ieftine, ci prin reducerea timpului fizic de execuție (reducerea amprentei de manoperă brută prin tehnologii prefabricate sau automatizate), deoarece manopera se scumpiește de două ori mai rapid decât cărămida sau cimentul.

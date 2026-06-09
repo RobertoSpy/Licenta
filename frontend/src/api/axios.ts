@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Instanța de bază pentru cereri publice
 export const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -11,7 +11,7 @@ export const api = axios.create({
 
 // Instanța protejată (necesită token)
 export const apiPrivate = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -33,7 +33,11 @@ export const getAccessToken = () => {
 apiPrivate.interceptors.request.use(
   (config) => {
     if (accessToken && config.headers) {
-      config.headers['Authorization'] = `Bearer ${accessToken}`;
+      if (typeof config.headers.set === 'function') {
+        config.headers.set('Authorization', `Bearer ${accessToken}`);
+      } else {
+        config.headers['Authorization'] = `Bearer ${accessToken}`;
+      }
     }
     return config;
   },
@@ -54,7 +58,11 @@ apiPrivate.interceptors.response.use(
         setAccessToken(newAccessToken);
 
         // Re-trimitem cererea originală cu noul token
-        prevRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+        if (typeof prevRequest.headers.set === 'function') {
+          prevRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
+        } else {
+          prevRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+        }
         return apiPrivate(prevRequest);
       } catch (err) {
         // Dacă refresh-ul eșuează (ex. refresh token expirat 7 zile)
@@ -67,3 +75,32 @@ apiPrivate.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Utilitar pentru apeluri `fetch` (SSE) care au nevoie de Refresh Token automat
+// deoarece fetch() nu trece prin interceptorul axios de mai sus.
+export const fetchWithAuth = async (url: string, options: RequestInit = {}): Promise<Response> => {
+  let token = getAccessToken();
+  const getHeaders = () => ({
+    ...options.headers,
+    'Authorization': `Bearer ${token}`,
+  });
+
+  let response = await fetch(url, { ...options, headers: getHeaders() });
+
+  if (response.status === 401) {
+    try {
+      const refreshRes = await api.post('/auth/refresh');
+      token = refreshRes.data.accessToken;
+      setAccessToken(token);
+      
+      // Retry
+      response = await fetch(url, { ...options, headers: getHeaders() });
+    } catch (err) {
+      setAccessToken(null);
+      window.dispatchEvent(new Event('auth:unauthorized'));
+      throw err;
+    }
+  }
+
+  return response;
+};

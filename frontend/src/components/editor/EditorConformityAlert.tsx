@@ -1,0 +1,211 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { type ConformityRoom, type ConformityRuleIssue } from '../../hooks/useConformityCheck';
+import { aiApi } from '../../api/aiApi';
+import { AlertTriangle, XCircle, X } from 'lucide-react';
+
+interface Props {
+  violations: ConformityRoom[];
+  violationIssues: ConformityRuleIssue[];
+  warningIssues: ConformityRuleIssue[];
+  onAutoFix?: () => void;
+}
+
+export const EditorConformityAlert: React.FC<Props> = ({
+  violations,
+  violationIssues,
+  warningIssues,
+  onAutoFix,
+}) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const [aiExplanation, setAiExplanation] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  const totalIssues = violationIssues.length + warningIssues.length + violations.length;
+
+  const renderSources = (sources?: ConformityRuleIssue['sources']) => {
+    if (!sources || sources.length === 0) return null;
+    return (
+      <div className="mt-2 space-y-1 text-[10px] text-slate-400">
+        {sources.map((src, idx) => (
+          <div key={`${src.source}-${idx}`}>
+            <span className="font-semibold">{src.source}</span> · {src.chapter}
+            {src.excerpt && (
+              <div className="text-[10px] text-slate-400">{src.excerpt}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    if (violations.length === 0) {
+      setAiExplanation('');
+      return;
+    }
+    setIsOpen(true);
+    fetchAiExplanation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [violations.map((v) => v.id + v.usableSqm).join(',')]);
+
+  const fetchAiExplanation = async () => {
+    setAiExplanation('');
+    setIsStreaming(true);
+    try {
+      await aiApi.streamConformityExplanation(
+        violations.map((v) => ({
+          label: v.label,
+          usableSqm: v.usableSqm,
+          minRequired: v.minRequiredSqm,
+        })),
+        (text) => setAiExplanation((prev) => prev + text)
+      );
+    } catch (e) {
+      console.error('[ConformityAlert] Eroare SSE:', e);
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
+  if (totalIssues === 0) return null;
+
+  const hasViolations = violationIssues.length > 0 || violations.length > 0;
+
+  if (!isOpen) {
+    return (
+      <button 
+        onClick={() => setIsOpen(true)}
+        className={`fixed right-6 top-24 z-40 p-3 rounded-full shadow-lg flex items-center justify-center border transition-all hover:scale-105
+          ${hasViolations ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}
+        title="Avertismente & Conformitate"
+      >
+        <AlertTriangle className={`w-6 h-6 ${hasViolations ? 'text-red-500' : 'text-amber-500'}`} />
+        <span className={`absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm
+          ${hasViolations ? 'bg-red-500' : 'bg-amber-500'}`}>
+          {totalIssues}
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        key="conformity-panel"
+        initial={{ x: 40, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: 40, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+        className={`
+          flex flex-col w-80 bg-white border rounded-2xl shadow-2xl z-30 overflow-hidden fixed right-6 top-24
+          ${hasViolations ? 'border-red-200' : 'border-amber-200'}
+        `}
+        style={{ maxHeight: 'calc(100vh - 120px)' }}
+      >
+        {/* ── Header (sticky) ─────────────────────────────── */}
+        <div
+          className={`flex flex-col px-4 py-3 cursor-pointer shrink-0 border-b
+            ${hasViolations ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}
+          onClick={() => setIsOpen(v => !v)}
+        >
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className={`w-4 h-4 ${hasViolations ? 'text-red-500' : 'text-amber-500'}`} />
+              <span className={`text-xs font-bold ${hasViolations ? 'text-red-800' : 'text-amber-800'}`}>
+                {violationIssues.length + violations.length > 0
+                  ? `${violationIssues.length + violations.length} încălcări`
+                  : ''}
+                {violationIssues.length + violations.length > 0 && warningIssues.length > 0 ? ' · ' : ''}
+                {warningIssues.length > 0 ? `${warningIssues.length} recomandări` : ''}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                }}
+                className="p-1 rounded-lg hover:bg-black/10 transition-colors"
+                title="Închide"
+              >
+                <X className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+          </div>
+          
+          {onAutoFix && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAutoFix();
+              }}
+              className="mt-3 w-full flex items-center justify-center gap-2 bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm hover:bg-slate-800 transition-all hover:scale-[1.02]"
+            >
+              ✨ Auto-Fix AI
+            </button>
+          )}
+        </div>
+
+        {/* ── Body scrollabil ─────────────────────────────── */}
+        <div className="overflow-y-auto flex-1 p-4 space-y-3">
+          {/* Violări (erori) */}
+          {violationIssues.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide">Încălcări legale</p>
+              {violationIssues.map((issue) => (
+                <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-2 bg-red-50 rounded-xl px-3 py-2">
+                  <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 text-xs">
+                    <div className="font-bold text-slate-900 leading-snug">{issue.message}</div>
+                    <div className="text-red-700 mt-0.5">
+                      {issue.currentValue} → {issue.requiredValue}
+                      {issue.deltaValue ? ` (−${Math.abs(issue.deltaValue)} lipsă)` : ''}
+                    </div>
+                    <div className="text-red-500 mt-1">{issue.suggestion}</div>
+                    {renderSources(issue.sources)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Avertismente */}
+          {warningIssues.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Recomandări</p>
+              {warningIssues.map((issue) => (
+                <div key={`${issue.code}-${issue.targetId}`} className="flex items-start gap-2 bg-amber-50 rounded-xl px-3 py-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 text-xs text-amber-800">
+                    <div className="font-bold leading-snug">{issue.message}</div>
+                    <div className="text-amber-700 mt-0.5 font-medium">
+                      {issue.currentValue} → {issue.requiredValue}
+                      {issue.deltaValue ? ` (−${Math.abs(issue.deltaValue)} lipsă)` : ''}
+                    </div>
+                    <div className="mt-1 text-amber-600">{issue.suggestion}</div>
+                    {renderSources(issue.sources)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* AI Explicație */}
+          {(aiExplanation || isStreaming) && (
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                🤖 Zidario explică
+                {isStreaming && <span className="inline-block w-1.5 h-3.5 bg-buildorange animate-pulse rounded-sm" />}
+              </p>
+              <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                {aiExplanation}
+              </p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};

@@ -1,0 +1,114 @@
+name: CI - Continuous Integration
+
+on:
+  push:
+    branches: [ "**" ] # Rulează pe ORICE branch, pentru a verifica fiecare linie nouă
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-backend:
+    name: Backend Tests & Lint
+    runs-on: ubuntu-latest
+    
+    # Ridicăm serviciile izolate pentru teste de Integrare (Database & Redis)
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: buildconstruct_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+
+    - name: Install Dependencies
+      run: npm ci
+      working-directory: ./backend
+
+    - name: Run Type Check (TypeScript)
+      run: npx tsc --noEmit
+      working-directory: ./backend
+
+    - name: Apply Database Migrations
+      run: npx prisma migrate deploy
+      working-directory: ./backend
+      env:
+        DATABASE_URL: "postgresql://user:password@localhost:5432/buildconstruct_test?schema=public"
+
+    - name: Run Jest Test Suite (Strict Coverage)
+      env:
+        DATABASE_URL: "postgresql://user:password@localhost:5432/buildconstruct_test?schema=public"
+        REDIS_HOST: "localhost"
+        JWT_SECRET: "test_secret_for_ci"
+      # Vom impune pe viitor ca CI-ul să refuze pull request-urile care ne scad coverage-ul
+      run: npx jest --coverage
+      working-directory: ./backend
+
+  security-and-smells:
+    name: CodeQL Security & Smells Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: 'javascript' # Scaneaza atat TS cat si JS
+        queries: security-extended,security-and-quality # Activăm și setul pt Code Smells (Quality)
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+
+  test-frontend:
+    name: Frontend Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install Frontend Dependencies
+      run: npm ci
+      working-directory: ./frontend
+
+    - name: Validate Build
+      run: npm run build
+      working-directory: ./frontend

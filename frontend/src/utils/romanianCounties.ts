@@ -1,0 +1,9 @@
+export const ROMANIAN_COUNTIES = [
+  "Alba", "Arad", "Arges", "Bacau", "Bihor", "Bistrita-Nasaud",
+  "Botosani", "Brasov", "Braila", "Bucuresti", "Buzau", "Caras-Severin",
+  "Calarasi", "Cluj", "Constanta", "Covasna", "Dambovita", "Dolj",
+  "Galati", "Giurgiu", "Gorj", "Harghita", "Hunedoara", "Ialomita",
+  "Iasi", "Ilfov", "Maramures", "Mehedinti", "Mures", "Neamt",
+  "Olt", "Prahova", "Satu Mare", "Salaj", "Sibiu", "Suceava",
+  "Teleorman", "Timis", "Tulcea", "Vaslui", "Valcea", "Vrancea"
+];

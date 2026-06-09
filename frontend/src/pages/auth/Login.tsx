@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/useAuth';
 import { api } from '../../api/axios';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Building2, Lock, Mail } from 'lucide-react';
+import { Building2, Lock, Mail, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const Login = () => {
@@ -13,7 +13,9 @@ export const Login = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  const successMessage = (location.state as { message?: string })?.message || '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,10 +25,19 @@ export const Login = () => {
     try {
       const response = await api.post('/auth/login', { email, password });
       // Răspunsul trebuie să conțină accessToken-ul, cookie-ul de refresh e trimis automat de backend.
+      const userRole = response.data.user.role;
       login(response.data.accessToken, response.data.user);
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Conexiunea a eșuat. Verifică datele introduse.');
+      
+      if (userRole === 'ADMIN') {
+        navigate('/admin');
+      } else if (userRole === 'CONTRACTOR') {
+        navigate('/contractor');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg || 'Datele introduse sunt greșite. Verifică adresa de email și parola.');
     } finally {
       setIsLoading(false);
     }
@@ -57,6 +68,9 @@ export const Login = () => {
 
       {/* Partea dreaptă - Formularul de Login */}
       <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-24 xl:px-32 bg-white relative">
+        <Link to="/" className="absolute top-8 left-8 sm:left-16 lg:left-24 xl:left-32 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-buildorange transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Înapoi acasă
+        </Link>
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -71,6 +85,11 @@ export const Login = () => {
           <p className="text-slate-500 mt-2 mb-8">Introdu credențiale tale pentru a accesa panoul tău de proiecte.</p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {successMessage && (
+              <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-700 text-sm rounded-r-md">
+                {successMessage}
+              </div>
+            )}
             {error && (
               <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded-r-md">
                 {error}
@@ -102,9 +121,9 @@ export const Login = () => {
                 <input type="checkbox" className="rounded border-slate-300 text-buildorange focus:ring-buildorange" />
                 <span className="ml-2 text-sm text-slate-600">Ține-mă minte</span>
               </label>
-              <a href="#" className="text-sm font-medium text-buildorange hover:text-orange-600">
+              <Link to="/forgot-password" className="text-sm font-medium text-buildorange hover:text-orange-600">
                 Ai uitat parola?
-              </a>
+              </Link>
             </div>
 
             <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>

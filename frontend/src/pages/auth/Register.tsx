@@ -3,21 +3,32 @@ import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../api/axios';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Building2, Lock, Mail, User } from 'lucide-react';
+import { Building2, Lock, Mail, User, ChevronDown, MapPin, Phone, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { ContractorSpecialization, SPECIALIZATION_LABELS } from '../../types/contractor';
+import { ROMANIAN_COUNTIES } from '../../utils/romanianCounties';
 
 export const Register = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'CLIENT', // 'CLIENT' | 'CONTRACTOR'
+    companyName: '',
+    cui: '',
+    county: '',
+    specializations: [] as ContractorSpecialization[]
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isCountyOpen, setIsCountyOpen] = useState(false);
+  const [acceptedGdpr, setAcceptedGdpr] = useState(false);
   const navigate = useNavigate();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -73,16 +84,47 @@ export const Register = () => {
       return;
     }
 
+    if (!acceptedTerms || !acceptedGdpr) {
+      setError('Trebuie să accepți Termenii și Condițiile și Politica de Confidențialitate (GDPR) pentru a continua.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      await api.post('/auth/register', {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password
-      });
-      // După înregistrare, redirecționăm către login
-      navigate('/login');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Înregistrarea a eșuat. Această adresă ar putea fi deja folosită.');
+      if (formData.role === 'CONTRACTOR') {
+        if (!formData.companyName || !formData.cui || !formData.county) {
+          setError('Firma, CUI-ul și Județul sunt obligatorii pentru constructori.');
+          setIsLoading(false);
+          return;
+        }
+        if (formData.specializations.length === 0) {
+          setError('Te rugăm să alegi cel puțin o specializare (filieră).');
+          setIsLoading(false);
+          return;
+        }
+        await api.post('/auth/register-contractor', {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          companyName: formData.companyName,
+          cui: formData.cui,
+          county: formData.county,
+          specializations: formData.specializations,
+          coverageRadius: 50
+        });
+      } else {
+        await api.post('/auth/register', {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password
+        });
+      }
+      
+      // După înregistrare, redirecționăm către ecranul de verificare email
+      navigate('/verify-email', { state: { email: formData.email } });
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg || 'Înregistrarea a eșuat. Această adresă ar putea fi deja folosită.');
     } finally {
       setIsLoading(false);
     }
@@ -113,6 +155,9 @@ export const Register = () => {
 
       {/* Partea dreaptă - Formularul de Înregistrare */}
       <div className="flex-1 flex flex-col justify-center py-12 px-8 sm:px-16 lg:px-24 xl:px-32 bg-white relative">
+        <Link to="/" className="absolute top-8 left-8 sm:left-16 lg:left-24 xl:left-32 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-buildorange transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Înapoi acasă
+        </Link>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -133,12 +178,37 @@ export const Register = () => {
               </div>
             )}
 
+            <div className="flex gap-4 mb-4">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, role: 'CLIENT' })}
+                className={`flex-1 py-3 px-4 rounded-xl border-2 font-medium transition-colors ${
+                  formData.role === 'CLIENT' 
+                    ? 'border-buildorange bg-orange-50 text-buildorange' 
+                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                }`}
+              >
+                Sunt Client
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, role: 'CONTRACTOR' })}
+                className={`flex-1 py-3 px-4 rounded-xl border-2 font-medium transition-colors ${
+                  formData.role === 'CONTRACTOR' 
+                    ? 'border-buildorange bg-orange-50 text-buildorange' 
+                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                }`}
+              >
+                Sunt Constructor
+              </button>
+            </div>
+
             <Input
               label="Nume Complet"
               name="name"
               type="text"
               icon={<User className="w-5 h-5" />}
-              placeholder="ex. Ion Popescu"
+              placeholder={formData.role === 'CONTRACTOR' ? 'Nume Reprezentant' : 'ex. Ion Popescu'}
               value={formData.name}
               onChange={handleChange}
               required
@@ -154,6 +224,122 @@ export const Register = () => {
               onChange={handleChange}
               required
             />
+
+            <Input
+              label="Număr Telefon"
+              name="phone"
+              type="tel"
+              icon={<Phone className="w-5 h-5" />}
+              placeholder="ex. 0722123456"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+            />
+
+            {formData.role === 'CONTRACTOR' && (
+              <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h4 className="text-sm font-semibold text-slate-700">Detalii Firmă</h4>
+                <Input
+                  label="Denumire Firmă"
+                  name="companyName"
+                  type="text"
+                  icon={<Building2 className="w-5 h-5" />}
+                  placeholder="SC Construct SRL"
+                  value={formData.companyName}
+                  onChange={handleChange}
+                  required
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="CUI / CIF"
+                    name="cui"
+                    type="text"
+                    placeholder="RO123456"
+                    value={formData.cui}
+                    onChange={handleChange}
+                    required
+                  />
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Județ</label>
+                    <div 
+                      className="relative"
+                      tabIndex={0}
+                      onBlur={(e) => {
+                        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                          setIsCountyOpen(false);
+                        }
+                      }}
+                    >
+                      <div 
+                        onClick={() => setIsCountyOpen(!isCountyOpen)}
+                        className={`w-full px-4 py-[9px] border ${isCountyOpen ? 'border-buildorange ring-2 ring-buildorange/20' : 'border-slate-300'} rounded-lg flex items-center justify-between cursor-pointer hover:border-buildorange transition-all bg-white`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-slate-400" />
+                          <span className={formData.county ? "text-slate-900 text-sm" : "text-slate-400 text-sm"}>
+                            {formData.county || "Alege Județ"}
+                          </span>
+                        </div>
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isCountyOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                      
+                      {isCountyOpen && (
+                        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                          <div 
+                            onClick={() => {
+                              setFormData({...formData, county: ''});
+                              setIsCountyOpen(false);
+                            }}
+                            className={`px-4 py-2 cursor-pointer text-sm hover:bg-slate-50 transition-colors ${!formData.county ? 'bg-orange-50 text-buildorange font-medium' : 'text-slate-600'}`}
+                          >
+                            Alege Județ
+                          </div>
+                          {ROMANIAN_COUNTIES.map(county => (
+                            <div 
+                              key={county}
+                              onClick={() => {
+                                setFormData({...formData, county});
+                                setIsCountyOpen(false);
+                              }}
+                              className={`px-4 py-2 cursor-pointer text-sm hover:bg-slate-50 transition-colors border-t border-slate-50 ${formData.county === county ? 'bg-orange-50 text-buildorange font-medium' : 'text-slate-600'}`}
+                            >
+                              {county}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Specializări (poți alege mai multe)</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(SPECIALIZATION_LABELS).map(([enumValue, label]) => {
+                      const spec = enumValue as ContractorSpecialization;
+                      return (
+                        <label key={spec} className="flex items-center gap-2 cursor-pointer text-sm text-slate-600 hover:text-slate-900">
+                          <input 
+                            type="checkbox"
+                            className="rounded border-slate-300 text-buildorange focus:ring-buildorange"
+                            checked={formData.specializations.includes(spec)}
+                            onChange={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                specializations: prev.specializations.includes(spec)
+                                  ? prev.specializations.filter(s => s !== spec)
+                                  : [...prev.specializations, spec]
+                              }));
+                            }}
+                          />
+                          {label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-4">
@@ -203,7 +389,41 @@ export const Register = () => {
               )}
             </div>
 
-            <Button type="submit" className="w-full mt-4" size="lg" isLoading={isLoading} disabled={passwordStrength < 4}>
+            {/* GDPR & Terms Checkboxes */}
+            <div className="space-y-3 pt-2 pb-1">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={e => setAcceptedTerms(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-buildorange focus:ring-buildorange"
+                />
+                <span className="text-sm text-slate-600 leading-snug">
+                  Am citit și sunt de acord cu{' '}
+                  <Link to="/terms" target="_blank" className="font-semibold text-buildorange hover:underline">
+                    Termenii și Condițiile
+                  </Link>
+                  {' '}de utilizare.
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={acceptedGdpr}
+                  onChange={e => setAcceptedGdpr(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-buildorange focus:ring-buildorange"
+                />
+                <span className="text-sm text-slate-600 leading-snug">
+                  Am luat la cunoștință{' '}
+                  <Link to="/privacy" target="_blank" className="font-semibold text-buildorange hover:underline">
+                    Politica de Confidențialitate (GDPR)
+                  </Link>
+                  {' '}și sunt de acord cu prelucrarea datelor mele personale.
+                </span>
+              </label>
+            </div>
+
+            <Button type="submit" className="w-full mt-4" size="lg" isLoading={isLoading} disabled={passwordStrength < 4 || !acceptedTerms || !acceptedGdpr}>
               Creează Cont
             </Button>
           </form>

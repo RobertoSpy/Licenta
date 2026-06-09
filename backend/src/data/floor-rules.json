@@ -1,0 +1,10 @@
+{
+  "_source": "P100-1/2013 + NP112-2014",
+  "_note": "Număr maxim de etaje (inclusiv parter) per zonă seismică și tip sol. Stâncos = sol cel mai stabil (rocă).",
+  "0.10g": { "Stâncos": 6, "Pietros": 5, "Argilos": 4, "Nisipos": 3, "Necunoscut": 3 },
+  "0.15g": { "Stâncos": 5, "Pietros": 4, "Argilos": 4, "Nisipos": 3, "Necunoscut": 3 },
+  "0.20g": { "Stâncos": 5, "Pietros": 4, "Argilos": 3, "Nisipos": 2, "Necunoscut": 2 },
+  "0.25g": { "Stâncos": 4, "Pietros": 3, "Argilos": 2, "Nisipos": 2, "Necunoscut": 2 },
+  "0.30g": { "Stâncos": 4, "Pietros": 3, "Argilos": 2, "Nisipos": 1, "Necunoscut": 2 },
+  "0.35g": { "Stâncos": 3, "Pietros": 2, "Argilos": 1, "Nisipos": 1, "Necunoscut": 1 }
+}

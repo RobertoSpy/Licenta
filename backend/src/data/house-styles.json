@@ -1,0 +1,161 @@
+{
+  "_meta": {
+    "source": "Heuristici extrase din practici arhitecturale comune",
+    "description": "Ponderi estetice și proporții stilistice pentru autogenerarea planurilor 2D. NU sunt valori normative. Definește topologia (layout_matrix) și ierarhia vizuală (ratios). Regulile legale se extrag separat din conformity-rules.json.",
+    "version": "2.0"
+  },
+  "templates": {
+    "Modern": {
+      "concept": "Open-space, circulație fluidă, zona de zi comasată.",
+      "configurations": {
+        "1_dormitor": {
+          "layout_matrix": [
+            ["bucatarie", "living",    "living"],
+            ["hol",       "hol",       "baie"],
+            ["debara",    "dormitor1", "dormitor1"]
+          ],
+          "ratios": {
+            "living": 0.35, "bucatarie": 0.15, "dormitor1": 0.25,
+            "baie": 0.10, "hol": 0.10, "debara": 0.05
+          }
+        },
+        "2_dormitoare": {
+          "layout_matrix": [
+            ["bucatarie",  "living",    "living"],
+            ["hol",        "hol",       "baie"],
+            ["dormitor2",  "hol",       "dormitor1"]
+          ],
+          "ratios": {
+            "living": 0.30, "bucatarie": 0.13, "dormitor1": 0.22,
+            "dormitor2": 0.18, "baie": 0.09, "hol": 0.08
+          }
+        },
+        "3_dormitoare": {
+          "layout_matrix": [
+            ["bucatarie",  "living",    "living"],
+            ["dormitor3",  "hol",       "baie"],
+            ["dormitor2",  "hol",       "dormitor1"]
+          ],
+          "ratios": {
+            "living": 0.26, "bucatarie": 0.11, "dormitor1": 0.18,
+            "dormitor2": 0.15, "dormitor3": 0.13, "baie": 0.09, "hol": 0.08
+          }
+        }
+      }
+    },
+    "Clasic": {
+      "concept": "Decomandat, camere închise, circulație prin hol central.",
+      "configurations": {
+        "1_dormitor": {
+          "layout_matrix": [
+            ["bucatarie", "hol", "living"],
+            ["debara",    "hol", "living"],
+            ["baie",      "hol", "dormitor1"]
+          ],
+          "ratios": {
+            "living": 0.30, "bucatarie": 0.15, "dormitor1": 0.25,
+            "baie": 0.10, "hol": 0.15, "debara": 0.05
+          }
+        },
+        "2_dormitoare": {
+          "layout_matrix": [
+            ["bucatarie",  "hol", "living"],
+            ["dormitor2",  "hol", "living"],
+            ["baie",       "hol", "dormitor1"]
+          ],
+          "ratios": {
+            "living": 0.27, "bucatarie": 0.13, "dormitor1": 0.22,
+            "dormitor2": 0.17, "baie": 0.09, "hol": 0.12
+          }
+        },
+        "3_dormitoare": {
+          "layout_matrix": [
+            ["bucatarie",  "hol",  "living"],
+            ["dormitor3",  "hol",  "dormitor1"],
+            ["baie",       "hol",  "dormitor2"]
+          ],
+          "ratios": {
+            "living": 0.24, "bucatarie": 0.11, "dormitor1": 0.19,
+            "dormitor2": 0.16, "dormitor3": 0.14, "baie": 0.09, "hol": 0.07
+          }
+        }
+      }
+    },
+    "Industrial": {
+      "concept": "Stil Loft, spații uriașe complet deschise, pereți de compartimentare minimi.",
+      "configurations": {
+        "1_dormitor": {
+          "layout_matrix": [
+            ["bucatarie", "living",    "living"],
+            ["bucatarie", "living",    "living"],
+            ["baie",      "hol",       "dormitor1"]
+          ],
+          "ratios": {
+            "living": 0.45, "bucatarie": 0.15, "dormitor1": 0.20,
+            "baie": 0.10, "hol": 0.10
+          }
+        },
+        "2_dormitoare": {
+          "layout_matrix": [
+            ["bucatarie", "living",    "living"],
+            ["bucatarie", "living",    "dormitor2"],
+            ["baie",      "hol",       "dormitor1"]
+          ],
+          "ratios": {
+            "living": 0.35, "bucatarie": 0.13, "dormitor1": 0.18,
+            "dormitor2": 0.15, "baie": 0.09, "hol": 0.10
+          }
+        },
+        "3_dormitoare": {
+          "layout_matrix": [
+            ["bucatarie", "living",    "dormitor3"],
+            ["bucatarie", "living",    "dormitor2"],
+            ["baie",      "hol",       "dormitor1"]
+          ],
+          "ratios": {
+            "living": 0.30, "bucatarie": 0.12, "dormitor1": 0.17,
+            "dormitor2": 0.14, "dormitor3": 0.12, "baie": 0.08, "hol": 0.07
+          }
+        }
+      }
+    },
+    "Mediteranean": {
+      "concept": "Zonă de zi vastă cu orientare spre terasă/exterior, dormitoare bine izolate.",
+      "configurations": {
+        "1_dormitor": {
+          "layout_matrix": [
+            ["dormitor1", "baie",    "bucatarie"],
+            ["dormitor1", "hol",     "living"],
+            ["hol",       "hol",     "living"]
+          ],
+          "ratios": {
+            "living": 0.35, "bucatarie": 0.15, "dormitor1": 0.25,
+            "baie": 0.10, "hol": 0.15
+          }
+        },
+        "2_dormitoare": {
+          "layout_matrix": [
+            ["dormitor2", "baie",    "bucatarie"],
+            ["dormitor1", "hol",     "living"],
+            ["dormitor1", "hol",     "living"]
+          ],
+          "ratios": {
+            "living": 0.30, "bucatarie": 0.12, "dormitor1": 0.22,
+            "dormitor2": 0.16, "baie": 0.09, "hol": 0.11
+          }
+        },
+        "3_dormitoare": {
+          "layout_matrix": [
+            ["dormitor3", "baie",    "bucatarie"],
+            ["dormitor2", "hol",     "living"],
+            ["dormitor1", "hol",     "living"]
+          ],
+          "ratios": {
+            "living": 0.27, "bucatarie": 0.11, "dormitor1": 0.18,
+            "dormitor2": 0.14, "dormitor3": 0.12, "baie": 0.09, "hol": 0.09
+          }
+        }
+      }
+    }
+  }
+}

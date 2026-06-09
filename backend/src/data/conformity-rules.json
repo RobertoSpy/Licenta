@@ -1,0 +1,240 @@
+{
+  "room_min_sqm": [
+    {
+      "code": "L114_LIVING_MIN",
+      "targets": ["living", "sufragerie", "cameradezi", "salon"],
+      "min_sqm": 18,
+      "severity": "error",
+      "_source": "NP057/2002, Art.5, Tabel 1 + Legea 114/1996, Anexa 1",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "L114_BEDROOM_MIN",
+      "targets": ["dormitor", "camera", "cameraparintilor", "cameracopilului"],
+      "min_sqm": 12,
+      "severity": "error",
+      "_source": "NP057/2002, Art.5, Tabel 1 + Legea 114/1996, Anexa 1",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "L114_BEDROOM_SINGLE_MIN",
+      "targets": ["dormitorsimplu", "camerasimpla"],
+      "min_sqm": 8,
+      "severity": "error",
+      "_source": "NP057/2002, Art.5, Tabel 1 + Legea 114/1996, Anexa 1",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "L114_KITCHEN_MIN",
+      "targets": ["bucatarie", "bucătărie"],
+      "min_sqm": 5,
+      "severity": "error",
+      "_source": "NP057/2002, Art.5, Tabel 1 + Legea 114/1996, Anexa 1",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "L114_BATHROOM_MIN",
+      "targets": ["baie", "baiemare", "baieprincipal"],
+      "min_sqm": 3.5,
+      "severity": "warning",
+      "_source": "Legea 114/1996, Anexa 1",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "L114_WC_MIN",
+      "targets": ["wc", "toaleta", "toaletă", "grupсаниtar", "grupanitar"],
+      "min_sqm": 1.2,
+      "severity": "warning",
+      "_source": "Legea 114/1996, Anexa 1",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "L114_HALL_MIN",
+      "targets": ["hol", "holentru", "holprincipala", "antreu", "vestibul"],
+      "min_sqm": 4,
+      "severity": "warning",
+      "_source": "NP057/2002, Art.6 + Legea 114/1996, Art.4",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "L114_STORAGE_MIN",
+      "targets": ["debara", "spatiumdepozitare", "camaredepozitare"],
+      "min_sqm": 1.5,
+      "severity": "warning",
+      "_source": "Legea 114/1996, Anexa 1",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "L114_DININGROOM_MIN",
+      "targets": ["sufragariediningroom", "dining", "sufragarie"],
+      "min_sqm": 12,
+      "severity": "warning",
+      "_source": "NP057/2002, Art.5, Tabel 1",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "L114_OFFICE_MIN",
+      "targets": ["birou", "cabinet", "studiu"],
+      "min_sqm": 8,
+      "severity": "warning",
+      "_source": "NP057/2002, Art.5",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed", "commercial"]
+    }
+  ],
+  "clearance_rules": [
+    {
+      "code": "L114_CORRIDOR_WIDTH",
+      "targets": ["hol", "coridor", "vestibul", "circulatie", "circulație"],
+      "property": "widthM",
+      "value": 1.2,
+      "severity": "error",
+      "_source": "Legea 114/1996, Anexa 1",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "P118_DOOR_WIDTH",
+      "targets": ["usa", "usaexterior", "usainterior"],
+      "property": "widthM",
+      "value": 0.8,
+      "severity": "warning",
+      "_source": "P118-99 / NP057/2002",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed", "commercial"]
+    },
+    {
+      "code": "P118_EMERGENCY_DOOR_WIDTH",
+      "targets": ["usaevacuare", "iesireurgenta"],
+      "property": "widthM",
+      "value": 0.9,
+      "severity": "error",
+      "_source": "P118-99, Art. 2.6.4",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["commercial", "mixed"]
+    },
+    {
+      "code": "NP057_DOOR_ENTRANCE_MAIN",
+      "targets": ["usaintrare", "usaexterior"],
+      "property": "widthM",
+      "value": 0.9,
+      "severity": "error",
+      "_source": "NP057/2002, Art. 3.2.(A).3.h — intrare principală locuință unifamilială min. 0.90m",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "NP057_INTERIOR_HEIGHT",
+      "targets": ["toate_camerele"],
+      "property": "heightM",
+      "value": 2.0,
+      "severity": "error",
+      "_source": "NP057/2002, Art. 3.2.(A).4.b — înălțime liberă trecere min. 2.00m, în subsoluri și mansarde min. 1.90m",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "NP057_DOOR_INTERIOR_WIDTH",
+      "targets": ["usainterior"],
+      "property": "widthM",
+      "value": 0.8,
+      "severity": "error",
+      "_source": "NP057/2002, Art. 3.2.(A).4.h — lățime liberă uși interioare min. 0.80m, acces apartament min. 0.90m",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    }
+  ],
+  "environmental_rules": [
+    {
+      "code": "NP057_SUNLIGHT_MIN",
+      "targets": ["dormitor", "living", "cameradezi"],
+      "property": "sunlightHours",
+      "value": 2,
+      "severity": "warning",
+      "_source": "NP057/2002, Art. 3.4.(D).1.1 — cel puțin o cameră de locuit să primească radiație solară directă min. 2 ore/zi în ziua de referință 21 feb sau 21 oct",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "NP057_WINDOW_FLOOR_RATIO_LIVING",
+      "targets": ["living", "dormitor", "cameradezi"],
+      "property": "windowFloorRatio",
+      "value": 0.125,
+      "severity": "warning",
+      "_source": "NP057/2002, Art. 3.4.(E).1.2 — raport arie ferestre/arie pardoseală: camere de locuit 1/6...1/8 (adică 0.125-0.167)",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "NP057_WINDOW_FLOOR_RATIO_OTHER",
+      "targets": ["bucatarie", "baie", "hol"],
+      "property": "windowFloorRatio",
+      "value": 0.1,
+      "severity": "warning",
+      "_source": "NP057/2002, Art. 3.4.(E).1.2 — celelalte încăperi 1/8...1/10",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "NP057_MIN_TEMP_LIVING",
+      "targets": ["living", "dormitor", "cameradezi", "hol"],
+      "property": "designTempC",
+      "value": 20,
+      "severity": "info",
+      "_source": "NP057/2002, Art. 3.4.(C).1.2 — temperatură interior iarnă: camere locuit și holuri min. 20°C",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "NP057_MIN_TEMP_BATHROOM",
+      "targets": ["baie"],
+      "property": "designTempC",
+      "value": 22,
+      "severity": "info",
+      "_source": "NP057/2002, Art. 3.4.(C).1.2 — baie și duș min. 22°C",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "NP057_MIN_TEMP_KITCHEN",
+      "targets": ["bucatarie"],
+      "property": "designTempC",
+      "value": 18,
+      "severity": "info",
+      "_source": "NP057/2002, Art. 3.4.(C).1.2 — bucătărie min. 18°C",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    }
+  ],
+  "acoustic_rules": [
+    {
+      "code": "NP057_SOUND_INSULATION_BETWEEN_ROOMS",
+      "targets": ["pereteinterior"],
+      "property": "soundInsulationDB",
+      "value": 32,
+      "severity": "warning",
+      "_source": "NP057/2002, Art. 3.6.1.1.1.b — pereți interiori în cadrul apartamentului min. 32dB izolare zgomot aerian",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    },
+    {
+      "code": "NP057_SOUND_INSULATION_BETWEEN_APARTMENTS",
+      "targets": ["peretedespartitor"],
+      "property": "soundInsulationDB",
+      "value": 51,
+      "severity": "error",
+      "_source": "NP057/2002, Art. 3.6.1.1.1.c — pereți între apartamente min. 51dB",
+      "_extractedAt": "2024-01-15",
+      "applies_to": ["residential", "mixed"]
+    }
+  ]
+}
