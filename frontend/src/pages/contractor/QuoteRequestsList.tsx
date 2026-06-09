@@ -106,7 +106,7 @@ export default function QuoteRequestsList() {
  </div>
  <p className="text-xs font-bold text-blue-600 mb-2 flex items-center gap-1">
    <Layers className="w-3 h-3" />
-   {q.phase?.name || 'Etapă Nespecificată'}
+    {q.phases && q.phases.length > 0 ? q.phases.map((p: any) => p.name).join(', ') : 'Etape Nespecificate'}
  </p>
  <p className="text-xs text-slate-500 flex items-center gap-1">
  <Clock className="w-3 h-3" />
@@ -131,7 +131,7 @@ export default function QuoteRequestsList() {
  className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm"
  >
  <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center justify-between">
- <span>Detalii Proiect #{selectedQuote.projectId} - Etapa {selectedQuote.phase?.name}</span>
+ <span>Detalii Proiect #{selectedQuote.projectId} - Etape: {selectedQuote.phases?.map((p: any) => p.name).join(', ')}</span>
  <span className="text-sm font-normal px-3 py-1 bg-slate-100 rounded-lg">
  Status: <strong className="uppercase">{selectedQuote.status}</strong>
  </span>

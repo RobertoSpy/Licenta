@@ -226,7 +226,7 @@ function ContractorProjectsView() {
                   <div>
                     <h3 className="font-bold text-slate-900">
                       Proiect #{q.projectId}
-                      {q.phase?.name && <span className="text-buildorange ml-1">- {q.phase.name}</span>}
+                      {q.phases && q.phases.length > 0 && <span className="text-buildorange ml-1">- {q.phases.map((p: any) => p.name).join(', ')}</span>}
                       {q.project?.user?.name && (
                         <span className="text-slate-500 font-normal"> · {q.project.user.name}</span>
                       )}

@@ -76,7 +76,7 @@ export default function MyQuotesClient() {
 
   // Grupare pe faze
   const quotesByPhase = quotes.reduce((acc, quote) => {
-    const phaseName = quote.phase?.name || 'Necunoscută';
+    const phaseName = quote.phases && quote.phases.length > 0 ? quote.phases.map((p: any) => p.name).join(', ') : 'Necunoscută';
     if (!acc[phaseName]) acc[phaseName] = [];
     acc[phaseName].push(quote);
     return acc;
