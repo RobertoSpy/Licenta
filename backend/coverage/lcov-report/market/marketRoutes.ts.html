@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>15/15</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>15/15</span>
             </div>
         
             
@@ -85,48 +85,87 @@
 <a name='L20'></a><a href='#L20'>20</a>
 <a name='L21'></a><a href='#L21'>21</a>
 <a name='L22'></a><a href='#L22'>22</a>
-<a name='L23'></a><a href='#L23'>23</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
- * backend/src/modules/market/marketRoutes.ts
- *
- * Rute Market Intelligence — toate protejate cu middleware `protect`.
- */
-&nbsp;
-import { Router } from 'express';
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Router } from 'express';
 import { protect } from '../../core/middleware/authMiddleware';
-import { marketController } from './marketController';
+import {
+  publishProject,
+  getFeed,
+  submitQuote,
+  getProjectQuotes,
+  acceptQuote,
+  rejectQuote,
+  getHistory,
+  getForecast,
+  getSummary
+} from './marketController';
 &nbsp;
 const router = Router();
 &nbsp;
-// GET /api/market/history — toate punctele CNS107D (pentru grafice)
-router.get('/history', protect, marketController.getHistory);
+// Toate rutele de market necesită autentificare
+router.use(protect);
 &nbsp;
-// GET /api/market/forecast — prognoze AI 2027 / 2028 (cu cache 30 zile)
-router.get('/forecast', protect, marketController.getForecast);
+// Rute Date Piață (Market Intelligence)
+router.get('/history', getHistory);
+router.get('/forecast', getForecast);
+router.get('/summary', getSummary);
 &nbsp;
-// GET /api/market/summary — rezumat compact pentru chat agent financiar
-router.get('/summary', protect, marketController.getSummary);
+// Rute Client
+router.post('/projects/:id/publish', publishProject);
+router.get('/projects/:id/quotes', getProjectQuotes);
+router.post('/quotes/:quoteId/accept', acceptQuote);
+router.post('/quotes/:quoteId/reject', rejectQuote);
+&nbsp;
+// Rute Constructor
+router.get('/projects/feed', getFeed);
+router.post('/projects/:id/quotes', submitQuote);
 &nbsp;
 export default router;
 &nbsp;</pre></td></tr></table></pre>
@@ -136,7 +175,7 @@ export default router;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-07T13:53:16.339Z
+                at 2026-06-10T05:44:19.409Z
             </div>
         <script src="../prettify.js"></script>
         <script>

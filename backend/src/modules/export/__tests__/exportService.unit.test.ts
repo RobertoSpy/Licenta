@@ -75,6 +75,26 @@ describe('exportService (unit)', () => {
         expect(html).toContain('Baie secreta');
       });
 
+      it('includes chat summaries if present', () => {
+        const html = _testable.buildHtmlTemplate(
+          { 
+            title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null, 
+            chatSummaries: [
+              { phase: 'faza1', summary: 'Geo test\\nGeo line 2', screen: 'screen1' },
+              { phase: 'faza2', summary: 'Arhi test\\nArhi line 2', screen: 'screen2' }
+            ] 
+          } as any,
+          'data',
+          [],
+          '1 Jan 2026',
+          1
+        );
+        expect(html).toContain('Concluziile Agenților AI (Faza 1)');
+        expect(html).toContain('Geo test<br/>Geo line 2');
+        expect(html).toContain('Consultant AI Arhitectural (Faza 2)');
+        expect(html).toContain('Arhi test<br/>Arhi line 2');
+      });
+
       it('generated HTML is parseable (no unclosed tags)', () => {
         const html = _testable.buildHtmlTemplate(
           { title: 'Proj', county: null, locality: null, floors: null, houseType: null, totalFloorAreaSqm: null, chatSummaries: [] } as any,
@@ -137,6 +157,73 @@ describe('exportService (unit)', () => {
       // Dacă dă crash înainte de puppeteer.launch, launch n-a fost apelat. 
       // Deci nici close nu trebuie chemat pe undefined, mock-ul se asigură că suntem ok.
       expect(puppeteer.launch).not.toHaveBeenCalled();
+    });
+
+    it('generates pdf successfully', async () => {
+      prismaMock.project.findUnique.mockResolvedValue({ 
+        id: 1, title: 'Casa', county: null, locality: null, houseStyle: null, totalFloors: null, totalFloorAreaSqm: null, 
+        chatSummaries: [] 
+      } as any);
+      prismaMock.planSnapshot.findFirst.mockResolvedValue({ 
+        id: 1, version: 1, planJSON: { elements: [ { id: '1', type: 'room', width: 100, height: 100, wallThicknessCm: 25 } ] } 
+      } as any);
+
+      const res = await exportService.generatePlanPdf(1, 'base64png');
+      expect(res).not.toBeNull();
+      expect(res?.filename).toBe('plan-parter-casa-v1.pdf');
+      expect(mockBrowser.close).toHaveBeenCalled();
+    });
+  });
+
+  describe('generateContractorPdf', () => {
+    let mockBrowser: any;
+    let mockPage: any;
+
+    beforeEach(() => {
+      mockPage = {
+        setContent: jest.fn(),
+        pdf: jest.fn().mockResolvedValue(Buffer.from('PDF Content')),
+      };
+      mockBrowser = {
+        newPage: jest.fn().mockResolvedValue(mockPage),
+        close: jest.fn(),
+      };
+      (puppeteer.launch as jest.Mock).mockResolvedValue(mockBrowser);
+    });
+
+    it('returns null if quote not found', async () => {
+      prismaMock.contractorQuote.findFirst.mockResolvedValue(null);
+      const res = await exportService.generateContractorPdf(1, 1, null);
+      expect(res).toBeNull();
+    });
+
+    it('generates pdf successfully', async () => {
+      prismaMock.contractorQuote.findFirst.mockResolvedValue({
+        id: 1, contractorId: 1, projectId: 1, project: { title: 'Test Project' }
+      } as any);
+      prismaMock.projectBOM.findMany.mockResolvedValue([
+        { phase: '1', quantity: 10, material: { name: 'M1' } }
+      ] as any);
+      prismaMock.planSnapshot.findFirst.mockResolvedValue({ version: 1 } as any);
+
+      const res = await exportService.generateContractorPdf(1, 1, 'b64');
+      
+      expect(res).not.toBeNull();
+      expect(res?.filename).toBe('proiect-executie-test-project.pdf');
+      expect(mockBrowser.close).toHaveBeenCalled();
+    });
+
+    it('closes browser on error', async () => {
+      prismaMock.contractorQuote.findFirst.mockResolvedValue({
+        id: 1, contractorId: 1, projectId: 1, project: { title: 'Test Project' }
+      } as any);
+      prismaMock.projectBOM.findMany.mockResolvedValue([] as any);
+      prismaMock.planSnapshot.findFirst.mockResolvedValue(null);
+      
+      mockPage.pdf.mockRejectedValue(new Error('err'));
+
+      await expect(exportService.generateContractorPdf(1, 1, null)).rejects.toThrow('err');
+      expect(mockBrowser.close).toHaveBeenCalled();
     });
   });
 });

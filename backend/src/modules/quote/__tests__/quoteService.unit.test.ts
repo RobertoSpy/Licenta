@@ -26,6 +26,21 @@ describe('Quote Service Unit Tests', () => {
       }));
     });
 
+    it('creates quotes for various phases to test specializations map', async () => {
+      prismaMock.project.findUnique.mockResolvedValue({ id: 1, constructionPhases: [
+        { name: 'Structură' }, { name: 'Planșeu & Coroană' }, { name: 'Termoizolație & Hidroizolație' },
+        { name: 'Acoperiș' }, { name: 'Tâmplărie' }, { name: 'Instalații' }, { name: 'Finisaje' }, { name: 'Amenajări Exterioare' }, { name: 'Unknown' }
+      ] } as any);
+      prismaMock.contractorProfile.findMany.mockResolvedValue([
+        { id: 10, specializations: ['CONSTRUCTII_GENERALE'] }
+      ] as any);
+      prismaMock.contractorQuote.findUnique.mockResolvedValue(null);
+      prismaMock.contractorQuote.create.mockResolvedValue({} as any);
+
+      const result = await quoteService.requestQuotes(1, [10]);
+      expect(result.count).toBeGreaterThan(0);
+    });
+
     it('does not create duplicate quote if contractor already has PENDING quote for project', async () => {
       prismaMock.project.findUnique.mockResolvedValue({ id: 1, constructionPhases: [{ name: 'Fundatie' }] } as any);
       prismaMock.contractorProfile.findMany.mockResolvedValue([
@@ -135,6 +150,13 @@ describe('Quote Service Unit Tests', () => {
       ).rejects.toThrow('Validation: Nu se poate retrimite o ofertă deja acceptată');
     });
 
+    it('throws if quoteId is missing for normal offers', async () => {
+      prismaMock.contractorProfile.findUnique.mockResolvedValue({ id: 50 } as any);
+      await expect(
+        quoteService.submitQuote(undefined, 100, { totalAmount: 1000, executionDays: 10, acceptsBOM: true })
+      ).rejects.toThrow('Validation: quoteId este necesar pentru ofertele normale');
+    });
+
     it('updates quote to SENT with valid data', async () => {
       prismaMock.contractorProfile.findUnique.mockResolvedValue({ id: 50 } as any);
       prismaMock.contractorQuote.findUnique.mockResolvedValue({ contractorId: 50, status: QuoteStatus.PENDING } as any);
@@ -152,6 +174,60 @@ describe('Quote Service Unit Tests', () => {
           acceptsBOM: false
         })
       });
+      expect(result.status).toBe(QuoteStatus.SENT);
+    });
+
+    it('updates quote to SENT with valid data including selectedPhases', async () => {
+      prismaMock.contractorProfile.findUnique.mockResolvedValue({ id: 50 } as any);
+      prismaMock.contractorQuote.findUnique.mockResolvedValue({ contractorId: 50, status: QuoteStatus.PENDING } as any);
+      prismaMock.contractorQuote.update.mockResolvedValue({ id: 1, status: QuoteStatus.SENT } as any);
+
+      await quoteService.submitQuote(1, 100, { totalAmount: 1500, executionDays: 14, acceptsBOM: false, selectedPhases: [1, 2] });
+
+      expect(prismaMock.contractorQuote.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          phases: { set: [{ id: 1 }, { id: 2 }] }
+        })
+      }));
+    });
+
+    it('throws if selfInitiated without projectId or selectedPhases', async () => {
+      prismaMock.contractorProfile.findUnique.mockResolvedValue({ id: 50 } as any);
+      
+      await expect(
+        quoteService.submitQuote(1, 100, { selfInitiated: true, totalAmount: 1000, executionDays: 10, acceptsBOM: true })
+      ).rejects.toThrow('Validation: projectId și selectedPhases sunt necesare pentru oferte inițiate de constructor');
+    });
+
+    it('throws if selectedPhases do not exist in DB for selfInitiated quote', async () => {
+      prismaMock.contractorProfile.findUnique.mockResolvedValue({ id: 50 } as any);
+      prismaMock.constructionPhase.findMany.mockResolvedValue([{ id: 1 } as any]);
+      
+      await expect(
+        quoteService.submitQuote(1, 100, { selfInitiated: true, projectId: 10, selectedPhases: [1, 2], totalAmount: 1000, executionDays: 10, acceptsBOM: true })
+      ).rejects.toThrow('Validation: Unele faze nu există');
+    });
+
+    it('throws if contractor specialization does not match the phase', async () => {
+      prismaMock.contractorProfile.findUnique.mockResolvedValue({ id: 50, specializations: ['FINISAJE'] } as any);
+      prismaMock.constructionPhase.findMany.mockResolvedValue([{ id: 1, name: 'Fundație' } as any]);
+      
+      await expect(
+        quoteService.submitQuote(1, 100, { selfInitiated: true, projectId: 10, selectedPhases: [1], totalAmount: 1000, executionDays: 10, acceptsBOM: true })
+      ).rejects.toThrow('Validation: Specializarea dumneavoastră nu vă permite să licitați pe etapa Fundație');
+    });
+
+    it('upserts a quote when selfInitiated is true and specializations match', async () => {
+      prismaMock.contractorProfile.findUnique.mockResolvedValue({ id: 50, specializations: ['FUNDATII'] } as any);
+      prismaMock.constructionPhase.findMany.mockResolvedValue([{ id: 1, name: 'Fundație' } as any]);
+      prismaMock.contractorQuote.upsert.mockResolvedValue({ id: 2, status: QuoteStatus.SENT } as any);
+
+      const result = await quoteService.submitQuote(1, 100, { selfInitiated: true, projectId: 10, selectedPhases: [1], totalAmount: 1000, executionDays: 10, acceptsBOM: true });
+      
+      expect(prismaMock.contractorQuote.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        where: { contractorId_projectId: { contractorId: 50, projectId: 10 } },
+        create: expect.objectContaining({ projectId: 10, contractorId: 50, status: QuoteStatus.SENT })
+      }));
       expect(result.status).toBe(QuoteStatus.SENT);
     });
   });

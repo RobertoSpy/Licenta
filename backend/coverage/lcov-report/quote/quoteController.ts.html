@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.15% </span>
+                <span class="strong">98.63% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>68/73</span>
+                <span class='fraction'>72/73</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">81.48% </span>
+                <span class="strong">93.1% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>22/27</span>
+                <span class='fraction'>27/29</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">92.45% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>49/53</span>
+                <span class='fraction'>53/53</span>
             </div>
         
             
@@ -166,27 +166,42 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -203,22 +218,7 @@
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Response } from 'express';
@@ -254,8 +254,8 @@ export const getClientQuotes = async (req: AuthRequest, res: Response) =&gt; {
   } catch (error: any) {
     console.error('getClientQuotes error:', error);
     if (error.message === 'Unauthorized') return res.status(403).json({ message: 'Proiectul nu vă aparține' });
-    <span class="missing-if-branch" title="else path not taken" >E</span>if (error.message.includes('not found')) return res.status(404).json({ message: 'Proiectul nu a fost găsit' });
-<span class="cstat-no" title="statement not covered" >    res.status(500).json({ message: 'Eroare la preluarea ofertelor' });</span>
+    if (error.message.includes('not found')) return res.status(404).json({ message: 'Proiectul nu a fost găsit' });
+    res.status(500).json({ message: 'Eroare la preluarea ofertelor' });
   }
 };
 &nbsp;
@@ -273,7 +273,7 @@ export const getContractorQuotes = async (req: AuthRequest, res: Response) =&gt;
 &nbsp;
 export const submitQuote = async (req: AuthRequest, res: Response) =&gt; {
   try {
-    const quoteId = Number(req.params.id);
+    const quoteId = req.params.id ? Number(req.params.id) : <span class="branch-1 cbranch-no" title="branch not covered" >undefined;</span>
     const userId = req.user!.id;
     const result = await quoteService.submitQuote(quoteId, userId, req.body);
     res.json(result);
@@ -281,8 +281,8 @@ export const submitQuote = async (req: AuthRequest, res: Response) =&gt; {
     console.error('submitQuote error:', error);
     if (error.message.includes('Unauthorized')) return res.status(403).json({ message: 'Acțiune nepermisă' });
     if (error.message.includes('not found')) return res.status(404).json({ message: 'Profil sau ofertă inexistentă' });
-    <span class="missing-if-branch" title="else path not taken" >E</span>if (error.message.includes('Validation:')) return res.status(400).json({ message: error.message });
-<span class="cstat-no" title="statement not covered" >    res.status(500).json({ message: 'Eroare la trimiterea ofertei' });</span>
+    if (error.message.includes('Validation:')) return res.status(400).json({ message: error.message });
+    res.status(500).json({ message: 'Eroare la trimiterea ofertei' });
   }
 };
 &nbsp;
@@ -295,9 +295,9 @@ export const acceptQuote = async (req: AuthRequest, res: Response) =&gt; {
   } catch (error: any) {
     console.error('acceptQuote error:', error);
     if (error.message.includes('Unauthorized')) return res.status(403).json({ message: 'Acțiune nepermisă' });
-    <span class="missing-if-branch" title="else path not taken" >E</span>if (error.message.includes('not found')) return res.status(404).json({ message: 'Oferta nu a fost găsită' });
-<span class="cstat-no" title="statement not covered" >    if (error.message.includes('Validation:')) <span class="cstat-no" title="statement not covered" >return res.status(400).json({ message: error.message });</span></span>
-<span class="cstat-no" title="statement not covered" >    res.status(500).json({ message: 'Eroare la acceptarea ofertei' });</span>
+    if (error.message.includes('not found')) return res.status(404).json({ message: 'Oferta nu a fost găsită' });
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (error.message.includes('Validation:')) <span class="cstat-no" title="statement not covered" >return res.status(400).json({ message: error.message });</span>
+    res.status(500).json({ message: 'Eroare la acceptarea ofertei' });
   }
 };
 &nbsp;</pre></td></tr></table></pre>
@@ -307,7 +307,7 @@ export const acceptQuote = async (req: AuthRequest, res: Response) =&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-07T13:53:16.339Z
+                at 2026-06-10T06:43:00.326Z
             </div>
         <script src="../prettify.js"></script>
         <script>

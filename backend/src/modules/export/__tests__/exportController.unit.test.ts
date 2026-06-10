@@ -64,5 +64,52 @@ describe('exportController (unit)', () => {
 
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
     });
+
+    it('returns 500 on error', async () => {
+      req.params.projectId = '1';
+      (exportService.generatePlanPdf as jest.Mock).mockRejectedValue(new Error('err'));
+      await exportController.generatePlanPdf(req, res);
+      expect(res.status).toHaveBeenCalledWith(500);
+    });
+  });
+
+  describe('generateContractorPdf', () => {
+    it('returns 400 for invalid quoteId', async () => {
+      req.params.quoteId = 'abc';
+      await exportController.generateContractorPdf(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('returns 404 if exportService returns null', async () => {
+      req.params.quoteId = '1';
+      req.user = { id: 2 };
+      (exportService.generateContractorPdf as jest.Mock).mockResolvedValue(null);
+      await exportController.generateContractorPdf(req, res);
+      expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it('returns pdf buffer successfully', async () => {
+      req.params.quoteId = '1';
+      req.user = { id: 2 };
+      req.body.planPngBase64 = 'b64';
+      const fakeBuffer = Buffer.from('PDF Content');
+      (exportService.generateContractorPdf as jest.Mock).mockResolvedValue({
+        filename: 'contractor.pdf',
+        buffer: fakeBuffer
+      });
+
+      await exportController.generateContractorPdf(req, res);
+
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="contractor.pdf"');
+      expect(res.send).toHaveBeenCalledWith(fakeBuffer);
+    });
+
+    it('returns 500 on error', async () => {
+      req.params.quoteId = '1';
+      (exportService.generateContractorPdf as jest.Mock).mockRejectedValue(new Error('err'));
+      await exportController.generateContractorPdf(req, res);
+      expect(res.status).toHaveBeenCalledWith(500);
+    });
   });
 });

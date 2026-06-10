@@ -100,7 +100,8 @@ export function linearRegression(values: number[]): { slope: number; intercept: 
   const sumXY = xs.reduce((acc, x, i) => acc + x * ys[i], 0);
   const sumXX = xs.reduce((acc, x) => acc + x * x, 0);
 
-  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  const denominator = (n * sumXX - sumX * sumX);
+  const slope = denominator === 0 ? 0 : (n * sumXY - sumX * sumY) / denominator;
   const intercept = (sumY - slope * sumX) / n;
 
   // RMSE — eroare pătratică medie ca bază pentru intervalul de incertitudine

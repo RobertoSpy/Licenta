@@ -10,6 +10,28 @@ describe('Market Service', () => {
     jest.clearAllMocks();
   });
 
+  describe('getIndexHistory', () => {
+    it('returns formatted and sorted history points', async () => {
+      (marketRepository.getAll as jest.Mock).mockResolvedValue([
+        { year: 2026, month: 2, category: 'rezidential', indexValue: 120 },
+        { year: 2026, month: 1, category: 'rezidential', indexValue: 110 },
+        { year: 2026, month: 1, category: 'total_cladiri', indexValue: 115 }
+      ]);
+
+      const res = await marketService.getIndexHistory();
+      
+      expect(res.length).toBe(2);
+      expect(res[0].year).toBe(2026);
+      expect(res[0].month).toBe(1);
+      expect((res[0] as any).rezidential).toBe(110);
+      expect((res[0] as any).total_cladiri).toBe(115);
+      
+      expect(res[1].year).toBe(2026);
+      expect(res[1].month).toBe(2);
+      expect((res[1] as any).rezidential).toBe(120);
+    });
+  });
+
   describe('getForecast', () => {
     const NOW = new Date('2026-06-07T00:00:00Z').getTime();
     

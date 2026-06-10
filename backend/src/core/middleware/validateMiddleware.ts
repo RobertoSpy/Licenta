@@ -118,8 +118,8 @@ export const explainConformitySchema = z.object({
   violations: z.array(
     z.object({
       label: z.string(),
-      usableSqm: z.number().positive(),
-      minRequired: z.number().positive(),
+      usableSqm: z.number().min(0),
+      minRequired: z.number().min(0),
     })
   ).min(1, 'At least one violation required'),
 }).strip();

@@ -1,4 +1,4 @@
-import { register, login, refresh, logout, forgotPassword, resetPassword, verifyEmail, resendVerification } from '../authController';
+import { register, login, refresh, logout, forgotPassword, resetPassword, verifyEmail, resendVerification, registerContractor } from '../authController';
 import { userRepository } from '../userRepository';
 import * as emailService from '../emailService';
 import jwt from 'jsonwebtoken';
@@ -57,6 +57,38 @@ describe('authController', () => {
       expect(res.status).toHaveBeenCalledWith(201);
       expect(mockEmail.sendVerificationEmail).toHaveBeenCalled();
     });
+
+    it('returns 400 when password is weak', async () => {
+      const req: any = { body: { email: 'a@b.com', password: 'weak', name: 'X' } };
+      const res = mockRes();
+      await register(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('suficient de puternică') }));
+    });
+  });
+
+  describe('registerContractor', () => {
+    it('returns 400 when essential fields are missing', async () => {
+      const req: any = { body: { email: 'c@d.com', password: 'StrongPassword1!' } }; // lipsesc companyName, etc
+      const res = mockRes();
+      await registerContractor(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('returns 400 when password is weak', async () => {
+      const req: any = { body: { email: 'c@d.com', password: 'weak', companyName: 'SRL', cui: '123', county: 'B' } };
+      const res = mockRes();
+      await registerContractor(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('returns 409 if user exists', async () => {
+      mockUserRepo.findByEmail.mockResolvedValue({ id: 1 } as any);
+      const req: any = { body: { email: 'c@d.com', password: 'StrongPassword1!', companyName: 'SRL', cui: '123', county: 'B' } };
+      const res = mockRes();
+      await registerContractor(req, res);
+      expect(res.status).toHaveBeenCalledWith(409);
+    });
   });
 
   describe('login', () => {
@@ -114,6 +146,18 @@ describe('authController', () => {
       expect(res.cookie).toHaveBeenCalledWith('jwt', expect.any(String), expect.objectContaining({
         secure: true
       }));
+    });
+
+    it('returns 403 if user is not verified', async () => {
+      mockUserRepo.findByEmail.mockResolvedValue({ id: 3, password: 'hash', isVerified: false, email: 'a@b.com' } as any);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const req: any = { body: { email: 'a@b.com', password: 'x' } };
+      const res = mockRes();
+      await login(req, res);
+      
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({ message: 'Contul nu este verificat. Introdu codul trimis pe email.' });
     });
   });
 
@@ -213,4 +257,24 @@ describe('authController', () => {
       expect(mockEmail.sendPasswordResetEmail).toHaveBeenCalled();
     });
   });
+
+  describe('deleteAccount', () => {
+    it('returns 400 if password is not provided', async () => {
+      const req: any = { user: { id: 1 }, body: {} };
+      const res = mockRes();
+      const { deleteAccount } = require('../authController');
+      await deleteAccount(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('returns 400 if email or otp is missing', async () => {
+      const req: any = { body: {} };
+      const res = mockRes();
+      await verifyEmail(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+  });
 });
+

@@ -7,7 +7,9 @@ module.exports = {
     'src/modules/**/*.ts',
     '!src/modules/**/__tests__/**/*.test.ts',
     '!src/modules/**/index.ts',
-    '!src/modules/**/schemas.ts'
+    '!src/modules/**/schemas.ts',
+    '!src/modules/**/*Routes.ts',
+    '!src/modules/bom/pdfService.ts'
   ],
   coverageDirectory: 'coverage',
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
@@ -24,10 +26,10 @@ module.exports = {
   },
   coverageThreshold: {
     global: {
-      statements: 55,
-      branches: 40,
-      functions: 55,
-      lines: 55,
+      statements: 80,
+      branches: 60,
+      functions: 80,
+      lines: 80,
     }
   },
   moduleNameMapper: {

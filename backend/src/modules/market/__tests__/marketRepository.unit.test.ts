@@ -92,4 +92,58 @@ describe('Market Repository', () => {
       expect(res).toEqual([mockPoint]);
     });
   });
+
+  describe('getByCategory', () => {
+    it('returns points', async () => {
+      prismaMock.marketIndexPoint.findMany.mockResolvedValue([{ id: 1 }] as any);
+      const res = await marketRepository.getByCategory('TOTAL');
+      expect(prismaMock.marketIndexPoint.findMany).toHaveBeenCalledWith({
+        where: { category: 'TOTAL' },
+        orderBy: [{ year: 'asc' }, { month: 'asc' }]
+      });
+      expect(res).toEqual([{ id: 1 }]);
+    });
+  });
+
+  describe('getAll', () => {
+    it('returns all points', async () => {
+      prismaMock.marketIndexPoint.findMany.mockResolvedValue([{ id: 2 }] as any);
+      const res = await marketRepository.getAll();
+      expect(prismaMock.marketIndexPoint.findMany).toHaveBeenCalledWith({
+        orderBy: [{ year: 'asc' }, { month: 'asc' }]
+      });
+      expect(res).toEqual([{ id: 2 }]);
+    });
+  });
+
+  describe('getAnnualAverages', () => {
+    it('computes annual averages', async () => {
+      prismaMock.marketIndexPoint.findMany.mockResolvedValue([
+        { year: 2023, indexValue: 100 },
+        { year: 2023, indexValue: 110 },
+        { year: 2024, indexValue: 120 }
+      ] as any);
+      const res = await marketRepository.getAnnualAverages('TOTAL');
+      expect(res).toEqual([
+        { year: 2023, avg: 105 },
+        { year: 2024, avg: 120 }
+      ]);
+    });
+  });
+
+  describe('getLatestPoint', () => {
+    it('returns latest point', async () => {
+      prismaMock.marketIndexPoint.findFirst.mockResolvedValue({ id: 1 } as any);
+      const res = await marketRepository.getLatestPoint('TOTAL');
+      expect(res).toEqual({ id: 1 });
+    });
+  });
+
+  describe('getLatestForecast', () => {
+    it('returns latest forecast', async () => {
+      prismaMock.marketForecastCache.findFirst.mockResolvedValue({ id: 1 } as any);
+      const res = await marketRepository.getLatestForecast();
+      expect(res).toEqual({ id: 1 });
+    });
+  });
 });

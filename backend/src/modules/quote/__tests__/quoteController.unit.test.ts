@@ -98,6 +98,13 @@ describe('Quote Controller Unit Tests', () => {
 
       expect(res.json).toHaveBeenCalledWith([{ id: 1 }]);
     });
+
+    it('returns 500 on generic error', async () => {
+      req.params = { projectId: '1' };
+      (quoteService.getQuotesForClient as jest.Mock).mockRejectedValue(new Error('err'));
+      await getClientQuotes(req as AuthRequest, res);
+      expect(res.status).toHaveBeenCalledWith(500);
+    });
   });
 
   describe('getContractorQuotes', () => {
@@ -149,6 +156,12 @@ describe('Quote Controller Unit Tests', () => {
       await submitQuote(req as AuthRequest, res);
       expect(res.json).toHaveBeenCalledWith({ id: 1, status: 'SENT' });
     });
+
+    it('returns 500 on generic error', async () => {
+      (quoteService.submitQuote as jest.Mock).mockRejectedValue(new Error('err'));
+      await submitQuote(req as AuthRequest, res);
+      expect(res.status).toHaveBeenCalledWith(500);
+    });
   });
 
   describe('acceptQuote', () => {
@@ -172,6 +185,12 @@ describe('Quote Controller Unit Tests', () => {
       (quoteService.acceptQuote as jest.Mock).mockResolvedValue({ id: 1, status: 'ACCEPTED' });
       await acceptQuote(req as AuthRequest, res);
       expect(res.json).toHaveBeenCalledWith({ id: 1, status: 'ACCEPTED' });
+    });
+
+    it('returns 500 on generic error', async () => {
+      (quoteService.acceptQuote as jest.Mock).mockRejectedValue(new Error('err'));
+      await acceptQuote(req as AuthRequest, res);
+      expect(res.status).toHaveBeenCalledWith(500);
     });
   });
 });

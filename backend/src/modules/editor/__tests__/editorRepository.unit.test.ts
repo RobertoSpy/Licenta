@@ -1,6 +1,10 @@
 import { editorRepository } from '../editorRepository';
 import { prismaMock } from '../../../../tests/setup';
 
+jest.mock('../../../lib/planMetricsExtractor', () => ({
+  extractMetricsFromSnapshot: jest.fn()
+}));
+
 describe('Editor Repository', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -104,6 +108,124 @@ describe('Editor Repository', () => {
 
       const result = await editorRepository.verifySnapshotOwnership(1, 100);
       expect(result).toBe(true);
+    });
+  });
+
+  describe('createSnapshot', () => {
+    it('creates snapshot with incremented version', async () => {
+      prismaMock.planSnapshot.findFirst.mockResolvedValue({ version: 5 } as any);
+      prismaMock.planSnapshot.create.mockResolvedValue({ id: 10, version: 6 } as any);
+      
+      const res = await editorRepository.createSnapshot(1, {}, 'parter', 'L1');
+      
+      expect(prismaMock.planSnapshot.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { projectId: 1, floor: 'parter' } }));
+      expect(prismaMock.planSnapshot.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: { projectId: 1, planJSON: {}, floor: 'parter', version: 6, label: 'L1' }
+      }));
+      expect(res).toEqual({ id: 10, version: 6 });
+    });
+
+    it('creates snapshot with version 1 if none exists', async () => {
+      prismaMock.planSnapshot.findFirst.mockResolvedValue(null);
+      await editorRepository.createSnapshot(1, {}, 'etaj1');
+      expect(prismaMock.planSnapshot.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ version: 1 })
+      }));
+    });
+  });
+
+  describe('listSnapshots', () => {
+    it('lists snapshots', async () => {
+      prismaMock.planSnapshot.findMany.mockResolvedValue([{ id: 1 }] as any);
+      const res = await editorRepository.listSnapshots(1, 'parter');
+      expect(prismaMock.planSnapshot.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { projectId: 1, floor: 'parter' } }));
+      expect(res).toEqual([{ id: 1 }]);
+    });
+  });
+
+  describe('publishSnapshot', () => {
+    it('extracts area successfully and updates project', async () => {
+      prismaMock.planSnapshot.updateMany.mockResolvedValue({} as any);
+      prismaMock.planSnapshot.update.mockResolvedValue({
+        id: 1,
+        project: { totalFloors: 1 },
+        planJSON: {}
+      } as any);
+      prismaMock.project.update.mockResolvedValue({} as any);
+      
+      const { extractMetricsFromSnapshot } = require('../../../lib/planMetricsExtractor');
+      extractMetricsFromSnapshot.mockReturnValue({
+        fromSnapshot: true,
+        metrics: { totalFloorAreaSqm: 150 }
+      });
+
+      await editorRepository.publishSnapshot(1, 100);
+
+      expect(prismaMock.project.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          totalFloorAreaSqm: 150
+        })
+      }));
+    });
+
+    it('catches and logs error if extractMetricsFromSnapshot throws', async () => {
+      prismaMock.planSnapshot.updateMany.mockResolvedValue({} as any);
+      prismaMock.planSnapshot.update.mockResolvedValue({
+        id: 1,
+        project: { totalFloors: 1 },
+        planJSON: {}
+      } as any);
+      prismaMock.project.update.mockResolvedValue({} as any);
+      
+      const { extractMetricsFromSnapshot } = require('../../../lib/planMetricsExtractor');
+      extractMetricsFromSnapshot.mockImplementation(() => {
+        throw new Error('Metrics Error');
+      });
+
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await editorRepository.publishSnapshot(1, 100);
+
+      expect(consoleSpy).toHaveBeenCalledWith('[publishSnapshot] Eroare extragere suprafata:', expect.any(Error));
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('getSnapshot', () => {
+    it('returns snapshot', async () => {
+      prismaMock.planSnapshot.findUnique.mockResolvedValue({ id: 1 } as any);
+      const res = await editorRepository.getSnapshot(1);
+      expect(res).toEqual({ id: 1 });
+    });
+  });
+
+  describe('getLatestSnapshot', () => {
+    it('gets latest', async () => {
+      prismaMock.planSnapshot.findFirst.mockResolvedValue({ id: 5 } as any);
+      const res = await editorRepository.getLatestSnapshot(1, 'parter');
+      expect(res).toEqual({ id: 5 });
+    });
+  });
+
+  describe('deleteSnapshot', () => {
+    it('deletes snapshot', async () => {
+      await editorRepository.deleteSnapshot(1);
+      expect(prismaMock.planSnapshot.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    });
+  });
+
+  describe('publishSnapshot', () => {
+    it('publishes and updates project', async () => {
+      prismaMock.planSnapshot.update.mockResolvedValue({ id: 1, planJSON: {}, project: { totalFloors: 1 } } as any);
+      
+      const res = await editorRepository.publishSnapshot(1, 2);
+      
+      expect(prismaMock.planSnapshot.updateMany).toHaveBeenCalledWith({ where: { projectId: 2 }, data: { isPublished: false } });
+      expect(prismaMock.planSnapshot.update).toHaveBeenCalledWith(expect.objectContaining({ data: { isPublished: true } }));
+      expect(prismaMock.project.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ publishedSnapshotId: 1, bomGeneratedAt: null })
+      }));
+      expect(res).toEqual(expect.objectContaining({ id: 1 }));
     });
   });
 });

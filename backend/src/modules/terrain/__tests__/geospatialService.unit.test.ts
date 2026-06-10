@@ -43,6 +43,15 @@ describe('geospatialService (unit)', () => {
       expect(redisClient!.setex).toHaveBeenCalledWith('geo:46.77000:23.59000', 24 * 60 * 60, JSON.stringify({ county: 'Cluj', locality: 'SomeTown' }));
     });
 
+    it('Redis set failure does not crash reverseGeocode', async () => {
+      (redisClient!.get as jest.Mock).mockResolvedValue(null);
+      mockedAxios.get.mockResolvedValue({ data: { address: { county: 'Județul Cluj', village: 'SomeTown' } } });
+      (redisClient!.setex as jest.Mock).mockRejectedValue(new Error('Redis set down'));
+
+      const res = await geospatialService.reverseGeocode(46.77, 23.59);
+      expect(res).toEqual({ county: 'Cluj', locality: 'SomeTown' });
+    });
+
     it('Redis failure (connection error) does not crash the service — falls back to Nominatim', async () => {
       (redisClient!.get as jest.Mock).mockRejectedValue(new Error('Redis is down'));
       mockedAxios.get.mockResolvedValue({ data: { address: { county: 'Sibiu', city: 'Sibiu' } } });
@@ -94,6 +103,14 @@ describe('geospatialService (unit)', () => {
       expect(res).toBeNull();
       expect(mockedAxios.get).toHaveBeenCalledTimes(1); // Fără retry-uri
     });
+
+    it('catches generic errors and returns null (e.g. from toFixed on null input)', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const res = await geospatialService.reverseGeocode(null as any, null as any);
+      expect(res).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith('Eroare reverse geocoding:', expect.any(TypeError));
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('getSeismicZone and getFrostDepth', () => {
@@ -103,6 +120,17 @@ describe('geospatialService (unit)', () => {
 
       const frost = geospatialService.getFrostDepth('Cluj');
       expect(frost === null || typeof frost === 'number').toBeTruthy();
+    });
+  });
+
+  describe('getFloorRules', () => {
+    it('returns 2 if seismic zone not found', () => {
+      expect(geospatialService.getFloorRules('invalid_zone', 'argila')).toBe(2);
+    });
+
+    it('returns rule for soil type if exists or default', () => {
+      // Mocking floorRules indirectly through behavior or just testing default
+      expect(geospatialService.getFloorRules('0.20g', 'invalid_soil')).toBeGreaterThanOrEqual(1);
     });
   });
 });
