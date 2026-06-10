@@ -1,4 +1,18 @@
 services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+
   backend:
     build:
       context: ./backend
@@ -29,3 +43,6 @@ services:
       - "80"
     depends_on:
       - backend
+
+volumes:
+  db-data:
