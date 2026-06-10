@@ -24,6 +24,7 @@ interface FeedProject {
     contractorId: number | null;
     contractor?: { companyName: string } | null;
   }[];
+  contractorQuotes?: { status: string }[];
 }
 
 export default function ContractorFeed() {
@@ -304,15 +305,42 @@ export default function ContractorFeed() {
                         </div>
                       )}
 
-                      <div className="pt-4 flex justify-end">
-                        <button
-                          type="submit" disabled={isSubmitting}
-                          className="px-8 py-3 bg-buildorange hover:bg-orange-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2"
-                        >
-                          <Send className="w-5 h-5" />
-                          {isSubmitting ? 'Se trimite...' : 'Trimite Oferta'}
-                        </button>
-                      </div>
+                      {(() => {
+                        const activeQuote = selectedProject.contractorQuotes?.find(q => q.status !== 'REJECTED');
+                        if (activeQuote) {
+                          let statusLabel = 'Trimisă';
+                          if (activeQuote.status === 'PENDING') statusLabel = 'Cerută de client (În Așteptare)';
+                          if (activeQuote.status === 'ACCEPTED') statusLabel = 'Acceptată';
+                          if (activeQuote.status === 'NEGOTIATING') statusLabel = 'În Negociere';
+                          
+                          return (
+                            <div className="pt-4 flex flex-col items-end gap-2">
+                              <div className="text-sm font-medium text-amber-600 bg-amber-50 px-4 py-2 rounded-lg border border-amber-200">
+                                Ai deja o ofertă pentru acest proiect: <strong>{statusLabel}</strong>. Gestioneaz-o din meniul Ofertările Mele.
+                              </div>
+                              <button
+                                type="button" disabled
+                                className="px-8 py-3 bg-slate-300 text-white font-bold rounded-xl flex items-center gap-2 cursor-not-allowed"
+                              >
+                                <Send className="w-5 h-5" />
+                                Trimite Oferta
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="pt-4 flex justify-end">
+                            <button
+                              type="submit" disabled={isSubmitting || selectedPhases.length === 0 || !totalAmount || !executionDays}
+                              className="px-8 py-3 bg-buildorange hover:bg-orange-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                              <Send className="w-5 h-5" />
+                              {isSubmitting ? 'Se trimite...' : 'Trimite Oferta'}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </form>
                   ) : (
                     <div className="bg-amber-50 border border-amber-200 p-6 rounded-xl text-center">

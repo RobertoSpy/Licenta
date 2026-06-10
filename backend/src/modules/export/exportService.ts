@@ -1,21 +1,3 @@
-// backend/src/services/exportService.ts
-//
-// Export Plan 2D — PDF de prezentare (2 pagini) + PNG via Konva frontend
-//
-// ARHITECTURA:
-//   • PNG   — exportat direct din frontend (Konva Stage.toDataURL) fără backend
-//   • PDF   — generat backend cu Puppeteer: renderizează HTML template → PDF A4
-//
-// Structura PDF:
-//   Pagina 1 — Copertă: titlu proiect, județ, localitate, dată, rezumat
-//   Pagina 2 — Plan parter: imagine PNG + scară + legendă + tabel camere
-//
-// Fluxul:
-//   1. exportController cere snapshot publicat din DB (editorRepository)
-//   2. exportService renderizează HTML cu datele proiectului + PNG inline (base64)
-//   3. Puppeteer generează PDF și îl returnează ca Buffer
-//   4. Controller trimite Buffer cu Content-Type: application/pdf
-
 import puppeteer from 'puppeteer';
 import { prisma } from '../../lib/prisma';
 import { conformityService } from '../../core/services/conformityService';
@@ -40,12 +22,22 @@ export interface ExportProjectData {
   buildingPurpose: string | null;
   budgetCategory: string | null;
   chatSummaries: Array<{ phase: string; screen: string | null; summary: string }>;
+  // NEW FIELDS
+  lat: number | null;
+  lng: number | null;
+  seismicZone: string | null;
+  frostDepthCm: number | null;
+  hasBasement: boolean;
+  hasGroundFloor: boolean;
+  upperFloorsCount: number;
+  hasMansard: boolean;
 }
 
 interface RoomRow {
   label: string;
   usableSqm: number;
   status: 'ok' | 'warning' | 'error';
+  minRequiredSqm?: number;
 }
 
 const PIXELS_PER_METER = 20;
@@ -90,10 +82,6 @@ function escapeHtml(unsafe: string | null | undefined): string {
     .replace(/'/g, "&#039;");
 }
 
-// ─────────────────────────────────────────────────────────────────
-// HTML TEMPLATE — Copertă + Plan (renderizat de Puppeteer)
-// ─────────────────────────────────────────────────────────────────
-
 function buildHtmlTemplate(
   project: ExportProjectData,
   planPngBase64: string | null,
@@ -101,9 +89,27 @@ function buildHtmlTemplate(
   generatedAt: string,
   snapshotVersion: number,
 ): string {
-  const totalSqm = rooms.reduce((acc, r) => acc + r.usableSqm, 0).toFixed(1);
+  const totalSqmFloat = rooms.reduce((acc, r) => acc + r.usableSqm, 0);
+  const totalSqm = totalSqmFloat.toFixed(1);
+  const totalBuiltSqm = project.totalFloorAreaSqm ? project.totalFloorAreaSqm.toFixed(1) : (totalSqmFloat * 1.25).toFixed(1);
   const violationsCount = rooms.filter((r) => r.status === 'error').length;
   const safeTitle = escapeHtml(project.title);
+
+  const getNorthRotation = (orientation: string | null): number => {
+    if (!orientation) return 0;
+    const map: Record<string, number> = {
+      'N': 180, 'NE': 225, 'E': 270, 'SE': 315,
+      'S': 0, 'SV': 45, 'V': 90, 'NV': 135,
+    };
+    return map[orientation] ?? 0;
+  };
+
+  const configParts = [];
+  if (project.hasBasement) configParts.push('Subsol');
+  if (project.hasGroundFloor) configParts.push('Parter');
+  if (project.upperFloorsCount > 0) configParts.push(`Etaje: ${project.upperFloorsCount}`);
+  if (project.hasMansard) configParts.push('Mansardă');
+  const configString = configParts.length > 0 ? configParts.join(' / ') : 'Parter';
 
   const roomRows = rooms
     .map((r) => {
@@ -112,11 +118,12 @@ function buildHtmlTemplate(
           ? '<span style="color:#16a34a">✓ Conform</span>'
           : r.status === 'warning'
           ? '<span style="color:#d97706">⚠ Aproape</span>'
-          : '<span style="color:#dc2626">✗ Sub limită</span>';
+          : '<span style="color:#dc2626">✗ Neconform</span>';
       return `<tr>
-        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9">${r.label}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center">${r.usableSqm} m²</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center">${statusBadge}</td>
+        <td>${escapeHtml(r.label)}</td>
+        <td style="text-align:center">${r.usableSqm.toFixed(1)} mp</td>
+        <td style="text-align:center">${r.minRequiredSqm ? r.minRequiredSqm.toFixed(1) + ' mp' : '-'}</td>
+        <td style="text-align:center">${statusBadge}</td>
       </tr>`;
     })
     .join('');
@@ -127,62 +134,52 @@ function buildHtmlTemplate(
   <meta charset="UTF-8" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; background: #fff; }
+    
+    .page { width: 210mm; height: 297mm; padding: 48px; page-break-after: always; display: flex; flex-direction: column; }
+    .page-center { justify-content: center; align-items: center; text-align: center; }
+    
+    /* Cover */
+    .cover-header { margin-bottom: 60px; }
+    .cover-logo { font-size: 36px; font-weight: 900; color: #f97316; }
+    .cover-logo span { color: #1e293b; }
+    .cover-title { font-size: 32px; font-weight: 900; margin-bottom: 8px; }
+    .cover-address { font-size: 18px; color: #64748b; margin-bottom: 24px; }
+    .cover-date { font-size: 14px; color: #94a3b8; margin-bottom: 60px; }
+    .cover-summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; max-width: 500px; margin: 0 auto; text-align: left; width: 100%; }
+    .cover-summary ul { list-style: none; }
+    .cover-summary li { font-size: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .cover-summary li::before { content: '•'; color: #f97316; font-size: 20px; font-weight: bold; }
+    .cover-summary strong { color: #334155; }
 
-    /* ── Pagina 1: Copertă ── */
-    .cover {
-      width: 210mm; height: 297mm;
-      display: flex; flex-direction: column;
-      padding: 0;
-      page-break-after: always;
-    }
-    .cover-header {
-      background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-      color: white; padding: 40px 48px;
-    }
-    .cover-logo { font-size: 28px; font-weight: 900; letter-spacing: -0.5px; }
-    .cover-logo span { opacity: 0.7; }
-    .cover-subtitle { font-size: 12px; opacity: 0.8; margin-top: 4px; }
-    .cover-body { flex: 1; padding: 48px; display: flex; flex-direction: column; justify-content: space-between; }
-    .cover-title { font-size: 32px; font-weight: 900; color: #1e293b; line-height: 1.2; }
-    .cover-meta { margin-top: 24px; display: flex; flex-direction: column; gap: 10px; }
-    .cover-meta-row { display: flex; gap: 8px; align-items: center; font-size: 14px; }
-    .cover-meta-label { color: #64748b; min-width: 100px; }
-    .cover-meta-value { font-weight: 600; color: #1e293b; }
-    .cover-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 32px; }
-    .cover-stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
-    .cover-stat-value { font-size: 28px; font-weight: 900; color: #f97316; }
-    .cover-stat-label { font-size: 11px; color: #64748b; margin-top: 2px; }
-    .cover-footer { border-top: 1px solid #e2e8f0; padding-top: 16px; }
-    .cover-footer-text { font-size: 11px; color: #94a3b8; }
-
-    /* ── Pagina 2: Plan ── */
-    .plan-page { width: 210mm; padding: 32px 40px; }
-    .plan-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-    .plan-title { font-size: 18px; font-weight: 900; color: #1e293b; }
-    .plan-version { font-size: 11px; color: #64748b; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; }
-    .plan-image { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
-    .plan-image img { width: 100%; display: block; }
-    .plan-no-image { height: 200px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 13px; background: #f8fafc; }
-    .legend { display: flex; gap: 20px; margin-bottom: 20px; font-size: 11px; color: #64748b; }
-    .legend-item { display: flex; align-items: center; gap: 6px; }
-    .legend-swatch { width: 20px; height: 12px; border-radius: 2px; border: 1px solid currentColor; }
-    .rooms-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    .rooms-table th { background: #f8fafc; padding: 8px 10px; text-align: left; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 2px solid #e2e8f0; }
-    .rooms-table td { vertical-align: middle; }
-    .violations-note { margin-top: 12px; padding: 10px 14px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 11px; color: #b91c1c; }
-
-    /* ── Stiluri Comune Pagini Noi ── */
-    .content-page { width: 210mm; min-height: 297mm; padding: 48px; page-break-after: always; }
-    .page-header { border-bottom: 2px solid #f97316; padding-bottom: 12px; margin-bottom: 32px; }
-    .page-title { font-size: 24px; font-weight: 900; color: #1e293b; }
-    .section-title { font-size: 16px; font-weight: 700; color: #334155; margin-bottom: 16px; margin-top: 32px; text-transform: uppercase; letter-spacing: 0.05em; }
+    /* Tables & Grid */
+    .section-title { font-size: 18px; font-weight: 800; color: #f97316; margin-bottom: 16px; margin-top: 32px; border-bottom: 2px solid #f97316; padding-bottom: 8px; }
     .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .data-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
-    .data-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+    .data-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
     .data-value { font-size: 15px; font-weight: 700; color: #1e293b; }
-    .chat-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #22c55e; border-radius: 8px; padding: 20px; margin-top: 24px; font-size: 13px; line-height: 1.6; color: #166534; }
-    .chat-title { font-size: 12px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; color: #15803d; display: flex; align-items: center; gap: 6px; }
+    
+    /* Plan Page */
+    .plan-page { width: 210mm; height: 297mm; padding: 32px; page-break-after: always; display: flex; flex-direction: column; }
+    .plan-header { text-align: center; margin-bottom: 20px; }
+    .plan-title { font-size: 20px; font-weight: 900; }
+    .plan-container { position: relative; border: 2px solid #e2e8f0; border-radius: 8px; padding: 20px; background: #fff; flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .plan-image { max-width: 100%; max-height: 100%; object-fit: contain; }
+    
+    .north-arrow { position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+    .north-arrow svg { width: 20px; height: 32px; }
+    
+    .legend { display: flex; justify-content: center; gap: 24px; margin-top: 20px; font-size: 12px; color: #64748b; font-weight: 600; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-swatch { width: 24px; height: 12px; border-radius: 2px; border: 1px solid currentColor; }
+    
+    /* Rooms Table */
+    .rooms-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 20px; }
+    .rooms-table th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 800; color: #475569; border-bottom: 2px solid #e2e8f0; }
+    .rooms-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+
+    /* Disclaimer */
+    .disclaimer-text { font-size: 16px; font-weight: 600; color: #64748b; line-height: 1.6; max-width: 600px; text-align: center; }
 
     @media print {
       @page { size: A4; margin: 0; }
@@ -191,203 +188,141 @@ function buildHtmlTemplate(
 </head>
 <body>
 
-  <!-- ══ PAGINA 1: COPERTĂ ══════════════════════════════════════ -->
-  <div class="cover">
+  <!-- P1: Copertă -->
+  <div class="page page-center">
     <div class="cover-header">
       <div class="cover-logo">Zidario<span>.ro</span></div>
-      <div class="cover-subtitle">Plan de arhitectură generat automat</div>
     </div>
-    <div class="cover-body">
-      <div>
-        <div class="cover-title">${safeTitle}</div>
-        <div class="cover-meta">
-          <div class="cover-meta-row">
-            <span class="cover-meta-label">📍 Locație</span>
-            <span class="cover-meta-value">${project.locality ?? '—'}, ${project.county ?? '—'}</span>
-          </div>
-          <div class="cover-meta-row">
-            <span class="cover-meta-label">🏠 Tip casă</span>
-            <span class="cover-meta-value">${project.houseType ?? '—'}</span>
-          </div>
-          <div class="cover-meta-row">
-            <span class="cover-meta-label">📐 Regim înălțime</span>
-            <span class="cover-meta-value">${project.floors !== null ? `P+${(project.floors ?? 1) - 1}` : '—'}</span>
-          </div>
-        </div>
-
-        <div class="cover-stats">
-          <div class="cover-stat">
-            <div class="cover-stat-value">${totalSqm}</div>
-            <div class="cover-stat-label">mp suprafață utilă totală</div>
-          </div>
-          <div class="cover-stat">
-            <div class="cover-stat-value">${rooms.length}</div>
-            <div class="cover-stat-label">camere desenate</div>
-          </div>
-          <div class="cover-stat">
-            <div class="cover-stat-value" style="color:${violationsCount > 0 ? '#dc2626' : '#16a34a'}">${violationsCount === 0 ? '✓' : violationsCount}</div>
-            <div class="cover-stat-label">${violationsCount === 0 ? 'Plan conform Legea 114/1996' : `camere sub limita legală`}</div>
-          </div>
-          <div class="cover-stat">
-            <div class="cover-stat-value">v${snapshotVersion}</div>
-            <div class="cover-stat-label">versiunea planului</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="cover-footer">
-        <div class="cover-footer-text">Generat de Zidario.ro · ${generatedAt} · Scop informativ — nu înlocuiește proiectul tehnic semnat de arhitect</div>
-      </div>
+    <div class="cover-title">${safeTitle}</div>
+    <div class="cover-address">${escapeHtml(project.locality) || 'Localitate nespecificată'}, ${escapeHtml(project.county) || 'Județ nespecificat'}</div>
+    <div class="cover-date">Data generării: ${generatedAt}</div>
+    
+    <div class="cover-summary">
+      <ul>
+        <li><strong>Suprafața construită estimată:</strong> ${totalBuiltSqm} mp</li>
+        <li><strong>Regim de înălțime:</strong> ${project.floors !== null ? `P+${project.floors - 1}` : 'Parter'}</li>
+        <li><strong>Stil arhitectural ales:</strong> ${escapeHtml(project.houseType) || 'Nespecificat'}</li>
+        <li><strong>Status conformitate:</strong> <span style="color:${violationsCount > 0 ? '#dc2626' : '#16a34a'}">${violationsCount === 0 ? 'Conform' : 'Neconform'}</span></li>
+        <li><strong>Număr camere:</strong> ${rooms.length}</li>
+      </ul>
     </div>
   </div>
 
-  <!-- ══ PAGINA 2: DATE TEREN ȘI REGLEMENTĂRI ════════════════════ -->
-  <div class="content-page">
-    <div class="page-header">
-      <div class="page-title">I. Analiza Terenului și Reglementări</div>
-    </div>
-
-    <div class="section-title">Date Geotehnice și Topografice</div>
+  <!-- P2: Fișă Tehnică a Terenului și Construcției -->
+  <div class="page">
+    <h1 style="font-size: 24px; font-weight: 900; margin-bottom: 10px;">Fișă Tehnică a Terenului și Construcției</h1>
+    
+    <div class="section-title">1. Teren</div>
     <div class="data-grid">
       <div class="data-box">
-        <div class="data-label">Suprafață Teren</div>
+        <div class="data-label">Suprafața terenului</div>
         <div class="data-value">${project.plotAreaSqm ? project.plotAreaSqm.toFixed(1) + ' mp' : 'Nespecificat'}</div>
       </div>
       <div class="data-box">
-        <div class="data-label">Tipul Solului</div>
-        <div class="data-value">${project.soilType ?? 'Nespecificat'}</div>
+        <div class="data-label">Coordonate GPS</div>
+        <div class="data-value">${project.lat && project.lng ? `${project.lat.toFixed(4)}, ${project.lng.toFixed(4)}` : 'Nespecificat'}</div>
       </div>
       <div class="data-box">
-        <div class="data-label">Înclinare (Panta)</div>
-        <div class="data-value">${project.slopePercent !== null ? project.slopePercent + '%' : 'Plat'}</div>
+        <div class="data-label">Tip sol</div>
+        <div class="data-value">${escapeHtml(project.soilType) || 'Nespecificat'}</div>
       </div>
       <div class="data-box">
-        <div class="data-label">Orientare Stradală</div>
-        <div class="data-value">${project.streetOrientation ?? 'Nespecificat'}</div>
+        <div class="data-label">Pantă teren</div>
+        <div class="data-value">${project.slopePercent !== null ? project.slopePercent + '%' : 'Nespecificat'}</div>
+      </div>
+      <div class="data-box" style="grid-column: 1 / -1;">
+        <div class="data-label">Observații sol</div>
+        <div class="data-value" style="font-weight: normal;">${escapeHtml(project.soilNotes) || 'Nicio observație.'}</div>
       </div>
     </div>
 
-    <div class="section-title">Reglementări Urbanistice Locale</div>
+    <div class="section-title">2. Construcție și Reglementări</div>
     <div class="data-grid">
       <div class="data-box">
-        <div class="data-label">Regim Maxim Permis</div>
+        <div class="data-label">Zonă seismică</div>
+        <div class="data-value">${escapeHtml(project.seismicZone) || 'Nespecificat'}</div>
+      </div>
+      <div class="data-box">
+        <div class="data-label">Adâncime minimă fundare</div>
+        <div class="data-value">${project.minFoundationDepthCm || project.frostDepthCm ? `${project.minFoundationDepthCm || project.frostDepthCm} cm` : 'Nespecificat'}</div>
+      </div>
+      <div class="data-box">
+        <div class="data-label">Regim înălțime permis</div>
         <div class="data-value">${project.maxAllowedFloors ? 'P+' + (project.maxAllowedFloors - 1) : 'Nespecificat'}</div>
       </div>
       <div class="data-box">
-        <div class="data-label">Adâncime Fundație (Îngheț)</div>
-        <div class="data-value">${project.minFoundationDepthCm ? project.minFoundationDepthCm + ' cm' : 'Nespecificat'}</div>
-      </div>
-      <div class="data-box" style="grid-column: 1 / -1;">
-        <div class="data-label">Restricții Zonale / Note</div>
-        <div class="data-value" style="font-size: 13px; font-weight: normal; margin-top: 8px;">${project.zoningRestrictions || project.soilNotes || 'Nu au fost identificate restricții speciale.'}</div>
+        <div class="data-label">Configurația aleasă</div>
+        <div class="data-value">${escapeHtml(configString)}</div>
       </div>
     </div>
-
-    ${project.chatSummaries.find(s => s.phase === 'faza1') ? `
-    <div class="section-title" style="margin-top: 48px;">Concluziile Agenților AI (Faza 1)</div>
-    <div class="chat-box">
-      <div class="chat-title">✦ Rezumat Geotehnic & Urbanistic</div>
-      <div>${escapeHtml(project.chatSummaries.find(s => s.phase === 'faza1')?.summary).replace(/\\n/g, '<br/>')}</div>
-    </div>` : ''}
   </div>
 
-  <!-- ══ PAGINA 3: CONCEPT ARHITECTURAL ══════════════════════════ -->
-  <div class="content-page">
-    <div class="page-header">
-      <div class="page-title">II. Concept Arhitectural</div>
-    </div>
-
-    <div class="section-title">Parametri Generali</div>
-    <div class="data-grid">
-      <div class="data-box">
-        <div class="data-label">Stil Arhitectural</div>
-        <div class="data-value">${project.houseType ?? 'Standard'}</div>
-      </div>
-      <div class="data-box">
-        <div class="data-label">Tip Construcție</div>
-        <div class="data-value">${project.buildingPurpose === 'commercial' ? 'Comercial' : project.buildingPurpose === 'mixed' ? 'Mixt' : 'Rezidențial'}</div>
-      </div>
-      <div class="data-box">
-        <div class="data-label">Categorie Buget</div>
-        <div class="data-value" style="text-transform: capitalize;">${project.budgetCategory ?? 'Mediu'}</div>
-      </div>
-      <div class="data-box">
-        <div class="data-label">Regim Înălțime Final</div>
-        <div class="data-value">${project.floors !== null ? 'P+' + (project.floors - 1) : 'Parter'}</div>
-      </div>
-    </div>
-
-    ${project.chatSummaries.find(s => s.phase === 'faza2') ? `
-    <div class="section-title" style="margin-top: 48px;">Consultant AI Arhitectural (Faza 2)</div>
-    <div class="chat-box" style="background: #eff6ff; border-color: #bfdbfe; border-left-color: #3b82f6; color: #1e40af;">
-      <div class="chat-title" style="color: #1d4ed8;">✦ Note Arhitect & Layout</div>
-      <div>${escapeHtml(project.chatSummaries.find(s => s.phase === 'faza2')?.summary).replace(/\\n/g, '<br/>')}</div>
-    </div>` : ''}
-  </div>
-
-  <!-- ══ PAGINA 4: PLAN PARTER ══════════════════════════════════ -->
+  <!-- P3: Planul Fiecărui Etaj -->
   <div class="plan-page">
     <div class="plan-header">
-      <div>
-        <div class="plan-title">Plan Parter — ${safeTitle}</div>
-        <div style="font-size:11px;color:#64748b;margin-top:3px">Scara: 1:100 · 1 celulă grid = 1m real</div>
-      </div>
-      <div class="plan-version">Versiunea ${snapshotVersion}</div>
+      <div class="plan-title">Plan Parter</div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px">Scara: 1:100 (la tipărire A4) · Orientare: Landscape</div>
     </div>
-
-    <div class="plan-image">
-      ${planPngBase64
-        ? `<img src="data:image/png;base64,${planPngBase64}" alt="Plan parter" />`
-        : '<div class="plan-no-image">Imaginea planului nu este disponibilă</div>'
-      }
+    
+    <div class="plan-container">
+      <div class="north-arrow" style="transform: rotate(${getNorthRotation(project.streetOrientation)}deg);">
+         <div style="font-weight: 900; font-size: 14px; margin-bottom: 2px;">N</div>
+         <svg viewBox="0 0 24 40">
+            <path d="M12 0 L24 40 L12 30 L0 40 Z" fill="#1e293b"/>
+         </svg>
+      </div>
+      ${planPngBase64 ? `<img src="data:image/png;base64,${planPngBase64}" class="plan-image" alt="Plan" />` : '<div style="color:#94a3b8">Imaginea planului nu este disponibilă</div>'}
     </div>
 
     <div class="legend">
-      <div class="legend-item">
-        <div class="legend-swatch" style="background:#1e293b;border-color:#1e293b"></div>
-        Perete exterior (25cm)
-      </div>
-      <div class="legend-item">
-        <div class="legend-swatch" style="background:#64748b;border-color:#64748b"></div>
-        Perete interior (12.5cm)
-      </div>
-      <div class="legend-item">
-        <div class="legend-swatch" style="background:#f97316;border-color:#f97316"></div>
-        Ușă
-      </div>
-      <div class="legend-item">
-        <div class="legend-swatch" style="background:#3b82f6;border-color:#3b82f6"></div>
-        Fereastră
-      </div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#1e293b; border-color:#1e293b;"></div>Perete exterior</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#64748b; border-color:#64748b;"></div>Perete interior</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#f97316; border-color:#f97316;"></div>Ușă</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#3b82f6; border-color:#3b82f6;"></div>Fereastră</div>
     </div>
+  </div>
 
-    <!-- Tabel camere -->
+  <!-- P4: Tabel Încăperi -->
+  <div class="page">
+    <h1 style="font-size: 24px; font-weight: 900; margin-bottom: 20px;">Tabel Încăperi</h1>
     <table class="rooms-table">
       <thead>
         <tr>
           <th>Cameră</th>
           <th style="text-align:center">Suprafață utilă</th>
-          <th style="text-align:center">Conformitate (Legea 114/1996)</th>
+          <th style="text-align:center">Minim legal</th>
+          <th style="text-align:center">Status</th>
         </tr>
       </thead>
       <tbody>
-        ${roomRows || '<tr><td colspan="3" style="padding:10px;text-align:center;color:#94a3b8">Nicio cameră desenată</td></tr>'}
+        ${roomRows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8">Nicio cameră desenată</td></tr>'}
       </tbody>
     </table>
+    
+    <div style="margin-top: 32px; background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0;">
+      <div style="display:flex; justify-content:space-between; margin-bottom: 12px; font-size: 16px;">
+        <span style="color:#64748b; font-weight:600;">Total suprafață utilă desfășurată:</span>
+        <span style="font-weight:800; color:#1e293b;">${totalSqm} mp</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size: 16px;">
+        <span style="color:#64748b; font-weight:600;">Total suprafață construită:</span>
+        <span style="font-weight:800; color:#1e293b;">${totalBuiltSqm} mp</span>
+      </div>
+    </div>
+  </div>
 
-    ${violationsCount > 0
-      ? `<div class="violations-note">⚠ ${violationsCount} ${violationsCount === 1 ? 'cameră este' : 'camere sunt'} sub suprafețele minime impuse de Legea 114/1996, Art. 5. Consultați un arhitect autorizat pentru conformare.</div>`
-      : ''
-    }
+  <!-- P5: Disclaimer -->
+  <div class="page page-center">
+    <p class="disclaimer-text">
+      Planul a fost generat automat de platforma Zidario pe baza datelor introduse de utilizator și validat față de Legea 114/1996 și NP 057-2002.<br/><br/>
+      Nu înlocuiește un proiect tehnic semnat și ștampilat de arhitect autorizat.
+    </p>
   </div>
 
 </body>
 </html>`;
 }
 
-// ─────────────────────────────────────────────────────────────────
-// HTML TEMPLATE — Contractor PDF
-// ─────────────────────────────────────────────────────────────────
 function buildContractorHtmlTemplate(project: any, bom: any[], snapshot: any, planPngBase64: string | null): string {
   const safeTitle = escapeHtml(project.title);
   const generatedAt = new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -468,26 +403,14 @@ function buildContractorHtmlTemplate(project: any, bom: any[], snapshot: any, pl
 </html>`;
 }
 
-
-// ─────────────────────────────────────────────────────────────────
-// EXPORT SERVICE
-// ─────────────────────────────────────────────────────────────────
-
 export const exportService = {
-  /**
-   * Generează PDF de prezentare pentru proiect.
-   * Necesită snapshot publicat în DB.
-   * Returnează Buffer PDF sau null dacă nu există snapshot publicat.
-   */
   async generatePlanPdf(
     projectId: number,
     planPngBase64: string | null
   ): Promise<{ buffer: Buffer; filename: string } | null> {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      include: {
-        chatSummaries: true
-      }
+      include: { chatSummaries: true }
     });
 
     if (!project) return null;
@@ -498,7 +421,6 @@ export const exportService = {
 
     if (!snapshot) return null;
 
-    // 2. Extrage camere din planJSON
     const planJSON = snapshot.planJSON as {
       elements?: Array<{
         id: string;
@@ -521,13 +443,16 @@ export const exportService = {
     const results = await conformityService.evaluateRooms(rawRooms);
     const resultsById = new Map(results.rooms.map((r) => [r.id, r]));
 
-    const rooms: RoomRow[] = rawRooms.map((room) => ({
-      label: room.label,
-      usableSqm: room.usableSqm,
-      status: resultsById.get(room.id)?.status ?? 'ok',
-    }));
+    const rooms: RoomRow[] = rawRooms.map((room) => {
+      const roomResult = resultsById.get(room.id);
+      return {
+        label: room.label,
+        usableSqm: room.usableSqm,
+        status: roomResult?.status ?? 'ok',
+        minRequiredSqm: roomResult?.minRequiredSqm,
+      };
+    });
 
-    // 3. Build HTML
     const generatedAt = new Date().toLocaleDateString('ro-RO', {
       day: '2-digit', month: 'long', year: 'numeric',
     });
@@ -554,7 +479,15 @@ export const exportService = {
           phase: s.phase,
           screen: s.screen,
           summary: s.summary
-        }))
+        })),
+        lat: project.lat,
+        lng: project.lng,
+        seismicZone: project.seismicZone,
+        frostDepthCm: project.frostDepthCm,
+        hasBasement: project.hasBasement,
+        hasGroundFloor: project.hasGroundFloor,
+        upperFloorsCount: project.upperFloorsCount,
+        hasMansard: project.hasMansard,
       },
       planPngBase64,
       rooms,
@@ -562,7 +495,6 @@ export const exportService = {
       snapshot.version,
     );
 
-    // 4. Puppeteer → PDF
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -589,15 +521,11 @@ export const exportService = {
     }
   },
 
-  /**
-   * Generează PDF de execuție pentru contractor pe baza unui Quote acceptat sau în așteptare.
-   */
   async generateContractorPdf(
     quoteId: number,
     contractorId: number,
     planPngBase64: string | null
   ): Promise<{ buffer: Buffer; filename: string } | null> {
-    // 1. Verifică că quote-ul aparține contractorului
     const quote = await prisma.contractorQuote.findFirst({
       where: { id: quoteId, contractorId },
       include: { project: true }
@@ -605,23 +533,19 @@ export const exportService = {
 
     if (!quote) return null;
 
-    // 2. Ia BOM-ul proiectului
     const bom = await prisma.projectBOM.findMany({
       where: { projectId: quote.projectId },
       include: { material: true },
       orderBy: { phase: 'asc' },
     });
 
-    // 3. Ia snapshot-ul publicat
     const snapshot = await prisma.planSnapshot.findFirst({
       where: { projectId: quote.projectId, isPublished: true },
       orderBy: { version: 'desc' }
     });
 
-    // 4. Generează HTML
     const html = buildContractorHtmlTemplate(quote.project, bom, snapshot, planPngBase64);
 
-    // 5. Puppeteer → PDF
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],

@@ -198,7 +198,7 @@ export const Step1Location = ({ data, updateData }: Props) => {
   const defaultCenter: [number, number] = [45.9432, 24.9668]; // Centrul României
 
   return (
-    <div className="h-full flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-6">
       <div>
         <h3 className="text-xl font-bold text-slate-900 mb-2">1. Numele Proiectului</h3>
         <input
@@ -216,7 +216,7 @@ export const Step1Location = ({ data, updateData }: Props) => {
           onChange={(e) => updateData({ buildingPurpose: e.target.value })}
         >
           <option value="residential">Rezidențial (Casă / Vilă)</option>
-          <option value="commercial">Comercial (Birouri / Spații)</option>
+          <option value="commercial" disabled>Comercial (Indisponibil)</option>
         </select>
       </div>
 
@@ -398,12 +398,12 @@ export const Step1Location = ({ data, updateData }: Props) => {
         </div>
 
         {/* Partea Dreaptă: Harta Satelit */}
-        <div className="flex-1 w-full rounded-2xl overflow-hidden border-2 border-slate-200 relative z-0 shadow-inner min-h-[300px]">
+        <div className="flex-1 w-full rounded-2xl overflow-hidden border-2 border-slate-200 relative z-0 shadow-inner min-h-[300px] md:min-h-[400px]">
           <MapContainer
             center={data.lat ? [data.lat, data.lng!] : defaultCenter}
             zoom={data.lat ? 19 : 6}
             scrollWheelZoom={true}
-            className="w-full h-full"
+            className="absolute inset-0 w-full h-full"
           >
             <TileLayer
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -436,7 +436,7 @@ export const Step1Location = ({ data, updateData }: Props) => {
 
       {/* AI Prediction Section */}
       {(data.lat || isPredicting) && (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 shadow-sm mt-4 lg:mt-6">
           <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
             <Cpu className="text-buildorange w-5 h-5" />
             {isPredicting ? "Predicting Technical Data..." : "Technical Terrain Data (AI Extracted)"}

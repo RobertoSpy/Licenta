@@ -324,12 +324,27 @@ export const Register = () => {
                             className="rounded border-slate-300 text-buildorange focus:ring-buildorange"
                             checked={formData.specializations.includes(spec)}
                             onChange={() => {
-                              setFormData(prev => ({
-                                ...prev,
-                                specializations: prev.specializations.includes(spec)
-                                  ? prev.specializations.filter(s => s !== spec)
-                                  : [...prev.specializations, spec]
-                              }));
+                              if (spec === 'CONSTRUCTII_GENERALE') {
+                                const isChecked = !formData.specializations.includes(spec);
+                                if (isChecked) {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    specializations: Object.keys(SPECIALIZATION_LABELS) as ContractorSpecialization[]
+                                  }));
+                                } else {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    specializations: []
+                                  }));
+                                }
+                              } else {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  specializations: prev.specializations.includes(spec)
+                                    ? prev.specializations.filter(s => s !== spec && s !== 'CONSTRUCTII_GENERALE')
+                                    : [...prev.specializations, spec]
+                                }));
+                              }
                             }}
                           />
                           {label}

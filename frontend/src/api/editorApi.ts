@@ -16,27 +16,24 @@ export interface GenerateLayoutPayload {
 }
 
 export const editorApi = {
-  /**
-   * Salvează planul unui etaj specific.
-   */
-  async saveFloor(projectId: number, floor: FloorKey, elements: CanvasElement[], label?: string): Promise<void> {
+  async saveFloor(projectId: number, floor: FloorKey, state: any, label?: string): Promise<void> {
     await apiPrivate.post('/editor/snapshots', {
       projectId,
       floor,
-      planJSON: { elements, savedAt: Date.now() },
+      planJSON: { ...state, savedAt: Date.now() },
       label,
     });
   },
 
   /**
    * Încarcă cel mai recent plan al unui etaj specific.
-   * Returnează array-ul de elemente sau null dacă nu există.
+   * Returnează starea completă sau null.
    */
-  async loadFloor(projectId: number, floor: FloorKey): Promise<CanvasElement[] | null> {
+  async loadFloor(projectId: number, floor: FloorKey): Promise<any | null> {
     const res = await apiPrivate.get(`/editor/latest/${projectId}`, {
       params: { floor },
     });
-    return (res.data?.planJSON?.elements as CanvasElement[]) ?? null;
+    return res.data?.planJSON ?? null;
   },
 
   /**

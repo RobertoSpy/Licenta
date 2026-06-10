@@ -16,7 +16,7 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateConfiguratorLayout = exports.generateLayout = exports.explainConformity = exports.validateConformity = exports.deleteSnapshot = exports.publishSnapshot = exports.getLatestSnapshot = exports.getSnapshot = exports.listSnapshots = exports.createSnapshot = void 0;
+exports.generateConfiguratorLayout = exports.generateLayout = exports.explainConformity = exports.validateConformity = exports.deleteSnapshot = exports.publishLatestSnapshot = exports.publishSnapshot = exports.getLatestSnapshot = exports.getSnapshot = exports.listSnapshots = exports.createSnapshot = void 0;
 const editorService_1 = require("./editorService");
 const agentOrchestrator_1 = require("../ai/services/agentOrchestrator");
 const conformityService_1 = require("../../core/services/conformityService");
@@ -145,12 +145,33 @@ const publishSnapshot = (req, res) => __awaiter(void 0, void 0, void 0, function
         const published = yield editorService_1.editorService.publishSnapshot(snapshotId, projectId);
         res.json(published);
     }
-    catch (err) {
-        console.error('[editorController] publishSnapshot:', err);
-        res.status(500).json({ message: 'Eroare la publicarea planului.' });
+    catch (error) {
+        console.error('[EditorController] Eroare publishSnapshot:', error);
+        res.status(500).json({ message: 'Eroare la publicare', details: error.message });
     }
 });
 exports.publishSnapshot = publishSnapshot;
+const publishLatestSnapshot = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const projectId = parseInt(req.params.projectId);
+        if (isNaN(projectId)) {
+            res.status(400).json({ message: 'projectId este obligatoriu.' });
+            return;
+        }
+        const latest = yield editorService_1.editorService.getLatestSnapshot(projectId);
+        if (!latest) {
+            res.status(404).json({ message: 'Niciun snapshot găsit pentru a fi publicat.' });
+            return;
+        }
+        const published = yield editorService_1.editorService.publishSnapshot(latest.id, projectId);
+        res.json(published);
+    }
+    catch (error) {
+        console.error('[EditorController] Eroare publishLatestSnapshot:', error);
+        res.status(500).json({ message: 'Eroare la publicare', details: error.message });
+    }
+});
+exports.publishLatestSnapshot = publishLatestSnapshot;
 /**
  * DELETE /api/editor/snapshots/:id
  * Ștergere snapshot cu verificare ownership.

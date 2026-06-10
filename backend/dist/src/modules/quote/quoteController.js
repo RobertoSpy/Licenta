@@ -13,11 +13,11 @@ exports.acceptQuote = exports.submitQuote = exports.getContractorQuotes = export
 const quoteService_1 = require("./quoteService");
 const requestQuotes = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { projectId, contractorIds, message } = req.body;
+        const { projectId, contractorIds, message, phaseIds } = req.body;
         if (!projectId || !contractorIds || !Array.isArray(contractorIds)) {
             return res.status(400).json({ message: 'Date de intrare invalide: projectId și contractorIds sunt obligatorii' });
         }
-        const result = yield quoteService_1.quoteService.requestQuotes(projectId, contractorIds, message);
+        const result = yield quoteService_1.quoteService.requestQuotes(projectId, contractorIds, message, phaseIds);
         if (result.count > 0) {
             return res.status(201).json({ count: result.count, message: 'Cereri trimise cu succes.' });
         }

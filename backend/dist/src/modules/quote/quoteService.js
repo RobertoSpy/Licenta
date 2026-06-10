@@ -13,21 +13,23 @@ exports.quoteService = void 0;
 const prisma_1 = require("../../lib/prisma");
 const client_1 = require("@prisma/client");
 const mapPhaseToSpecializations = (phaseName) => {
-    switch (phaseName) {
+    // Strip the number prefix like "1. "
+    const name = phaseName.replace(/^\d+\.\s*/, '');
+    switch (name) {
         case 'Fundație': return ['FUNDATII', 'CONSTRUCTII_GENERALE'];
         case 'Structură': return ['STRUCTURA', 'CONSTRUCTII_GENERALE'];
-        case 'Planșeu & Coroană': return ['PLANSEU', 'CONSTRUCTII_GENERALE'];
-        case 'Termoizolație & Hidroizolație': return ['IZOLATII', 'FINISAJE', 'CONSTRUCTII_GENERALE'];
+        case 'Planșeu': return ['PLANSEU', 'CONSTRUCTII_GENERALE'];
         case 'Acoperiș': return ['ACOPERIS', 'CONSTRUCTII_GENERALE'];
-        case 'Tâmplărie': return ['TAMPLARIE', 'CONSTRUCTII_GENERALE'];
-        case 'Instalații': return ['INSTALATII_ELECTRICE', 'INSTALATII_SANITARE', 'INSTALATII_TERMICE', 'CONSTRUCTII_GENERALE'];
         case 'Finisaje': return ['FINISAJE', 'CONSTRUCTII_GENERALE'];
-        case 'Amenajări Exterioare': return ['FINISAJE', 'CONSTRUCTII_GENERALE'];
+        case 'Tâmplărie': return ['TAMPLARIE', 'CONSTRUCTII_GENERALE'];
+        case 'Termoizolație': return ['IZOLATII', 'CONSTRUCTII_GENERALE'];
+        case 'Instalații Electrice': return ['INSTALATII_ELECTRICE', 'CONSTRUCTII_GENERALE'];
+        case 'Instalații Sanitare și Termice': return ['INSTALATII_SANITARE', 'CONSTRUCTII_GENERALE'];
         default: return ['CONSTRUCTII_GENERALE'];
     }
 };
 exports.quoteService = {
-    requestQuotes(projectId, contractorIds, message) {
+    requestQuotes(projectId, contractorIds, message, phaseIds) {
         return __awaiter(this, void 0, void 0, function* () {
             const project = yield prisma_1.prisma.project.findUnique({
                 where: { id: projectId },
@@ -40,7 +42,11 @@ exports.quoteService = {
             });
             let quotesCreated = 0;
             for (const contractor of contractors) {
-                for (const phase of project.constructionPhases) {
+                // Filtrăm etapele dacă utilizatorul a selectat etape specifice
+                const phasesToProcess = phaseIds
+                    ? project.constructionPhases.filter(p => phaseIds.includes(p.id))
+                    : project.constructionPhases;
+                for (const phase of phasesToProcess) {
                     const allowedSpecs = mapPhaseToSpecializations(phase.name);
                     const canBid = contractor.specializations.some(spec => allowedSpecs.includes(spec));
                     if (canBid) {

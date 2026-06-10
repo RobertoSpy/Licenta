@@ -87,11 +87,11 @@ export const DashboardLayout = () => {
         {isMobileMenuOpen && (
           <div className="fixed inset-0 z-[60] md:hidden flex">
             {/* Backdrop */}
-            <div 
+            <div
               className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
               onClick={() => setIsMobileMenuOpen(false)}
             />
-            
+
             {/* Sidebar content */}
             <div className="relative w-64 max-w-sm bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-left">
               <div className="p-4 flex items-center justify-between border-b border-slate-100">

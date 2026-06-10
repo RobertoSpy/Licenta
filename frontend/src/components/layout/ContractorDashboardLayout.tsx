@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
-import { HardHat, Inbox, UserCircle, Star, LogOut, BarChart3, TrendingUp, AlertTriangle, Briefcase, Activity, User } from 'lucide-react';
+import { HardHat, Inbox, LogOut, AlertTriangle, Briefcase, Activity, User, PackageSearch, Users } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { contractorApi } from '../../api/contractorApi';
 
@@ -23,9 +23,11 @@ export default function ContractorDashboardLayout() {
   }, [user]);
 
   const menuItems = [
-    { name: 'Cereri & Oferte', path: '/contractor/quotes', icon: <Inbox className="w-5 h-5" /> },
-    { name: 'Piață / Feed Proiecte', path: '/contractor/feed', icon: <Briefcase className="w-5 h-5" /> },
+    { name: 'Proiectele Mele', path: '/contractor/quotes', icon: <Inbox className="w-5 h-5" /> },
+    { name: 'Proiecte Publice', path: '/contractor/feed', icon: <Briefcase className="w-5 h-5" /> },
     { name: 'Piață & Analize', path: '/contractor/market', icon: <Activity className="w-5 h-5" /> },
+    { name: 'Materiale Bricolaj', path: '/contractor/materials', icon: <PackageSearch className="w-5 h-5" /> },
+    { name: 'Experți Construcții', path: '/contractor/experts', icon: <Users className="w-5 h-5" /> },
     { name: 'Profil', path: '/contractor/profile', icon: <User className="w-5 h-5" /> },
   ];
 

@@ -244,7 +244,7 @@ export const ProjectDetail = () => {
               <DataPoint label="Stil Arhitectural" value={project.houseStyle} />
               <DataPoint label="Total Niveluri" value={project.totalFloors ? `${project.totalFloors} niveluri` : undefined} />
               <DataPoint label="Subsol" value={project.hasBasement ? '✓ Da' : '✗ Nu'} />
-              <DataPoint label="Mansardă" value={project.hasMansard ? '✓ Da' : '✗ Nu'} />
+
               <DataPoint label="Etaje Supraterane" value={project.upperFloorsCount !== undefined ? `${project.upperFloorsCount}` : undefined} />
             </div>
           ) : (

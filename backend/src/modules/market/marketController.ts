@@ -64,7 +64,9 @@ export const getFeed = async (req: AuthRequest, res: Response): Promise<void> =>
     }
 
     const projects = await prisma.project.findMany({
-      where: { isPublishedForBidding: true },
+      where: { 
+        isPublishedForBidding: true
+      },
       include: {
         user: {
           select: { name: true, email: true, phone: true }
@@ -72,6 +74,10 @@ export const getFeed = async (req: AuthRequest, res: Response): Promise<void> =>
         constructionPhases: {
           orderBy: { phaseOrder: 'asc' },
           include: { contractor: { select: { companyName: true } } }
+        },
+        contractorQuotes: {
+          where: { contractorId: contractor.id },
+          select: { status: true }
         }
       },
       orderBy: { updatedAt: 'desc' }

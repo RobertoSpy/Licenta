@@ -6,7 +6,7 @@ export const ContractorSpecialization = {
   TAMPLARIE: 'TAMPLARIE',
   INSTALATII_ELECTRICE: 'INSTALATII_ELECTRICE',
   INSTALATII_SANITARE: 'INSTALATII_SANITARE',
-  INSTALATII_TERMICE: 'INSTALATII_TERMICE',
+  IZOLATII: 'IZOLATII',
   FINISAJE: 'FINISAJE',
   CONSTRUCTII_GENERALE: 'CONSTRUCTII_GENERALE',
 } as const;
@@ -14,14 +14,14 @@ export const ContractorSpecialization = {
 export type ContractorSpecialization = typeof ContractorSpecialization[keyof typeof ContractorSpecialization];
 
 export const SPECIALIZATION_LABELS: Record<ContractorSpecialization, string> = {
-  [ContractorSpecialization.FUNDATII]: "Fundații",
-  [ContractorSpecialization.STRUCTURA]: "Structură & Zidărie",
-  [ContractorSpecialization.PLANSEU]: "Planșeu & Coroană",
-  [ContractorSpecialization.ACOPERIS]: "Acoperiș & Șarpantă",
-  [ContractorSpecialization.TAMPLARIE]: "Tâmplărie",
-  [ContractorSpecialization.INSTALATII_ELECTRICE]: "Instalații Electrice",
-  [ContractorSpecialization.INSTALATII_SANITARE]: "Instalații Sanitare",
-  [ContractorSpecialization.INSTALATII_TERMICE]: "Instalații Termice",
+  [ContractorSpecialization.FUNDATII]: "Fundație",
+  [ContractorSpecialization.STRUCTURA]: "Structură",
+  [ContractorSpecialization.PLANSEU]: "Planșeu",
+  [ContractorSpecialization.ACOPERIS]: "Acoperiș",
   [ContractorSpecialization.FINISAJE]: "Finisaje",
+  [ContractorSpecialization.TAMPLARIE]: "Tâmplărie",
+  [ContractorSpecialization.IZOLATII]: "Termoizolație",
+  [ContractorSpecialization.INSTALATII_ELECTRICE]: "Instalații Electrice",
+  [ContractorSpecialization.INSTALATII_SANITARE]: "Instalații Sanitare și Termice",
   [ContractorSpecialization.CONSTRUCTII_GENERALE]: "Construcții Generale",
 };

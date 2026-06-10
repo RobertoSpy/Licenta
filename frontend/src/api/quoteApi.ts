@@ -5,6 +5,7 @@ export interface QuoteRequestPayload {
   projectId: number;
   contractorIds: number[];
   message?: string;
+  phaseIds?: number[];
 }
 
 export interface Quote {

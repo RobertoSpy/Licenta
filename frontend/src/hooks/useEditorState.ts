@@ -134,8 +134,8 @@ interface EditorStore {
   pushToUndo: () => void;
 
   // Floor actions
-  /** Setează etajul activ și încarcă elementele sale. Reseteză undo/redo. */
-  switchFloor: (floor: FloorKey, elements: CanvasElement[]) => void;
+  /** Setează etajul activ și încarcă elementele și starea configuratorului. Resetează undo/redo. */
+  switchFloor: (floor: FloorKey, state: any) => void;
   setProjectId: (id: number) => void;
 
   // Configurator Actions
@@ -232,21 +232,23 @@ export const useEditorState = create<EditorStore>((set, get) => ({
     set({ undoStack: newStack, redoStack: [] });
   },
 
-  switchFloor: (floor, newElements) => {
-    // Înlocuim elementele cu cele ale etajului nou.
-    // Resetăm undo/redo — fiecare etaj are propria sa istorie în memorie.
-    // isDirty = false — datele tocmai au fost încărcate din server.
-    set({
+  switchFloor: (floor, state) => {
+    // Verificăm dacă state este doar un array de elemente (backward compatibility)
+    const elements = Array.isArray(state) ? state : (state.elements ?? []);
+    
+    set((prev) => ({
       activeFloor: floor,
-      elements: newElements,
-      selectedId: null,
+      elements,
+      dimensions: state.dimensions ?? prev.dimensions,
+      houseShape: state.houseShape ?? prev.houseShape,
+      activeRooms: state.activeRooms ?? prev.activeRooms,
+      streetOrientation: state.streetOrientation ?? prev.streetOrientation,
+      addedOpenings: state.addedOpenings ?? prev.addedOpenings,
+      userDeletedOpenings: state.userDeletedOpenings ?? prev.userDeletedOpenings,
+      isDirty: false,
       undoStack: [],
       redoStack: [],
-      isDirty: false,
-      // Resetăm și configuratorul intern (openings, etc.) — etajul nou are propria sa stare
-      addedOpenings: [],
-      userDeletedOpenings: [],
-    });
+    }));
   },
 
   setProjectId: (id) => set({ projectId: id }),

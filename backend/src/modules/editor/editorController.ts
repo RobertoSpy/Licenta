@@ -132,9 +132,32 @@ export const publishSnapshot = async (req: Request, res: Response) => {
 
     const published = await editorService.publishSnapshot(snapshotId, projectId);
     res.json(published);
-  } catch (err) {
-    console.error('[editorController] publishSnapshot:', err);
-    res.status(500).json({ message: 'Eroare la publicarea planului.' });
+  } catch (error: any) {
+    console.error('[EditorController] Eroare publishSnapshot:', error);
+    res.status(500).json({ message: 'Eroare la publicare', details: error.message });
+  }
+};
+
+export const publishLatestSnapshot = async (req: Request, res: Response) => {
+  try {
+    const projectId = parseInt(req.params.projectId as string);
+    
+    if (isNaN(projectId)) {
+      res.status(400).json({ message: 'projectId este obligatoriu.' });
+      return;
+    }
+
+    const latest = await editorService.getLatestSnapshot(projectId);
+    if (!latest) {
+      res.status(404).json({ message: 'Niciun snapshot găsit pentru a fi publicat.' });
+      return;
+    }
+
+    const published = await editorService.publishSnapshot(latest.id, projectId);
+    res.json(published);
+  } catch (error: any) {
+    console.error('[EditorController] Eroare publishLatestSnapshot:', error);
+    res.status(500).json({ message: 'Eroare la publicare', details: error.message });
   }
 };
 

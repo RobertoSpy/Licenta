@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reseedNormatives = exports.deleteMaterial = exports.updateMaterial = exports.getAllMaterials = exports.getUsers = exports.importMaterialsCsv = exports.addMaterialManual = exports.addMaterialFromUrl = exports.syncDedemanMaterials = void 0;
+exports.reseedNormatives = exports.deleteMaterial = exports.updateMaterial = exports.getAllMaterials = exports.toggleContractorVerification = exports.getUsers = exports.importMaterialsCsv = exports.addMaterialManual = exports.addMaterialFromUrl = exports.syncDedemanMaterials = void 0;
 const fs_1 = __importDefault(require("fs"));
 const csv_parser_1 = __importDefault(require("csv-parser"));
 const scraperService_1 = require("../../core/infrastructure/scraperService");
@@ -208,7 +208,12 @@ const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 name: true,
                 role: true,
                 isVerified: true,
-                createdAt: true
+                createdAt: true,
+                contractor: {
+                    select: {
+                        isVerified: true
+                    }
+                }
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -220,6 +225,26 @@ const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.getUsers = getUsers;
+const toggleContractorVerification = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        const contractor = yield prisma_1.prisma.contractorProfile.findUnique({ where: { userId } });
+        if (!contractor) {
+            res.status(404).json({ success: false, error: 'Profil de constructor negăsit.' });
+            return;
+        }
+        const updated = yield prisma_1.prisma.contractorProfile.update({
+            where: { userId },
+            data: { isVerified: !contractor.isVerified }
+        });
+        res.json({ success: true, isVerified: updated.isVerified });
+    }
+    catch (error) {
+        console.error('[AdminController.toggleContractorVerification] Eroare:', error);
+        res.status(500).json({ success: false, error: 'Eroare la modificarea statusului.' });
+    }
+});
+exports.toggleContractorVerification = toggleContractorVerification;
 const getAllMaterials = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const materials = yield prisma_1.prisma.material.findMany({

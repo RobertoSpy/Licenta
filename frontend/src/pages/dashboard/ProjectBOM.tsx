@@ -4,7 +4,7 @@
 // Mod implicit: Wizard etapă-cu-etapă.
 // Toggle în header: Wizard | Tabel Complet.
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Bot, LayoutList, Wand2 } from 'lucide-react';
@@ -13,6 +13,7 @@ import { BOMSummary } from '../../components/bom/BOMSummary';
 import { BOMTable } from '../../components/bom/BOMTable';
 import { BOMPhaseWizard } from '../../components/bom/BOMPhaseWizard';
 import { BOMAdvisorChat } from '../../components/bom/BOMAdvisorChat';
+import { useBOMAdvisorChat } from '../../hooks/useBOMAdvisorChat';
 
 type ViewMode = 'wizard' | 'table';
 
@@ -21,10 +22,22 @@ export const ProjectBOM = () => {
   const navigate = useNavigate();
   const { bomItems, isLoading, error, refetch } = useBOMData(id!);
 
+  const chatState = useBOMAdvisorChat(id!);
+
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [canGoNext, setCanGoNext] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('wizard');
+
+  const canGoNext = useMemo(() => {
+    if (chatState.messages.length === 0) return false;
+    let lastSystemIndex = -1;
+    for (let i = chatState.messages.length - 1; i >= 0; i--) {
+      if (chatState.messages[i].isSystemInjection && chatState.messages[i].requiresAnswer) {
+        lastSystemIndex = i;
+        break;
+      }
+    }
+    return lastSystemIndex === -1 || chatState.messages.findIndex((m, idx) => idx > lastSystemIndex && m.role === 'user') !== -1;
+  }, [chatState.messages]);
 
   useEffect(() => {
     const handleAskEvent = () => setIsChatOpen(true);
@@ -134,9 +147,9 @@ export const ProjectBOM = () => {
                 onClick={() => setIsChatOpen(true)}
                 className="relative flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-all shadow-sm group"
               >
-                {unreadCount > 0 && !isChatOpen && (
+                {chatState.unreadCount > 0 && !isChatOpen && (
                   <div className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-md animate-pulse">
-                    {unreadCount}
+                    {chatState.unreadCount}
                   </div>
                 )}
                 <Bot className="w-4 h-4 text-buildorange group-hover:scale-110 transition-transform" />
@@ -165,6 +178,7 @@ export const ProjectBOM = () => {
                 bomItems={bomItems}
                 onMaterialReplaced={refetch}
                 canGoNext={canGoNext}
+                chatState={chatState}
               />
             ) : (
               <BOMTable items={bomItems} onMaterialReplaced={refetch} />
@@ -178,8 +192,7 @@ export const ProjectBOM = () => {
         projectId={id!}
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
-        onUnreadChange={(count) => setUnreadCount(count)}
-        onCanGoNextChange={(can) => setCanGoNext(can)}
+        chatState={chatState}
       />
     </>
   );

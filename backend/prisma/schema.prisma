@@ -244,7 +244,7 @@ model ConstructionPhase {
   notes       String?  // note ale utilizatorului per etapă
   contractorId Int?
   contractor   ContractorProfile? @relation(fields: [contractorId], references: [id])
-  quoteId      Int?               @unique
+  quoteId      Int?
   quote        ContractorQuote?   @relation("WonQuote", fields: [quoteId], references: [id])
 
   quotes       ContractorQuote[]  @relation("PhaseQuotes")

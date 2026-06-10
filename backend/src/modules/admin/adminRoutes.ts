@@ -9,7 +9,8 @@ import {
   getAllMaterials,
   updateMaterial,
   deleteMaterial,
-  reseedNormatives
+  reseedNormatives,
+  toggleContractorVerification
 } from './adminController';
 import { protect } from '../../core/middleware/authMiddleware';
 import { requireAdmin } from '../../core/middleware/requireAdmin';
@@ -27,6 +28,7 @@ router.post('/scrape/add', addMaterialFromUrl);
 router.use(requireAdmin);
 
 router.get('/users', getUsers);
+router.patch('/users/:id/verify-contractor', toggleContractorVerification);
 router.get('/materials', getAllMaterials);
 router.post('/materials/manual', addMaterialManual);
 router.post('/materials/import-csv', upload.single('csvFile'), importMaterialsCsv);

@@ -68,7 +68,9 @@ const getFeed = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             return;
         }
         const projects = yield prisma_1.prisma.project.findMany({
-            where: { isPublishedForBidding: true },
+            where: {
+                isPublishedForBidding: true
+            },
             include: {
                 user: {
                     select: { name: true, email: true, phone: true }
@@ -76,6 +78,10 @@ const getFeed = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 constructionPhases: {
                     orderBy: { phaseOrder: 'asc' },
                     include: { contractor: { select: { companyName: true } } }
+                },
+                contractorQuotes: {
+                    where: { contractorId: contractor.id },
+                    select: { status: true }
                 }
             },
             orderBy: { updatedAt: 'desc' }

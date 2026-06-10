@@ -62,12 +62,11 @@ interface BOMAdvisorChatProps {
   projectId: string;
   isOpen: boolean;
   onClose: () => void;
-  onUnreadChange?: (count: number) => void;
-  onCanGoNextChange?: (canGoNext: boolean) => void;
+  chatState: any;
 }
 
-export const BOMAdvisorChat = ({ projectId, isOpen, onClose, onUnreadChange, onCanGoNextChange }: BOMAdvisorChatProps) => {
-  const { messages, isLoading, sendMessage, clearHistory, activePhase, completedPhases, confirmPhase, addSystemMessage, addLocalUserMessage, unreadCount, markAsRead } = useBOMAdvisorChat(projectId);
+export const BOMAdvisorChat = ({ projectId, isOpen, onClose, chatState }: BOMAdvisorChatProps) => {
+  const { messages, isLoading, sendMessage, clearHistory, activePhase, completedPhases, confirmPhase, addSystemMessage, addLocalUserMessage, unreadCount, markAsRead, isPhaseStateLoaded } = chatState;
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -80,43 +79,67 @@ export const BOMAdvisorChat = ({ projectId, isOpen, onClose, onUnreadChange, onC
         break;
       }
     }
-    return lastSystemIndex === -1 || messages.findIndex((m, idx) => idx > lastSystemIndex && m.role === 'user') !== -1;
+    return lastSystemIndex === -1 || messages.findIndex((m: any, idx: number) => idx > lastSystemIndex && m.role === 'user') !== -1;
   }, [messages]);
 
-  useEffect(() => {
-    if (onCanGoNextChange) {
-      onCanGoNextChange(canGoNext);
-    }
-  }, [canGoNext, onCanGoNextChange]);
+  // computed externally now, so no need to dispatch back
+
 
   const triggeredPhases = useRef<Set<string>>(new Set());
+
+  // Ascultăm evenimentul de schimbare a fazei vizualizate din Wizard
   useEffect(() => {
-    if (activePhase && !triggeredPhases.current.has(activePhase)) {
+    const handleViewChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ phase: string }>;
+      const viewedPhase = customEvent.detail.phase;
+
+      // Nu generăm mesaje pentru faze deja confirmate sau dacă tot devizul e gata
+      if (completedPhases.includes(viewedPhase as any) || completedPhases.length >= 9) return;
+
+      if (!triggeredPhases.current.has(viewedPhase)) {
+         triggeredPhases.current.add(viewedPhase);
+         
+         const phaseNames = {
+            fundatie: 'Fundație', structura: 'Structură', planseu: 'Planșeu',
+            acoperis: 'Acoperiș', finisaje: 'Finisaje', tamplarie: 'Tâmplărie',
+            termoizolatie: 'Termoizolație', instalatii_electrice: 'Instalații Electrice',
+            instalatii_sanitare: 'Instalații Sanitare și Termice'
+         };
+         const phaseName = phaseNames[viewedPhase as keyof typeof phaseNames] || viewedPhase;
+
+         setTimeout(() => {
+            addSystemMessage(`Suntem la etapa de **${phaseName}**. Ai nelămuriri sau vrei să discutăm despre materialele alese înainte să aprobi această etapă?`, true);
+         }, 500);
+      }
+    };
+    
+    window.addEventListener('bom-phase-view-changed', handleViewChanged);
+    return () => window.removeEventListener('bom-phase-view-changed', handleViewChanged);
+  }, [addSystemMessage, completedPhases]);
+
+  // Și la montare, verificăm faza curentă activă (doar dacă e neconfirmată)
+  useEffect(() => {
+    if (isPhaseStateLoaded && activePhase && !completedPhases.includes(activePhase as any) && !triggeredPhases.current.has(activePhase) && completedPhases.length < 9) {
        triggeredPhases.current.add(activePhase);
-       
        const phaseNames = {
-          fundatie: 'Fundație', structura: 'Structură', planseu: 'Planșeu & Coroană',
-          termoizolatie: 'Termoizolație & Hidroizolație', acoperis: 'Acoperiș', tamplarie: 'Tâmplărie',
-          instalatii: 'Instalații', finisaje: 'Finisaje', exterior: 'Amenajări Exterioare'
+          fundatie: 'Fundație', structura: 'Structură', planseu: 'Planșeu',
+          acoperis: 'Acoperiș', finisaje: 'Finisaje', tamplarie: 'Tâmplărie',
+          termoizolatie: 'Termoizolație', instalatii_electrice: 'Instalații Electrice',
+          instalatii_sanitare: 'Instalații Sanitare și Termice'
        };
        const phaseName = phaseNames[activePhase as keyof typeof phaseNames] || activePhase;
-
        setTimeout(() => {
           addSystemMessage(`Suntem la etapa de **${phaseName}**. Ai nelămuriri sau vrei să discutăm despre materialele alese înainte să aprobi această etapă?`, true);
        }, 500);
     }
-  }, [activePhase, addSystemMessage]);
+  }, [isPhaseStateLoaded, activePhase, completedPhases, addSystemMessage]);
 
   useScreenTutor({
     screenId: 'bom',
     addSystemMessage
   });
 
-  useEffect(() => {
-    if (onUnreadChange) {
-      onUnreadChange(unreadCount);
-    }
-  }, [unreadCount, onUnreadChange]);
+  // computed externally now, so no need to dispatch back
 
   useEffect(() => {
     if (isOpen) {
@@ -219,7 +242,7 @@ export const BOMAdvisorChat = ({ projectId, isOpen, onClose, onUnreadChange, onC
 
         {/* Mesaje */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((msg, idx) => (
+          {messages.map((msg: any, idx: number) => (
             <div
               key={idx}
               className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}

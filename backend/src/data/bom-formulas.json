@@ -227,7 +227,7 @@
     }
   },
   "floor_screed": {
-    "phase": "Finisaje Brute",
+    "phase": "Finisaje",
     "unit": "mp",
     "formula": "total_floor_area_sqm * floors_count",
     "wastePercent": 3,
@@ -240,7 +240,7 @@
     }
   },
   "wall_plaster": {
-    "phase": "Finisaje Brute",
+    "phase": "Finisaje",
     "unit": "mp",
     "formula": "(perimeter_m + interior_walls_m * 2) * floor_height_m * floors_count",
     "wastePercent": 5,
@@ -460,7 +460,7 @@
     }
   },
   "glet_interior": {
-    "phase": "Finisaje Brute",
+    "phase": "Finisaje",
     "unit": "kg",
     "formula": "((perimeter_m + interior_walls_m * 2) * floor_height_m * floors_count + total_floor_area_sqm * floors_count) * 1.5",
     "wastePercent": 5,
@@ -473,7 +473,7 @@
     }
   },
   "paint_interior": {
-    "phase": "Finisaje Brute",
+    "phase": "Finisaje",
     "unit": "L",
     "formula": "((perimeter_m + interior_walls_m * 2) * floor_height_m * floors_count + total_floor_area_sqm * floors_count) * 0.34",
     "wastePercent": 5,
@@ -525,7 +525,7 @@
     }
   },
   "plumbing_supply": {
-    "phase": "Instalații Sanitare",
+    "phase": "Instalații Sanitare și Termice",
     "unit": "ml",
     "formula": "(perimeter_m * 0.5 + interior_walls_m) * floors_count * 1.5",
     "wastePercent": 8,
@@ -538,7 +538,7 @@
     }
   },
   "plumbing_drainage_main": {
-    "phase": "Instalații Sanitare",
+    "phase": "Instalații Sanitare și Termice",
     "unit": "ml",
     "formula": "floor_height_m * floors_count * 2 + perimeter_m * 0.25",
     "wastePercent": 8,
@@ -551,7 +551,7 @@
     }
   },
   "plumbing_drainage_secondary": {
-    "phase": "Instalații Sanitare",
+    "phase": "Instalații Sanitare și Termice",
     "unit": "ml",
     "formula": "interior_walls_m * floors_count * 0.5 + floors_count * 3",
     "wastePercent": 8,

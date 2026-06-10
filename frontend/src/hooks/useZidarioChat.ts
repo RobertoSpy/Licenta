@@ -119,11 +119,18 @@ export function useZidarioChat(
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setMessages(parsed);
+          return; // Ne oprim aici dacă am restaurat din cache
         }
       } catch (e) {
         console.warn('Failed to parse cached chat messages', e);
       }
     }
+    
+    // Dacă nu avem nimic în cache (e.g. proiect complet nou), 
+    // curățăm forțat state-ul de orice mesaje de la proiectul anterior,
+    // păstrând totuși mesajele de sistem (tutorul) dacă au fost deja injectate.
+    setMessages(prev => prev.filter(m => m.isSystemInjection));
+    
   }, [projectId, screen]);
 
   useEffect(() => {

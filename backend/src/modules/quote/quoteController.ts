@@ -4,12 +4,12 @@ import { quoteService } from './quoteService';
 
 export const requestQuotes = async (req: AuthRequest, res: Response) => {
   try {
-    const { projectId, contractorIds, message } = req.body;
+    const { projectId, contractorIds, message, phaseIds } = req.body;
     if (!projectId || !contractorIds || !Array.isArray(contractorIds)) {
       return res.status(400).json({ message: 'Date de intrare invalide: projectId și contractorIds sunt obligatorii' });
     }
 
-    const result = await quoteService.requestQuotes(projectId, contractorIds, message);
+    const result = await quoteService.requestQuotes(projectId, contractorIds, message, phaseIds);
     if (result.count > 0) {
       return res.status(201).json({ count: result.count, message: 'Cereri trimise cu succes.' });
     } else {

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, XCircle, FileText, Calendar, DollarSign, MessageSquare, Phone, Mail, User, Building2, MapPin, Award, Layers } from 'lucide-react';
+import { CheckCircle, XCircle, FileText, Calendar, DollarSign, MessageSquare, Phone, Mail, User, Building2, MapPin, Award, Layers, Star, X } from 'lucide-react';
 import { quoteApi, type Quote } from '../../api/quoteApi';
+import { contractorApi } from '../../api/contractorApi';
+import { ContractorProfileModal } from '../../components/contractors/ContractorProfileModal';
 import { useParams } from 'react-router-dom';
 
 export default function MyQuotesClient() {
@@ -13,6 +15,12 @@ export default function MyQuotesClient() {
   
   const [rejectingQuoteId, setRejectingQuoteId] = useState<number | null>(null);
   const [rejectMessage, setRejectMessage] = useState('');
+
+  // Review State
+  const [reviewingQuote, setReviewingQuote] = useState<Quote | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Contractor Profile Modal State
   const [selectedContractor, setSelectedContractor] = useState<Quote['contractor'] | null>(null);
@@ -63,6 +71,33 @@ export default function MyQuotesClient() {
       console.error(err);
     } finally {
       setIsAccepting(null);
+    }
+  };
+
+  const handleAddReview = async () => {
+    if (!reviewingQuote) return;
+    setIsSubmittingReview(true);
+    try {
+      await contractorApi.addReview(
+        reviewingQuote.contractorId,
+        reviewingQuote.projectId,
+        reviewRating,
+        reviewComment
+      );
+      alert('Recenzia a fost adăugată cu succes! Îți mulțumim!');
+      setReviewingQuote(null);
+      setReviewRating(5);
+      setReviewComment('');
+      fetchQuotes();
+    } catch (err: any) {
+      console.error(err);
+      if (err.response?.data?.message === 'ALREADY_REVIEWED' || err.response?.data?.error === 'ALREADY_REVIEWED') {
+        alert('Ai acordat deja o recenzie pentru această firmă pe acest proiect.');
+      } else {
+        alert('Eroare la adăugarea recenziei.');
+      }
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -205,6 +240,27 @@ export default function MyQuotesClient() {
                         </button>
                       </div>
                     )}
+                    
+                    {q.status === 'ACCEPTED' && (
+                      <div className="mt-6 pt-6 border-t border-slate-200 flex flex-col gap-3">
+                        {q.contractor?.reviews && q.contractor.reviews.length > 0 ? (
+                          <div className="w-full py-3 bg-amber-50 text-amber-600 font-bold rounded-xl border border-amber-200 flex items-center justify-center gap-2">
+                            <CheckCircle className="w-5 h-5"/> Ai acordat deja o recenzie
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setReviewingQuote(q);
+                              setReviewRating(5);
+                              setReviewComment('');
+                            }}
+                            className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Star className="w-5 h-5"/> Acordă o Recenzie
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </motion.div>
                 ))}
               </div>
@@ -214,78 +270,67 @@ export default function MyQuotesClient() {
       )}
 
       {/* MODAL PROFIL CONSTRUCTOR */}
+      <ContractorProfileModal 
+        contractorId={selectedContractor?.id || null} 
+        onClose={() => setSelectedContractor(null)} 
+      />
+
+      {/* MODAL RECENZIE */}
       <AnimatePresence>
-        {selectedContractor && (
+        {reviewingQuote && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setSelectedContractor(null)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setReviewingQuote(null)}
             />
             <motion.div 
-              initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="relative bg-white rounded-3xl shadow-2xl p-8 max-w-lg w-full z-10"
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-white rounded-2xl shadow-xl p-6 max-w-md w-full z-10"
             >
-              <button 
-                onClick={() => setSelectedContractor(null)}
-                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors"
-              >
-                <XCircle className="w-6 h-6" />
-              </button>
-
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
-                  <Building2 className="w-8 h-8" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900">{selectedContractor.companyName}</h2>
-                  <div className="flex items-center gap-1 text-slate-500 text-sm mt-1">
-                    <MapPin className="w-4 h-4" /> {selectedContractor.county} (Rază: {selectedContractor.coverageRadius} km)
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <div className="text-2xl font-bold text-slate-800">{selectedContractor.yearsExperience || '-'} ani</div>
-                  <div className="text-xs text-slate-500 font-medium">Experiență</div>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <div className="text-2xl font-bold text-slate-800">{selectedContractor.completedProjects || 0}</div>
-                  <div className="text-xs text-slate-500 font-medium">Proiecte finalizate</div>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 col-span-2 flex items-center gap-3">
-                  <div className="text-2xl font-bold text-amber-500 flex items-center gap-1">
-                    {selectedContractor.avgRating ? selectedContractor.avgRating.toFixed(1) : '-'} <span className="text-lg">★</span>
-                  </div>
-                  <div className="text-xs text-slate-500 font-medium">Rating mediu (recenzii)</div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Acordă o Recenzie</h3>
+              <p className="text-sm text-slate-500 mb-6">Cum a decurs colaborarea cu <span className="font-bold">{reviewingQuote.contractor?.companyName || 'Constructorul'}</span>?</p>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 mb-2">Punctaj</label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setReviewRating(star)}
+                      className="focus:outline-none transition-transform hover:scale-110"
+                    >
+                      <Star className={`w-8 h-8 ${star <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> Despre firmă
-                  </h4>
-                  <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    {selectedContractor.description || 'Nicio descriere disponibilă.'}
-                  </p>
-                </div>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 mb-2">Comentariu</label>
+                <textarea
+                  rows={4}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-400"
+                  placeholder="Scrie părerea ta aici..."
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                />
+              </div>
 
-                {selectedContractor.certifications && selectedContractor.certifications.length > 0 && (
-                  <div>
-                    <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
-                      <Award className="w-4 h-4" /> Certificări
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedContractor.certifications.map((cert: string, idx: number) => (
-                        <span key={idx} className="bg-purple-50 text-purple-700 text-xs font-bold px-3 py-1 rounded-full border border-purple-100">
-                          {cert}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setReviewingQuote(null)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 font-medium rounded-lg transition-colors"
+                >
+                  Anulează
+                </button>
+                <button
+                  onClick={handleAddReview}
+                  disabled={isSubmittingReview || !reviewComment.trim()}
+                  className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {isSubmittingReview ? 'Se trimite...' : 'Trimite Recenzia'}
+                </button>
               </div>
             </motion.div>
           </div>

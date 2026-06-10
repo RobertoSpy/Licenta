@@ -29,6 +29,7 @@ interface BOMPhaseWizardProps {
   onMaterialReplaced: () => void;
   onAllConfirmed?: () => void;
   canGoNext?: boolean;
+  chatState: any;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ export const BOMPhaseWizard = ({
   onMaterialReplaced,
   onAllConfirmed,
   canGoNext = false,
+  chatState,
 }: BOMPhaseWizardProps) => {
   const {
     activePhase: dbActivePhase,
@@ -49,7 +51,7 @@ export const BOMPhaseWizard = ({
     grandTotal,
     allPhasesConfirmed,
     confirmCurrentPhase,
-  } = useBOMPhaseWizard(projectId, bomItems);
+  } = useBOMPhaseWizard(projectId, bomItems, chatState);
 
   // Faza vizuală locală — poate fi diferită de cea activă din DB
   // (utilizatorul poate naviga înapoi la etape confirmate)
@@ -79,7 +81,8 @@ export const BOMPhaseWizard = ({
   const handlePublish = async () => {
     try {
       await apiPrivate.post(`/market/projects/${projectId}/publish`);
-      navigate(`/dashboard/projects/${projectId}/quotes`);
+      alert('Proiect publicat cu succes! Constructorii pot acum să vadă proiectul și să trimită oferte.');
+      navigate('/dashboard');
     } catch (error) {
       console.error('Eroare la publicarea proiectului:', error);
       alert('A apărut o eroare la publicarea proiectului.');
@@ -105,7 +108,9 @@ export const BOMPhaseWizard = ({
       await confirmCurrentPhase();
       // Dacă mai sunt etape, avansăm automat
       if (canGoForward) {
-        setLocalActivePhase(PHASE_CONFIG[currentPhaseIndex + 1].key);
+        const nextPhase = PHASE_CONFIG[currentPhaseIndex + 1].key;
+        setLocalActivePhase(nextPhase);
+        window.dispatchEvent(new CustomEvent('bom-phase-view-changed', { detail: { phase: nextPhase } }));
       } else {
         onAllConfirmed?.();
       }
@@ -115,16 +120,28 @@ export const BOMPhaseWizard = ({
   }, [confirmCurrentPhase, canGoForward, currentPhaseIndex, onAllConfirmed]);
 
   const handleBack = useCallback(() => {
-    if (canGoBack) setLocalActivePhase(PHASE_CONFIG[currentPhaseIndex - 1].key);
+    if (canGoBack) {
+      const prevPhase = PHASE_CONFIG[currentPhaseIndex - 1].key;
+      setLocalActivePhase(prevPhase);
+      window.dispatchEvent(new CustomEvent('bom-phase-view-changed', { detail: { phase: prevPhase } }));
+    }
   }, [canGoBack, currentPhaseIndex]);
 
   const handleForward = useCallback(() => {
-    if (canGoForward) setLocalActivePhase(PHASE_CONFIG[currentPhaseIndex + 1].key);
+    if (canGoForward) {
+      const nextPhase = PHASE_CONFIG[currentPhaseIndex + 1].key;
+      setLocalActivePhase(nextPhase);
+      window.dispatchEvent(new CustomEvent('bom-phase-view-changed', { detail: { phase: nextPhase } }));
+    }
   }, [canGoForward, currentPhaseIndex]);
 
   const handlePhaseClick = useCallback((key: BomPhaseKey) => {
     const isAccessible = completedPhases.includes(key) || key === dbActivePhase;
-    if (isAccessible) setLocalActivePhase(key);
+    if (isAccessible) {
+      setLocalActivePhase(key);
+      // Notificăm chat-ul că s-a schimbat faza vizualizată
+      window.dispatchEvent(new CustomEvent('bom-phase-view-changed', { detail: { phase: key } }));
+    }
   }, [completedPhases, dbActivePhase]);
 
   // ── Banner toate etapele confirmate ────────────────────────────
@@ -164,7 +181,7 @@ export const BOMPhaseWizard = ({
               className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white hover:bg-slate-800 font-bold rounded-xl transition-all shadow-md shadow-slate-900/20"
             >
               <Briefcase className="w-5 h-5" />
-              Caută Constructori (Publică)
+              Publică Proiectul
             </button>
             
             <button

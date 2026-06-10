@@ -56,7 +56,7 @@ export const Step2Terrain = ({ data, updateData }: Props) => {
   ];
 
   return (
-    <div className="h-full flex flex-col md:flex-row gap-8 pb-10">
+    <div className="flex flex-col md:flex-row gap-8 pb-10">
       {/* Partea Stângă: Date Teren */}
       <div className="w-full md:w-2/5 flex flex-col gap-6 overflow-y-auto pr-2">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={springConfig}>
@@ -182,13 +182,13 @@ export const Step2Terrain = ({ data, updateData }: Props) => {
             center={data.lat ? [data.lat, data.lng!] : [45.9432, 24.9668]}
             zoom={19}
             scrollWheelZoom={true}
-            className="w-full h-full bg-slate-100"
+            className="absolute inset-0 w-full h-full bg-slate-100"
           >
             <TileLayer
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               attribution='Tiles &copy; Esri'
             />
-            {data.polygonLatLngs.length > 0 && (
+            {data.polygonLatLngs && data.polygonLatLngs.length > 0 && (
               <>
                 <MapBoundsController positions={data.polygonLatLngs} />
                 <Polygon

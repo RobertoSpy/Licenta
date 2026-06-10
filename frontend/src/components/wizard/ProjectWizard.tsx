@@ -83,9 +83,41 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
   
   const { projectId, isLoading, restoredData, restoredStep, clearProject } = useProjectGuard();
 
-  // Chat Global pentru Wizard
-  const { messages, isStreaming, sendMessage: originalSendMessage, addSystemMessage, unreadCount, markAsRead } = useZidarioChat('wizard', projectId || 0, formData as unknown as Record<string, unknown>);
+  const contextForAi = useMemo(() => {
+    const context: Partial<ProjectFormData> = {
+      title: formData.title,
+      buildingPurpose: formData.buildingPurpose,
+      lat: formData.lat,
+      lng: formData.lng,
+      plotAreaSqm: formData.plotAreaSqm,
+      county: formData.county,
+      locality: formData.locality,
+      seismicZone: formData.seismicZone,
+      frostDepthCm: formData.frostDepthCm,
+    };
+    if (currentStep >= 2) {
+      context.soilType = formData.soilType;
+      context.slopePercent = formData.slopePercent;
+      context.streetOrientation = formData.streetOrientation;
+      context.soilNotes = formData.soilNotes;
+    }
+    if (currentStep >= 3) {
+      context.houseStyle = formData.houseStyle;
+      context.hasBasement = formData.hasBasement;
+      context.hasGroundFloor = formData.hasGroundFloor;
+      context.upperFloorsCount = formData.upperFloorsCount;
+      context.hasMansard = formData.hasMansard;
+    }
+    if (currentStep >= 4) {
+      context.maxAllowedFloors = formData.maxAllowedFloors;
+      context.minFoundationDepthCm = formData.minFoundationDepthCm;
+      context.zoningRestrictions = formData.zoningRestrictions;
+    }
+    return context as Record<string, unknown>;
+  }, [formData, currentStep]);
 
+  // Chat Global pentru Wizard
+  const { messages, isStreaming, sendMessage: originalSendMessage, addSystemMessage, unreadCount, markAsRead } = useZidarioChat('wizard', projectId || 0, contextForAi);
   // Tutor Educațional
   useScreenTutor({
     screenId: `step${currentStep}`,

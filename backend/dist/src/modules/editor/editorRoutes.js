@@ -14,6 +14,7 @@ router.get('/snapshots/:projectId', tenantGuard_1.tenantGuard, editorController_
 router.get('/snapshots/single/:id', editorController_1.getSnapshot);
 router.get('/latest/:projectId', tenantGuard_1.tenantGuard, editorController_1.getLatestSnapshot);
 router.patch('/snapshots/:id/publish', tenantGuard_1.tenantGuard, editorController_1.publishSnapshot);
+router.patch('/latest/:projectId/publish', tenantGuard_1.tenantGuard, editorController_1.publishLatestSnapshot);
 router.delete('/snapshots/:id', editorController_1.deleteSnapshot);
 // AI Conformitate — SSE stream
 router.post('/validate-conformity', (0, validateMiddleware_1.validateRequest)(validateMiddleware_1.validateConformitySchema), editorController_1.validateConformity);

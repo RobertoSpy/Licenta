@@ -7,6 +7,7 @@ import {
   getSnapshot,
   getLatestSnapshot,
   publishSnapshot,
+  publishLatestSnapshot,
   deleteSnapshot,
   validateConformity,
   explainConformity,
@@ -26,6 +27,7 @@ router.get('/snapshots/:projectId', tenantGuard, listSnapshots);
 router.get('/snapshots/single/:id', getSnapshot);
 router.get('/latest/:projectId', tenantGuard, getLatestSnapshot);
 router.patch('/snapshots/:id/publish', tenantGuard, publishSnapshot);
+router.patch('/latest/:projectId/publish', tenantGuard, publishLatestSnapshot);
 router.delete('/snapshots/:id', deleteSnapshot);
 
 // AI Conformitate — SSE stream

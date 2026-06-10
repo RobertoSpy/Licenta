@@ -90,7 +90,7 @@ export const BOMPhaseCard = ({
             <div className="flex flex-col items-center justify-center h-full text-center py-10 gap-4">
               <AlertCircle className="w-10 h-10 text-slate-300" />
               <p className="text-slate-500 text-sm max-w-sm leading-relaxed">{phase.emptyNote}</p>
-              {phase.key === 'instalatii' && (
+              {(phase.key as string) === 'instalatii' && (
                 <p className="text-xs text-buildorange font-medium">
                   Poți confirma această etapă și continua cu finisajele.
                 </p>

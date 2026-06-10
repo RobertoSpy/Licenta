@@ -214,7 +214,12 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
         name: true,
         role: true,
         isVerified: true,
-        createdAt: true
+        createdAt: true,
+        contractor: {
+          select: {
+            isVerified: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -222,6 +227,27 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
   } catch (error: any) {
     console.error('[AdminController.getUsers] Eroare:', error);
     res.status(500).json({ success: false, error: 'Eroare la preluarea utilizatorilor.' });
+  }
+};
+
+export const toggleContractorVerification = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = parseInt(req.params.id as string, 10);
+    const contractor = await prisma.contractorProfile.findUnique({ where: { userId } });
+    if (!contractor) {
+      res.status(404).json({ success: false, error: 'Profil de constructor negăsit.' });
+      return;
+    }
+
+    const updated = await prisma.contractorProfile.update({
+      where: { userId },
+      data: { isVerified: !contractor.isVerified }
+    });
+
+    res.json({ success: true, isVerified: updated.isVerified });
+  } catch (error: any) {
+    console.error('[AdminController.toggleContractorVerification] Eroare:', error);
+    res.status(500).json({ success: false, error: 'Eroare la modificarea statusului.' });
   }
 };
 

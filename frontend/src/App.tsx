@@ -34,6 +34,14 @@ import { CookieConsent } from './components/layout/CookieConsent';
 
 import { useAuth } from './context/useAuth';
 
+function RootRedirect() {
+  const { user, isAuthenticated } = useAuth();
+  if (!isAuthenticated || !user) return <LandingPage />;
+  if (user.role === 'ADMIN') return <Navigate to="/admin" replace />;
+  if (user.role === 'CONTRACTOR') return <Navigate to="/contractor" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
+
 function App() {
   const { isLoading, isAuthenticated } = useAuth();
 
@@ -48,75 +56,72 @@ function App() {
   return (
     <>
       <Routes>
-        <Route 
-          path="/" 
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+
+        <Route
+          path="/dashboard"
           element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />
-          } 
-        />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<MyProjects />} />
+          <Route path="profile" element={<UserProfile />} />
+          <Route path="market" element={<MarketAnalysis />} />
+          <Route path="materials" element={<Materials />} />
+          <Route path="experts" element={<Experts />} />
+          <Route path="projects/:id" element={<ProjectDetail />} />
+          <Route path="projects/:id/editor" element={<ProjectEditor />} />
+          <Route path="projects/:id/bom" element={<ProjectBOM />} />
+          <Route path="projects/:id/timeline" element={<ProjectTimeline />} />
+          <Route path="projects/:id/contractors" element={<ContractorsMarketplace />} />
+          <Route path="projects/:id/quotes" element={<MyQuotesClient />} />
+        </Route>
 
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<MyProjects />} />
-        <Route path="profile" element={<UserProfile />} />
-        <Route path="market" element={<MarketAnalysis />} />
-        <Route path="materials" element={<Materials />} />
-        <Route path="experts" element={<Experts />} />
-        <Route path="projects/:id" element={<ProjectDetail />} />
-        <Route path="projects/:id/editor" element={<ProjectEditor />} />
-        <Route path="projects/:id/bom" element={<ProjectBOM />} />
-        <Route path="projects/:id/timeline" element={<ProjectTimeline />} />
-        <Route path="projects/:id/contractors" element={<ContractorsMarketplace />} />
-        <Route path="projects/:id/quotes" element={<MyQuotesClient />} />
-      </Route>
+        <Route
+          path="/contractor"
+          element={
+            <ProtectedRoute>
+              <ContractorDashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="quotes" replace />} />
+          <Route path="feed" element={<ContractorFeed />} />
+          <Route path="quotes" element={<QuoteRequestsList />} />
+          <Route path="market" element={<MarketAnalysis />} />
+          <Route path="materials" element={<Materials />} />
+          <Route path="experts" element={<Experts />} />
+          <Route path="profile" element={<ProfileEdit />} />
+        </Route>
 
-      <Route
-        path="/contractor"
-        element={
-          <ProtectedRoute>
-            <ContractorDashboardLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="quotes" replace />} />
-        <Route path="feed" element={<ContractorFeed />} />
-        <Route path="quotes" element={<QuoteRequestsList />} />
-        <Route path="market" element={<MarketAnalysis />} />
-        <Route path="profile" element={<ProfileEdit />} />
-      </Route>
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="users" replace />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="materials" element={<AdminMaterials />} />
+        </Route>
 
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute>
-            <AdminDashboardLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="users" replace />} />
-        <Route path="users" element={<AdminUsers />} />
-        <Route path="materials" element={<AdminMaterials />} />
-      </Route>
+        {/* Rute publice — Juridic */}
+        <Route path="/terms" element={<TermsAndConditions />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
 
-      {/* Rute publice — Juridic */}
-      <Route path="/terms" element={<TermsAndConditions />} />
-      <Route path="/privacy" element={<PrivacyPolicy />} />
-
-      {/* Orice altă rută ne-existentă (Fallback) */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
-    <CookieConsent />
+        {/* Orice altă rută ne-existentă (Fallback) */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+      <CookieConsent />
     </>
   );
 }

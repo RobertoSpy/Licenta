@@ -193,11 +193,11 @@ export const ProjectEditor: React.FC = () => {
         setProjectTitle(project.title ?? 'Proiect');
         setProjectId(projectId);
 
-        // Îrcărcăm planul parterului din DB
-        const parterElements = await editorApi.loadFloor(projectId, 'parter');
-        if (parterElements && parterElements.length > 0) {
-          // Am plan salvat — îll încărcăm
-          switchFloor('parter', parterElements);
+        // Încărcăm planul parterului din DB
+        const savedState = await editorApi.loadFloor(projectId, 'parter');
+        if (savedState && savedState.elements && savedState.elements.length > 0) {
+          // Am plan salvat — îl încărcăm
+          switchFloor('parter', savedState);
         } else {
           // Plan nou — generăm din datele proiectului
           initializeFromProject(project);
@@ -216,7 +216,16 @@ export const ProjectEditor: React.FC = () => {
     if (isSaving) return;
     setIsSaving(true);
     try {
-      await editorApi.saveFloor(projectId, activeFloor, elements, 'Salvare manuală');
+      const fullState = {
+        elements: useEditorState.getState().elements,
+        dimensions: useEditorState.getState().dimensions,
+        houseShape: useEditorState.getState().houseShape,
+        activeRooms: useEditorState.getState().activeRooms,
+        streetOrientation: useEditorState.getState().streetOrientation,
+        addedOpenings: useEditorState.getState().addedOpenings,
+        userDeletedOpenings: useEditorState.getState().userDeletedOpenings,
+      };
+      await editorApi.saveFloor(projectId, activeFloor, fullState, 'Salvare manuală');
       markClean();
       setLastSaved(new Date());
     } catch (err) {
@@ -237,14 +246,23 @@ export const ProjectEditor: React.FC = () => {
     setIsSwitchingFloor(true);
     try {
       // 1. Salvează etajul curent
-      await editorApi.saveFloor(projectId, activeFloor, elements);
+      const fullState = {
+        elements: useEditorState.getState().elements,
+        dimensions: useEditorState.getState().dimensions,
+        houseShape: useEditorState.getState().houseShape,
+        activeRooms: useEditorState.getState().activeRooms,
+        streetOrientation: useEditorState.getState().streetOrientation,
+        addedOpenings: useEditorState.getState().addedOpenings,
+        userDeletedOpenings: useEditorState.getState().userDeletedOpenings,
+      };
+      await editorApi.saveFloor(projectId, activeFloor, fullState);
       markClean();
 
       // 2. Încarcă elementele etajului nou
-      const newElements = await editorApi.loadFloor(projectId, newFloor);
+      const newState = await editorApi.loadFloor(projectId, newFloor);
 
       // 3. Comutăm store-ul
-      switchFloor(newFloor, newElements ?? []);
+      switchFloor(newFloor, newState ?? { elements: [] });
       setLastSaved(new Date());
     } catch (err) {
       console.error('[ProjectEditor] Eroare la comutarea etajului:', err);
@@ -289,11 +307,15 @@ export const ProjectEditor: React.FC = () => {
     }
   }, [projectId, projectTitle]);
 
-  // Salvează planul curent (dacă e cazul) și merge mai departe la Deviz
   const handleContinue = useCallback(async () => {
     if (!canGoNext) return;
     if (isDirty) {
       await handleManualSave();
+    }
+    try {
+      await apiPrivate.patch(`/editor/latest/${projectId}/publish`);
+    } catch (err) {
+      console.error('[ProjectEditor] Auto-publish failed:', err);
     }
     navigate(`/dashboard/projects/${projectId}/bom`);
   }, [canGoNext, isDirty, handleManualSave, navigate, projectId]);

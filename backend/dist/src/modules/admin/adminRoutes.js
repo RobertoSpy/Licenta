@@ -17,6 +17,7 @@ router.post('/scrape/add', adminController_1.addMaterialFromUrl);
 // Toate rutele de aici în jos necesită rol de admin
 router.use(requireAdmin_1.requireAdmin);
 router.get('/users', adminController_1.getUsers);
+router.patch('/users/:id/verify-contractor', adminController_1.toggleContractorVerification);
 router.get('/materials', adminController_1.getAllMaterials);
 router.post('/materials/manual', adminController_1.addMaterialManual);
 router.post('/materials/import-csv', upload.single('csvFile'), adminController_1.importMaterialsCsv);

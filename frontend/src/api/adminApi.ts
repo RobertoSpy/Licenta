@@ -7,6 +7,9 @@ export interface UserDTO {
   role: string;
   isVerified: boolean;
   createdAt: string;
+  contractor?: {
+    isVerified: boolean;
+  };
 }
 
 export interface MaterialDTO {
@@ -26,6 +29,11 @@ export const adminApi = {
   getUsers: async (): Promise<UserDTO[]> => {
     const res = await apiPrivate.get('/admin/users');
     return res.data.users;
+  },
+
+  toggleContractorVerification: async (id: number): Promise<boolean> => {
+    const res = await apiPrivate.patch(`/admin/users/${id}/verify-contractor`);
+    return res.data.isVerified;
   },
 
   // Materials

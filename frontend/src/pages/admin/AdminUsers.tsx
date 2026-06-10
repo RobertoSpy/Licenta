@@ -23,6 +23,21 @@ export default function AdminUsers() {
     }
   };
 
+  const handleToggleContractor = async (userId: number) => {
+    try {
+      const newStatus = await adminApi.toggleContractorVerification(userId);
+      setUsers(prev => prev.map(u => {
+        if (u.id === userId && u.contractor) {
+          return { ...u, contractor: { ...u.contractor, isVerified: newStatus } };
+        }
+        return u;
+      }));
+    } catch (err) {
+      console.error(err);
+      alert('Eroare la modificarea statusului constructorului.');
+    }
+  };
+
   const filteredUsers = users.filter(u => 
     u.email.toLowerCase().includes(searchTerm.toLowerCase()) || 
     (u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -104,11 +119,42 @@ export default function AdminUsers() {
                       </div>
                     </td>
                     <td className="py-4">
-                      {user.isVerified ? (
-                        <span className="text-emerald-400 text-xs font-bold uppercase">Verificat</span>
-                      ) : (
-                        <span className="text-slate-500 text-xs font-bold uppercase">Neverificat</span>
-                      )}
+                      <div className="flex flex-col gap-2">
+                        {user.role === 'CONTRACTOR' ? (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-400 text-[10px] uppercase">Email:</span>
+                              {user.isVerified ? (
+                                <span className="text-emerald-400 text-xs font-bold uppercase">Verificat</span>
+                              ) : (
+                                <span className="text-slate-500 text-xs font-bold uppercase">Neverificat</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-400 text-[10px] uppercase">Firma (CUI):</span>
+                              <button 
+                                onClick={() => handleToggleContractor(user.id)}
+                                className={`text-xs font-bold uppercase px-2 py-1 rounded transition-colors ${
+                                  user.contractor?.isVerified 
+                                    ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' 
+                                    : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                                }`}
+                              >
+                                {user.contractor?.isVerified ? 'Aprobat' : 'Neaprobat (Click)'}
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 text-[10px] uppercase">Email:</span>
+                            {user.isVerified ? (
+                              <span className="text-emerald-400 text-xs font-bold uppercase">Verificat</span>
+                            ) : (
+                              <span className="text-slate-500 text-xs font-bold uppercase">Neverificat</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="py-4 text-slate-400">
                       {new Date(user.createdAt).toLocaleDateString('ro-RO', { year: 'numeric', month: 'short', day: 'numeric' })}

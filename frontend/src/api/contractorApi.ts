@@ -22,6 +22,7 @@ export interface ContractorProfile {
     email: string;
     phone?: string;
   };
+  reviews?: any[];
 }
 
 export const contractorApi = {

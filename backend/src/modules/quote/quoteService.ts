@@ -2,22 +2,25 @@ import { prisma } from '../../lib/prisma';
 import { QuoteStatus, ContractorSpecialization } from '@prisma/client';
 
 const mapPhaseToSpecializations = (phaseName: string): ContractorSpecialization[] => {
-  switch (phaseName) {
+  // Strip the number prefix like "1. "
+  const name = phaseName.replace(/^\d+\.\s*/, '');
+  
+  switch (name) {
     case 'Fundație': return ['FUNDATII', 'CONSTRUCTII_GENERALE'];
     case 'Structură': return ['STRUCTURA', 'CONSTRUCTII_GENERALE'];
-    case 'Planșeu & Coroană': return ['PLANSEU', 'CONSTRUCTII_GENERALE'];
-    case 'Termoizolație & Hidroizolație': return ['IZOLATII', 'FINISAJE', 'CONSTRUCTII_GENERALE'];
+    case 'Planșeu': return ['PLANSEU', 'CONSTRUCTII_GENERALE'];
     case 'Acoperiș': return ['ACOPERIS', 'CONSTRUCTII_GENERALE'];
-    case 'Tâmplărie': return ['TAMPLARIE', 'CONSTRUCTII_GENERALE'];
-    case 'Instalații': return ['INSTALATII_ELECTRICE', 'INSTALATII_SANITARE', 'INSTALATII_TERMICE', 'CONSTRUCTII_GENERALE'];
     case 'Finisaje': return ['FINISAJE', 'CONSTRUCTII_GENERALE'];
-    case 'Amenajări Exterioare': return ['FINISAJE', 'CONSTRUCTII_GENERALE'];
+    case 'Tâmplărie': return ['TAMPLARIE', 'CONSTRUCTII_GENERALE'];
+    case 'Termoizolație': return ['IZOLATII', 'CONSTRUCTII_GENERALE'];
+    case 'Instalații Electrice': return ['INSTALATII_ELECTRICE', 'CONSTRUCTII_GENERALE'];
+    case 'Instalații Sanitare și Termice': return ['INSTALATII_SANITARE', 'CONSTRUCTII_GENERALE'];
     default: return ['CONSTRUCTII_GENERALE'];
   }
 }
 
 export const quoteService = {
-  async requestQuotes(projectId: number, contractorIds: number[], message?: string) {
+  async requestQuotes(projectId: number, contractorIds: number[], message?: string, phaseIds?: number[]) {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       include: { constructionPhases: true }
@@ -32,7 +35,14 @@ export const quoteService = {
     let quotesCreated = 0;
 
     for (const contractor of contractors) {
-      for (const phase of project.constructionPhases) {
+      // Filtrăm etapele dacă utilizatorul a selectat etape specifice
+      const phasesToProcess = phaseIds 
+        ? project.constructionPhases.filter(p => phaseIds.includes(p.id))
+        : project.constructionPhases;
+
+      for (const phase of phasesToProcess) {
+        if (phase.contractorId !== null) continue; // Skip already awarded phases
+
         const allowedSpecs = mapPhaseToSpecializations(phase.name);
         const canBid = contractor.specializations.some(spec => allowedSpecs.includes(spec));
 
@@ -89,7 +99,15 @@ export const quoteService = {
       where: { projectId },
       include: {
         contractor: {
-          include: { user: { select: { name: true, email: true, phone: true } } }
+          include: { 
+            user: { select: { name: true, email: true, phone: true } },
+            reviews: {
+              where: {
+                reviewerId: userId,
+                projectId: projectId
+              }
+            }
+          }
         },
         phases: true
       },
@@ -135,8 +153,11 @@ export const quoteService = {
       const phases = await prisma.constructionPhase.findMany({ where: { id: { in: data.selectedPhases } }});
       if (!phases || phases.length !== data.selectedPhases.length) throw new Error('Validation: Unele faze nu există');
       
-      // Validează specializarea pentru fiecare fază (sau măcar pe una din ele)
+      // Validează specializarea pentru fiecare fază și verifică dacă nu a fost deja atribuită
       for (const phase of phases) {
+          if (phase.contractorId !== null) {
+              throw new Error(`Validation: Etapa ${phase.name} este deja atribuită altei firme.`);
+          }
           const allowedSpecs = mapPhaseToSpecializations(phase.name);
           const canBid = profile.specializations.some(spec => allowedSpecs.includes(spec));
           if (!canBid) {

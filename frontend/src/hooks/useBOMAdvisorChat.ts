@@ -34,6 +34,7 @@ export function useBOMAdvisorChat(projectId: string) {
   const [completedPhases, setCompletedPhases] = useState<BomPhaseKey[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isPhaseStateLoaded, setIsPhaseStateLoaded] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const addSystemMessage = useCallback((content: string, requiresAnswer = true) => {
@@ -69,6 +70,8 @@ export function useBOMAdvisorChat(projectId: string) {
         }
       } catch {
         // silent
+      } finally {
+        if (isMounted) setIsPhaseStateLoaded(true);
       }
     };
 
@@ -225,6 +228,7 @@ export function useBOMAdvisorChat(projectId: string) {
     addSystemMessage,
     addLocalUserMessage,
     unreadCount,
-    markAsRead
+    markAsRead,
+    isPhaseStateLoaded
   };
 }

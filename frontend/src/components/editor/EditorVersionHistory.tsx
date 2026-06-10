@@ -113,7 +113,7 @@ export const EditorVersionHistory: React.FC<Props> = ({ projectId, onRestore }) 
     e.stopPropagation(); // nu triggera restore
     setPublishingId(snap.id);
     try {
-      await apiPrivate.patch(`/editor/snapshots/${snap.id}/publish`);
+      await apiPrivate.patch(`/editor/snapshots/${snap.id}/publish`, { projectId });
       setSnapshots((prev) =>
         prev.map((s) => ({ ...s, isPublished: s.id === snap.id }))
       );
