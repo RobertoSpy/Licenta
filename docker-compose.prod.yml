@@ -4,8 +4,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: always
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       PORT: 3000
@@ -22,8 +22,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL}
     restart: always
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     depends_on:
       - backend

@@ -1,0 +1,7 @@
+{
+    "_source": "INSSE Buletin Statistic Prețuri, actualizat manual",
+    "_lastUpdated": "T1 2026",
+    "_note": "Forța de muncă și energia nu sunt disponibile ca serie TEMPO CSV. Sursa: tabelele 15.A și 15.B din buletinul lunar INSSE.",
+    "laborIndexVsBase2021": 89.67,
+    "energyIndexVsBase2021": 57.2
+}

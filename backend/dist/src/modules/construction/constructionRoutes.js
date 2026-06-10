@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const constructionController_1 = require("./constructionController");
+const authMiddleware_1 = require("../../core/middleware/authMiddleware");
+const tenantGuard_1 = require("../../core/middleware/tenantGuard");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.protect);
+router.get('/:projectId', tenantGuard_1.tenantGuard, constructionController_1.getPhases);
+router.patch('/:projectId/phase/:phaseOrder/complete', tenantGuard_1.tenantGuard, constructionController_1.completePhase);
+exports.default = router;
