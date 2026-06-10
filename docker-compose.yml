@@ -20,7 +20,9 @@ services:
       - "6379:6379"
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     volumes:
@@ -42,7 +44,9 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     ports:
       - "${FRONTEND_PORT}:${FRONTEND_PORT}"
     volumes:
