@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { Material } from '@prisma/client';
 
-export type MaterialQueryType = 'STRICT_NORMATIVE' | 'NORMATIVE_BUDGET' | 'FREE_PREFERENCE';
+export type MaterialQueryType = 'STRICT_NORMATIVE' | 'NORMATIVE_BUDGET' | 'FREE_PREFERENCE' | 'CONDITIONAL_NORMATIVE';
 
 export interface MaterialQuery {
   type: MaterialQueryType;

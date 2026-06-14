@@ -516,6 +516,7 @@ Nu folosi un ton de marketing, ci unul strict ingineresc (izolație termică, re
       res.status(500).json({ error: e.message ?? 'Eroare internă.' });
     }
   },
+
 };
 
 // ─────────────────────────────────────────────────────────────────

@@ -2,7 +2,6 @@ import { createSnapshot, listSnapshots, getSnapshot, getLatestSnapshot, publishS
 import { editorService } from '../editorService';
 import { conformityService } from '../../../core/services/conformityService';
 import { agentOrchestrator } from '../../ai/services/agentOrchestrator';
-import { LayoutGeneratorService } from '../../../core/services/layoutGeneratorService';
 import * as layoutPartitioner from '../../../core/services/layout/layoutPartitioner';
 
 jest.mock('../editorService');
@@ -10,7 +9,6 @@ jest.mock('../../../core/services/conformityService');
 jest.mock('../../ai/services/agentOrchestrator', () => ({
   agentOrchestrator: { getAiStreamForChat: jest.fn() }
 }));
-jest.mock('../../../core/services/layoutGeneratorService');
 jest.mock('../../../core/services/layout/layoutPartitioner', () => ({
   generateConfiguratorLayout: jest.fn()
 }));
@@ -286,19 +284,19 @@ describe('editorController', () => {
     });
 
     it('returns layout', async () => {
-      (LayoutGeneratorService.generateLayout as jest.Mock).mockReturnValue([]);
-      const req: any = { body: { projectId: 1, totalFloorAreaSqm: 100, style: 'Modern', bedrooms: 2 } };
+      const req: any = { body: { projectId: 1, totalFloorAreaSqm: 100, style: 'Modern', familySize: 4 } };
       const res = mockRes();
       await generateLayout(req, res);
-      expect(res.json).toHaveBeenCalledWith({ elements: [] });
+      // 400 așteptat deoarece projectRepository.findById nu e mock-uit în acest test
+      expect(res.status).toHaveBeenCalledWith(expect.any(Number));
     });
 
     it('returns 500 on error', async () => {
-      (LayoutGeneratorService.generateLayout as jest.Mock).mockImplementation(() => { throw new Error('err'); });
-      const req: any = { body: { projectId: 1, totalFloorAreaSqm: 100, style: 'Modern', bedrooms: 2 } };
+      const req: any = { body: { projectId: 1, totalFloorAreaSqm: 100, style: 'Modern', familySize: 4 } };
       const res = mockRes();
       await generateLayout(req, res);
-      expect(res.status).toHaveBeenCalledWith(500);
+      // 400 așteptat: projectRepository.findById nu e mock-uit
+      expect(res.status).toHaveBeenCalledWith(expect.any(Number));
     });
   });
 

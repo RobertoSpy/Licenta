@@ -1,9 +1,11 @@
 import React from 'react';
 import { type ConformityRoom } from '../../hooks/useConformityCheck';
 import { useEditorState } from '../../hooks/useEditorState';
-import { CheckCircle2, AlertTriangle, XCircle, Home, Compass, Settings, CheckSquare, SquareDot, Sparkles, RefreshCw } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, Home, Compass, Settings, Sparkles } from 'lucide-react';
 import { AiRoomSuggestModal } from './AiRoomSuggestModal';
 import { calculateShapeArea } from '../../utils/layoutPartitioner';
+import LAYOUT_CONSTANTS from '../../data/layout-constants.json';
+
 
 interface Props {
   rooms: ConformityRoom[];
@@ -17,33 +19,16 @@ const statusConfig = {
   error:   { icon: <XCircle className="w-3.5 h-3.5 text-red-500" />,          bg: 'bg-red-50/50',     border: 'border-red-100',     text: 'text-red-700'     },
 };
 
-const ALL_AVAILABLE_ROOMS = [
-  'Living',
-  'Bucătărie',
-  'Dormitor 1',
-  'Dormitor 2',
-  'Dormitor 3',
-  'Baie',
-  'WC',
-  'Hol',
-  'Debara',
-  'Birou'
-];
-
 export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectData }) => {
   const {
     houseShape,
     dimensions,
-    activeRooms,
     setHouseShape,
     setDimensions,
-    toggleRoom,
     selectElement,
     selectedId,
     isAiModalOpen,
     setAiModalOpen,
-    regenerateLayout,
-    isLayoutPendingRegeneration,
   } = useEditorState();
 
   const totalUsable = rooms.reduce((sum, r) => sum + r.usableSqm, 0);
@@ -69,22 +54,17 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
             <Home className="w-3.5 h-3.5 text-slate-400" /> 1. Forma Casei
           </h3>
           <div className="grid grid-cols-2 gap-2">
-            {([
-              { id: 'rectangle', label: 'Dreptunghi' },
-              { id: 'l_shape', label: 'Forma L' },
-              { id: 'u_shape', label: 'Forma U' },
-              { id: 't_shape', label: 'Forma T' }
-            ] as const).map((shape) => (
+            {LAYOUT_CONSTANTS.shapes.map((shape) => (
               <button
-                key={shape.id}
-                onClick={() => setHouseShape(shape.id)}
+                key={shape.value}
+                onClick={() => setHouseShape(shape.value as any)}
                 className={`py-2 px-3 text-xs font-bold rounded-xl border text-center transition-all ${
-                  houseShape === shape.id
+                  houseShape === shape.value
                     ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm shadow-orange-100'
                     : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
                 }`}
               >
-                {shape.label}
+                {shape.label.split(' (')[0]}
               </button>
             ))}
           </div>
@@ -153,13 +133,8 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
           )}
         </div>
 
-        {/* Section 3: Rooms Checklist */}
+        {/* AI suggestion button - moved up from section 3 */}
         <div className="space-y-2">
-          <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-            <CheckSquare className="w-3.5 h-3.5 text-slate-400" /> 3. Camere Dorite
-          </h3>
-
-          {/* AI suggestion button */}
           <button
             id="ai-room-suggest-btn"
             onClick={() => setAiModalOpen(true)}
@@ -168,32 +143,6 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
             <Sparkles className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
             Sugestie AI Camere
           </button>
-          <div className="grid grid-cols-2 gap-2">
-            {(() => {
-              const dynamicRooms = activeRooms
-                .map((r) => r.label)
-                .filter((label) => !ALL_AVAILABLE_ROOMS.includes(label));
-              const combinedRooms = [...ALL_AVAILABLE_ROOMS, ...Array.from(new Set(dynamicRooms))];
-              
-              return combinedRooms.map((roomLabel) => {
-                const isChecked = activeRooms.some((r) => r.label === roomLabel);
-                return (
-                  <button
-                    key={roomLabel}
-                    onClick={() => toggleRoom(roomLabel, !isChecked)}
-                    className={`flex items-center gap-2 px-3 py-2 text-left rounded-xl border transition-all text-xs font-semibold ${
-                      isChecked
-                        ? 'border-orange-200 bg-orange-50/50 text-slate-800'
-                        : 'border-slate-100 hover:bg-slate-50 text-slate-500 bg-slate-50/20'
-                    }`}
-                  >
-                    <SquareDot className={`w-3.5 h-3.5 shrink-0 ${isChecked ? 'text-orange-500' : 'text-slate-300'}`} />
-                    <span className="truncate">{roomLabel}</span>
-                  </button>
-                );
-              });
-            })()}
-          </div>
         </div>
 
         {/* Section 4: Live verification summary */}
@@ -256,31 +205,6 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
               );
             })}
           </div>
-        </div>
-
-        {/* Section 5: Regenerate button */}
-        <div className="pt-3 border-t border-slate-100 relative">
-          {isLayoutPendingRegeneration && (
-            <div className="absolute -top-10 left-0 right-0 bg-amber-100 border border-amber-200 text-amber-800 text-[10px] font-bold p-2 rounded-xl text-center mb-2 shadow-sm animate-pulse">
-              <AlertTriangle className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" />
-              Ai modificat camerele. Regenerează!
-            </div>
-          )}
-          <button
-            onClick={regenerateLayout}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl font-bold text-xs transition-all ${
-              isLayoutPendingRegeneration 
-                ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-200' 
-                : 'bg-slate-900 hover:bg-slate-800 text-white'
-            }`}
-            title="Regenerează planul complet din camerele active de mai sus. Atenție: schimbările manuale vor fi pierdute."
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLayoutPendingRegeneration ? 'animate-spin' : ''}`} />
-            Regenerează Plan
-          </button>
-          <p className="text-[10px] text-slate-400 text-center mt-1.5">
-            Recalculează pozițiile tuturor camerelor
-          </p>
         </div>
 
       </div>

@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { editorApi } from '../api/editorApi';
+import { aiApi } from '../api/aiApi';
 
 export interface ConfiguratorRoom {
   id: string;
+  type?: string;
   label: string;
   ratioValue: number;
   minSqm?: number;
@@ -78,12 +80,14 @@ interface EditorSnapshot {
   timestamp: number;
 }
 
-export type FloorKey = 'parter' | 'etaj1';
+export type FloorKey = 'parter' | 'etaj1' | 'subsol';
 
 export interface ProjectInitData {
   houseStyle?: string | null;
   streetOrientation?: string | null;
   plotAreaSqm?: number | null;
+  familySize?: number | null;
+  houseAreaSqm?: number | null;
 }
 
 interface EditorStore {
@@ -97,7 +101,6 @@ interface EditorStore {
   isSnapEnabled: boolean;
   showGrid: boolean;
   isDirty: boolean;
-  isLayoutPendingRegeneration: boolean;
 
   // Etaj activ
   activeFloor: FloorKey;
@@ -141,10 +144,7 @@ interface EditorStore {
   // Configurator Actions
   setHouseShape: (shape: 'rectangle' | 'l_shape' | 'u_shape' | 't_shape') => void;
   setDimensions: (dims: Partial<ConfiguratorDimensions>) => void;
-  toggleRoom: (label: string, checked: boolean) => void;
-  updateRoomRatio: (id: string, ratioValue: number) => void;
   swapRooms: (id1: string, id2: string) => void;
-  regenerateLayout: () => void;
   initializeFromProject: (project: ProjectInitData) => void;
   addManualOpening: (roomId: string, type: 'door' | 'window', side: 'top' | 'bottom' | 'left' | 'right') => void;
   /** Înlocuiește lista de camere active cu sugestia AI și regenerează layout-ul. */
@@ -154,39 +154,6 @@ interface EditorStore {
 }
 
 const MAX_UNDO = 50;
-
-const DEFAULT_ROOMS: ConfiguratorRoom[] = [
-  {
-    id: 'r-1', label: 'Living', ratioValue: 3, zone: 'zi',
-    naturalLight: true, orientation: ['S', 'SE'],
-    hasDoorTo: ['Hol', 'Bucătărie'],
-    isCirculation: false,
-  },
-  {
-    id: 'r-2', label: 'Bucătărie', ratioValue: 2, zone: 'zi',
-    naturalLight: true, orientation: ['E', 'N'],
-    hasDoorTo: ['Hol'],
-    isCirculation: false,
-  },
-  {
-    id: 'r-3', label: 'Dormitor 1', ratioValue: 2, zone: 'noapte',
-    naturalLight: true, orientation: ['S', 'E'],
-    hasDoorTo: ['Hol'],
-    isCirculation: false,
-  },
-  {
-    id: 'r-4', label: 'Baie', ratioValue: 1.5, zone: 'noapte',
-    naturalLight: false,
-    hasDoorTo: ['Hol'],
-    isCirculation: false,
-  },
-  {
-    id: 'r-5', label: 'Hol', ratioValue: 1.2, zone: 'distributie',
-    naturalLight: false,
-    hasDoorTo: [],
-    isCirculation: true,
-  },
-];
 
 const INITIAL_SHAPE: 'rectangle' | 'l_shape' | 'u_shape' | 't_shape' = 'rectangle';
 const INITIAL_DIMS: ConfiguratorDimensions = {
@@ -208,7 +175,6 @@ export const useEditorState = create<EditorStore>((set, get) => ({
   isSnapEnabled: true,
   showGrid: true,
   isDirty: false,
-  isLayoutPendingRegeneration: false,
   undoStack: [],
   redoStack: [],
 
@@ -219,7 +185,7 @@ export const useEditorState = create<EditorStore>((set, get) => ({
   // Configurator initial state
   houseShape: INITIAL_SHAPE,
   dimensions: INITIAL_DIMS,
-  activeRooms: DEFAULT_ROOMS,
+  activeRooms: [],
   streetOrientation: 'S',
   addedOpenings: [],
   userDeletedOpenings: [],
@@ -381,13 +347,11 @@ export const useEditorState = create<EditorStore>((set, get) => ({
           wingLengthM: parseFloat(((dimensions.wingLengthM ?? 4) * scale).toFixed(1))
         };
         
-        set({ houseShape: newShape, dimensions: newDims });
+        set({ houseShape: newShape, dimensions: newDims, isDirty: true });
       } else {
-        set({ houseShape: newShape });
+        set({ houseShape: newShape, isDirty: true });
       }
     }
-    
-    get().regenerateLayout();
   },
 
   setDimensions: (dims) => {
@@ -423,41 +387,6 @@ export const useEditorState = create<EditorStore>((set, get) => ({
     set({ dimensions: newDims, elements: newElements, isDirty: true });
   },
 
-  toggleRoom: (label, checked) => {
-    get().pushToUndo();
-    const { activeRooms } = get();
-    let newRooms = [...activeRooms];
-
-    if (checked) {
-      // Check if it already exists to prevent duplicate entries of unique types
-      const exists = activeRooms.some((r) => r.label === label);
-      if (!exists) {
-        let defaultRatio = 2;
-        const norm = label.toLowerCase();
-        if (norm.includes('baie') || norm.includes('wc')) defaultRatio = 1;
-        if (norm.includes('debara') || norm.includes('camara')) defaultRatio = 0.8;
-        if (norm.includes('living') || norm.includes('sufragerie')) defaultRatio = 3;
-        
-        newRooms.push({
-          id: `r-${Date.now()}`,
-          label,
-          ratioValue: defaultRatio,
-        });
-      }
-    } else {
-      newRooms = activeRooms.filter((r) => r.label !== label);
-    }
-
-    set({ activeRooms: newRooms, isLayoutPendingRegeneration: true });
-  },
-
-  updateRoomRatio: (id, ratioValue) => {
-    get().pushToUndo();
-    const { activeRooms } = get();
-    const newRooms = activeRooms.map((r) => (r.id === id ? { ...r, ratioValue } : r));
-    set({ activeRooms: newRooms, isLayoutPendingRegeneration: true });
-  },
-
   swapRooms: (id1, id2) => {
     if (id1 === id2) return;
     get().pushToUndo();
@@ -479,42 +408,6 @@ export const useEditorState = create<EditorStore>((set, get) => ({
       });
       set({ elements: newElements, isDirty: true });
     }
-  },
-
-  regenerateLayout: () => {
-    set({ isLayoutPendingRegeneration: true });
-    
-    if ((window as any).layoutDebounceTimeout) {
-      clearTimeout((window as any).layoutDebounceTimeout);
-    }
-    
-    (window as any).layoutDebounceTimeout = setTimeout(async () => {
-      const { houseShape, dimensions, activeRooms, streetOrientation, userDeletedOpenings, addedOpenings, projectId } = get();
-      if (!projectId) return; // Cannot generate layout without projectId
-      try {
-        let elements = await editorApi.generateConfiguratorLayout(projectId, houseShape, dimensions, activeRooms, streetOrientation);
-
-        // Filter out deleted openings
-        elements = elements.filter((el: CanvasElement) => {
-          if (el.type === 'door' || el.type === 'window') {
-            const matchesDeleted = userDeletedOpenings.some(del => {
-              const dist = Math.hypot(el.x - del.x, el.y - del.y);
-              return dist < 10 && el.type === del.type;
-            });
-            return !matchesDeleted;
-          }
-          return true;
-        });
-
-        // Append manually added openings
-        elements = [...elements, ...addedOpenings];
-
-        set({ elements, isDirty: true, isLayoutPendingRegeneration: false });
-      } catch (err) {
-        console.error('Failed to regenerate layout', err);
-        set({ isLayoutPendingRegeneration: false });
-      }
-    }, 300);
   },
 
   initializeFromProject: (project: ProjectInitData) => {
@@ -630,7 +523,6 @@ export const useEditorState = create<EditorStore>((set, get) => ({
       orientation: r.orientation,
     }));
     set({ activeRooms: newRooms, addedOpenings: [], userDeletedOpenings: [] });
-    get().regenerateLayout();
   },
 }));
 

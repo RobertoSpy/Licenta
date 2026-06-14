@@ -63,11 +63,10 @@ export interface ContextMultipliers {
   concreteClass: ConcreteClass | 'C30/37-XF4';
 
   // ── Selecții Inteligente Materiale (AI defaults) ───────────────
-  exteriorWallCode: string;
-  interiorWallCode: string;
-  insulationExteriorCode: string;
-  insulationRoofCode: string;
-  windowsCode: string;
+  // ELIMINAT: exteriorWallCode, interiorWallCode, insulationExteriorCode,
+  // insulationRoofCode, windowsCode — mutate în bom-formulas.json ca
+  // defaultMaterialCode + upgrades (data-driven, fără hardcode în TS).
+  // Singurul cod rămas este rebarCode, folosit de STRICT_NORMATIVE (engineKey='rebarCode').
   rebarCode: string;
 
   // ── Stâlpișori zidărie confinată ───────────────────────────────
@@ -77,7 +76,14 @@ export interface ContextMultipliers {
   seismic_note: string;
   soil_note: string;
   concrete_note: string;
-  materials_note: string;
+
+  // ── Coeficient subsol (Indicii cost în construcții, Cap. 3) ───────────────
+  // Subsolul în devizare se echivalează la 50% din costul unui nivel suprateran,
+  // datorită absenței finisajelor locuibile și prezenței hidroizolației și
+  // lucrărilor de săpătură care compensează diferit față de suprastructură.
+  // Sursa: Indicii cost în construcții (INSSE) — Coeficient de echivalare nivel subteran = 0.50
+  basement_sqm_coefficient: number;  // 0.50 dacă are subsol, 0 dacă nu
+  basement_note: string;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -224,24 +230,24 @@ function calcConcreteClass(ag: number, frostDepthCm: number, soilType?: string |
   const needsUpgrade = ag >= 0.25 || frostDepthCm > 90;
   if (needsUpgrade) {
     const reasons: string[] = [];
-    if (ag >= 0.25) reasons.push(`ag=${ag}g ≥ 0.25g`);
-    if (frostDepthCm > 90) reasons.push(`îngheț ${frostDepthCm}cm > 90cm (XF2)`);
+    if (ag >= 0.25) reasons.push(`ag=${ag}g \u2265 0.25g`);
+    if (frostDepthCm > 90) reasons.push(`\u00eenghe\u021b ${frostDepthCm}cm > 90cm (XF2)`);
     return {
       code: 'STANDARD_BETON_C25_30',
       class: 'C25/30-XF2',
-      note: `C25/30-XF2 aplicat automat: ${reasons.join(' + ')} — NE012-1:2022 Tab.E.1`,
+      note: `C25/30-XF2 aplicat automat: ${reasons.join(' + ')} \u2014 NE012-1:2022 Tab.E.1`,
     };
   }
   return {
     code: 'STANDARD_BETON_C20_25',
     class: 'C20/25-XC2',
-    note: `C20/25-XC2: ag=${ag}g <0.25g și îngheț ${frostDepthCm}cm ≤90cm — NE012-1:2022 Tab.E.1`,
+    note: `C20/25-XC2: ag=${ag}g <0.25g \u0219i \u00eenghe\u021b ${frostDepthCm}cm \u226490cm \u2014 NE012-1:2022 Tab.E.1`,
   };
 }
 
-// ─────────────────────────────────────────────────────────────────
-// FUNCȚIA PRINCIPALĂ — EXPORT
-// ─────────────────────────────────────────────────────────────────
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// FUNC\u021aIA PRINCIPAL\u0102 \u2014 EXPORT
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 export function buildContextMultipliers(
   input: ProjectContextInput,
@@ -252,74 +258,38 @@ export function buildContextMultipliers(
   }
 ): ContextMultipliers {
   const ag = parseAg(input.seismicZone);
-  const frostDepthCm = input.frostDepthCm ?? 80; 
+  const frostDepthCm = input.frostDepthCm ?? 80;
   const floors = Math.max(1, input.totalFloors ?? 1);
 
   const seismicRule = getSeismicRule(ag);
   const soilRule = getSoilRule(input.soilType);
   const foundationWidthM = calcFoundationWidth(floors, soilRule.concreteMult);
   const concreteInfo = calcConcreteClass(ag, frostDepthCm, input.soilType);
-  
+
   let frostDepthM = Math.max((frostDepthCm + 10) / 100, 0.80);
   if (input.hasBasement) {
-    // Dacă avem subsol, adâncimea fundației / săpăturii crește considerabil
-    frostDepthM = 2.80; // adâncime tipică subsol rezidențial
+    frostDepthM = 2.80; // ad\u00e2ncime tipic\u0103 subsol reziden\u021bial
   }
 
-  const interiorWallsM = planMetrics?.interiorWallsM ?? 20 * floors; 
+  const interiorWallsM = planMetrics?.interiorWallsM ?? 20 * floors;
   const countWindows = planMetrics?.countWindows ?? 6 * floors;
   const countExtDoors = planMetrics?.countExteriorDoors ?? 1;
 
   const count_corners_and_intersections = Math.round(
-    4 
-    + Math.floor(interiorWallsM / 4.5) 
-    + countWindows 
-    + countExtDoors 
+    4
+    + Math.floor(interiorWallsM / 4.5)
+    + countWindows
+    + countExtDoors
   );
 
-  // LOGICA INTELIGENTĂ MATERIALE
-  let exteriorWallCode = 'STANDARD_BCA_25';
-  let interiorWallCode = 'STANDARD_BCA_12';
-  let insulationExteriorCode = 'polistiren-eps-10cm';
-  let insulationRoofCode = 'vata-minerala-15cm';
-  let windowsCode = 'STANDARD_FEREASTRA_PVC';
+  // \u2500\u2500\u2500 rebarCode: STRICT_NORMATIVE (P100-1/2013 + NE012-1:2022) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // P\u0103strat \u00een contextMultiplierEngine pentru c\u0103 e determinist normativ (nu selec\u021bie liber\u0103).
+  // Toate celelalte materiale (zid\u0103rie, ferestre, izola\u021bie) au fost mutate
+  // \u00een bom-formulas.json ca defaultMaterialCode + upgrades (data-driven).
   let rebarCode = 'STANDARD_FIER_12';
-
-  const isColdClimate = frostDepthCm > 90;
-  const isHighSeismic = ag >= 0.25;
-  const isWeakSoil = input.soilType && /argi|lut|loess|praf|turb|umpl/i.test(input.soilType);
-  const isStableSoil = input.soilType && /nisip|pietri|bolovan|balast|stanc|roc/i.test(input.soilType);
-
-  // ZIDĂRIE EXTERIOARĂ
   if (ag >= 0.30) {
-    exteriorWallCode = 'CARAMIDA_POROTHERM_38'; // ag mare -> cărămidă groasă
-    rebarCode = 'STANDARD_FIER_14'; // extra ductilitate
-  } else if (ag >= 0.25) {
-    exteriorWallCode = 'CARAMIDA_POROTHERM_30';
-  } else if (ag <= 0.20 && isStableSoil) {
-    exteriorWallCode = 'STANDARD_BCA_25';
-  } else if (isColdClimate) {
-    exteriorWallCode = 'BCA_YTONG_30';
-  } else if (isWeakSoil) {
-    exteriorWallCode = 'CARAMIDA_POROTHERM_30';
+    rebarCode = 'STANDARD_FIER_14'; // DCH \u2014 ductilitate \u00eenalt\u0103
   }
-
-  // FERESTRE
-  const style = (input.houseStyle || '').toLowerCase();
-  if (style === 'modern' || style === 'industrial') {
-    windowsCode = 'FEREASTRA_ALUMINIU';
-  } else if (input.energyClass === 'A') {
-    windowsCode = 'FEREASTRA_PVC_3K';
-  } else if (isColdClimate) {
-    windowsCode = 'FEREASTRA_PVC_3K';
-  }
-
-  // TERMOIZOLAȚIE ACOPERIȘ
-  if (isColdClimate) {
-    insulationRoofCode = 'VATA_MINERALA_20';
-  }
-
-  const materials_note = `Selecții inteligente: PereteExt=${exteriorWallCode}, IzolExt=${insulationExteriorCode}, IzolAcoperis=${insulationRoofCode}, Tâmplărie=${windowsCode}, Armătură=${rebarCode}.`;
 
   const seismic_note =
     ag > 0
@@ -333,26 +303,25 @@ export function buildContextMultipliers(
     concreteInfo.note += ' [SĂPĂTURĂ/FUNDAȚIE ADÂNCĂ pt. SUBSOL (2.8m)]';
   }
 
-  return {
-    seismic_multiplier:       seismicRule.multiplier,
-    soil_concrete_multiplier: soilRule.concreteMult,
-    foundation_width_m:       foundationWidthM,
-    base_rebar_kg_per_mc:     15, 
-    frost_depth_m:            frostDepthM,
-    concreteCode:             concreteInfo.code as any,
-    concreteClass:            concreteInfo.class as any,
-    count_corners_and_intersections,
-    
-    exteriorWallCode,
-    interiorWallCode,
-    insulationExteriorCode,
-    insulationRoofCode,
-    windowsCode,
-    rebarCode,
+  const basement_sqm_coefficient = input.hasBasement ? 0.50 : 0;
+  const basement_note = input.hasBasement
+    ? 'Subsol echivalat la 0.50 din costul unui nivel suprateran — Indicii cost în construcții (INSSE), Cap. 3: Coeficient nivel subteran = 0.50 (absență finisaje locuibile + hidroizolație + săpătură)'
+    : 'Fără subsol — coeficient echivalare = 0';
 
+  return {
+    seismic_multiplier:              seismicRule.multiplier,
+    soil_concrete_multiplier:        soilRule.concreteMult,
+    foundation_width_m:              foundationWidthM,
+    base_rebar_kg_per_mc:            15,
+    frost_depth_m:                   frostDepthM,
+    concreteCode:                    concreteInfo.code as any,
+    concreteClass:                   concreteInfo.class as any,
+    count_corners_and_intersections,
+    rebarCode,
     seismic_note,
     soil_note,
     concrete_note: concreteInfo.note,
-    materials_note,
+    basement_sqm_coefficient,
+    basement_note,
   };
 }

@@ -2,6 +2,11 @@ import { Request, Response } from 'express';
 import { editorService } from './editorService';
 import { agentOrchestrator } from '../ai/services/agentOrchestrator';
 import { conformityService } from '../../core/services/conformityService';
+import { suggestRoomProgram } from '../ai/services/agentOrchestrator';
+import { projectRepository } from '../project/projectRepository';
+import { calcHouseFootprint } from '../../core/services/layout/layoutUtils';
+import { ConfiguratorRoom } from '../../core/services/layout/layoutTypes';
+import { generateConfiguratorLayout as runPartitioner } from '../../core/services/layout/layoutPartitioner';
 
 /**
  * POST /api/editor/snapshots
@@ -241,7 +246,7 @@ export const explainConformity = async (req: Request, res: Response) => {
 
     const stream = await agentOrchestrator.getAiStreamForChat(
       question,
-      'Context: validare conformitate plan 2D conform Legea 114/1996.',
+      '', // fără context manual, agentul face RAG automat pe baza întrebării
       [],
       'editor'
     );
@@ -266,27 +271,70 @@ export const explainConformity = async (req: Request, res: Response) => {
  * POST /api/editor/generate-layout
  * Autogenerare plan 2D folosind Template Mapping + Squarified Treemap + Constraint Solver.
  */
-import { LayoutGeneratorService } from '../../core/services/layoutGeneratorService';
-
 export const generateLayout = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { projectId, totalFloorAreaSqm, style, bedrooms } = req.body;
+    const { projectId, totalFloorAreaSqm, style, familySize, shape } = req.body;
     
-    if (!totalFloorAreaSqm || !style || bedrooms === undefined) {
-      res.status(400).json({ message: 'Date insuficiente pentru generare (necesar: totalFloorAreaSqm, style, bedrooms).' });
+    if (!projectId || !totalFloorAreaSqm || !style || familySize === undefined) {
+      res.status(400).json({ message: 'Date insuficiente pentru generare (necesar: projectId, totalFloorAreaSqm, style, familySize).' });
       return;
     }
 
-    const elements = LayoutGeneratorService.generateLayout({
-      totalFloorAreaSqm: Number(totalFloorAreaSqm),
-      style: String(style),
-      bedrooms: Number(bedrooms)
+    const project = await projectRepository.findById(parseInt(projectId, 10));
+    if (!project) {
+      res.status(404).json({ message: 'Proiect negăsit.' });
+      return;
+    }
+
+    if (!project.streetOrientation || !project.plotAreaSqm || !project.totalFloors) {
+      res.status(400).json({ 
+        message: 'Completează orientarea față de stradă, suprafața terenului și regimul de înălțime din Faza 1 înainte de a genera planul.' 
+      });
+      return;
+    }
+
+    const familySizeNum = Math.max(1, parseInt(familySize, 10));
+
+    // 1. AI Step (Creierul Creativ)
+    const suggestion = await suggestRoomProgram({
+        houseAreaSqm:     Number(totalFloorAreaSqm),
+        plotAreaSqm:      project.plotAreaSqm,
+        houseStyle:       String(style),
+        totalFloors:      project.totalFloors,
+        hasBasement:      project.hasBasement,
+        streetOrientation: project.streetOrientation,
+        familySize:       familySizeNum,
+        budgetCategory:   (project.budgetCategory as 'economic' | 'mediu') || 'mediu', 
+        buildingPurpose:  project.buildingPurpose    ?? 'residential',
     });
+
+    // 2. Mapping Step (Traducătorul)
+    const mappedRooms: ConfiguratorRoom[] = suggestion.rooms.map((r, i) => ({
+      id: `ai-room-${i}`,
+      type: r.type,
+      label: r.label,
+      ratioValue: r.weightRatio,
+      minSqm: r.minSqm,
+      maxSqm: r.maxSqm,
+      zone: r.zone,
+      naturalLight: r.naturalLight,
+      isCirculation: r.isCirculation,
+      hasStaircase: r.hasStaircase,
+      hasDoorTo: r.hasDoorTo,
+      mustAdjacentTo: r.mustAdjacentTo,
+      orientation: r.orientation
+    }));
+
+    // 3. Mathematic Step (Șeful de Șantier)
+    const footprint = calcHouseFootprint(Number(totalFloorAreaSqm), shape);
+    const dimensions = { widthM: footprint.widthM, heightM: footprint.heightM };
+    
+    const elements = runPartitioner(shape, dimensions, mappedRooms, project.streetOrientation);
 
     res.json({ elements });
   } catch (error: any) {
-    console.error('[EditorController] Eroare autogenerare layout:', error);
-    res.status(500).json({ message: 'Eroare la generarea planului', details: error.message });
+    console.error('[EditorController] Eroare autogenerare layout AI:', error);
+    res.status(500).json({ message: 'Eroare la generarea planului AI', details: error.message });
   }
 };
 
@@ -294,18 +342,16 @@ export const generateLayout = async (req: Request, res: Response): Promise<void>
  * POST /api/editor/generate-configurator-layout
  * API port from frontend layoutPartitioner.ts
  */
-import { generateConfiguratorLayout as runPartitioner } from '../../core/services/layout/layoutPartitioner';
-
 export const generateConfiguratorLayout = async (req: Request, res: Response): Promise<void> => {
   try {
     const { shape, dimensions, rooms, streetOrientation } = req.body;
     
-    if (!shape || !dimensions || !rooms) {
-      res.status(400).json({ message: 'shape, dimensions, și rooms sunt obligatorii.' });
+    if (!shape || !dimensions || !rooms || !streetOrientation) {
+      res.status(400).json({ message: 'shape, dimensions, rooms și streetOrientation sunt obligatorii.' });
       return;
     }
 
-    const elements = runPartitioner(shape, dimensions, rooms, streetOrientation || 'S');
+    const elements = runPartitioner(shape, dimensions, rooms, streetOrientation);
 
     res.json({ elements });
   } catch (error: any) {

@@ -27,7 +27,7 @@ export const addMaterialFromUrl = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    const scraped = await scraperService.scrapeProductPage(url);
+    const scraped = await scraperService.scrapeOne(url);
 
     if (!scraped) {
       res.status(400).json({ success: false, error: 'Scraping eșuat. Verifică URL-ul sau poate exista un blocaj (Cloudflare).' });

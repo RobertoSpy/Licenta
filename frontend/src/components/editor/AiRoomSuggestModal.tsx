@@ -9,11 +9,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, X, Users, Wallet, ChevronRight,
   Brain, CheckCircle2, AlertCircle, Loader2,
-  Info, Home, Lightbulb, Square
+  Info, Home, Lightbulb, Square, LayoutTemplate
 } from 'lucide-react';
 import { aiApi, type RoomSuggestion, type BudgetCategory } from '../../api/aiApi';
 import { useEditorState } from '../../hooks/useEditorState';
 import { editorApi, type FloorKey } from '../../api/editorApi';
+import LAYOUT_CONSTANTS from '../../data/layout-constants.json';
 
 interface Props {
   projectId: number;
@@ -62,7 +63,7 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
   const [error, setError]             = useState<string | null>(null);
   const [isSavingFloors, setIsSavingFloors] = useState(false);
 
-  const { setActiveRooms, houseShape, dimensions, setDimensions, switchFloor, streetOrientation } = useEditorState();
+  const { setActiveRooms, houseShape, setHouseShape, dimensions, setDimensions, switchFloor, streetOrientation } = useEditorState();
 
   const handleGenerate = async () => {
     setStep('loading');
@@ -82,26 +83,25 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
     setIsSavingFloors(true);
 
     // Grupăm camerele AI pe etaje
-    const FLOOR_ORDER: FloorKey[] = ['parter', 'etaj1'];
+    const FLOOR_ORDER = LAYOUT_CONSTANTS.floors.map(f => f.key as FloorKey);
     const byFloor: Record<string, typeof suggestion.rooms> = {};
     for (const room of suggestion.rooms) {
       const f = room.floor ?? 'parter';
       if (!byFloor[f]) byFloor[f] = [];
       byFloor[f].push(room);
     }
-    // Fallback: dacă parterul e gol, punem toate camerele acolo
-    if (!byFloor['parter'] || byFloor['parter'].length === 0) {
-      byFloor['parter'] = suggestion.rooms;
-    }
+    // Eliminat fallback-ul periculos care duplica camerele pe parter.
+    // Camerele primesc etaj by default in l. 89: const f = room.floor ?? 'parter';
 
     // FIX — Problema 1 & 2: Calculăm dimensiunile corecte ale amprentei per etaj.
     // Ne bazăm strict pe suprafața estimată de AI împărțită la numărul de etaje distincte.
     const floorsCount = Object.keys(byFloor).length || 1;
     const sqmPerFloor = suggestion.totalEstimatedSqm / floorsCount;
     
-    // Calculăm dimensiuni proporționale (raport 1.3)
-    const autoHeightM = Math.sqrt(sqmPerFloor / 1.3);
-    const autoWidthM  = autoHeightM * 1.3;
+    const shapeMultiplier = LAYOUT_CONSTANTS.shape_multipliers[houseShape as keyof typeof LAYOUT_CONSTANTS.shape_multipliers] || 1;
+    
+    const autoWidthM = Math.sqrt(sqmPerFloor * (4/3) * shapeMultiplier);
+    const autoHeightM = (sqmPerFloor * shapeMultiplier) / autoWidthM;
 
     const finalWidthM  = Math.round(autoWidthM * 10) / 10;
     const finalHeightM = Math.round(autoHeightM * 10) / 10;
@@ -119,14 +119,63 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
 
 
     try {
+      // Folosește cache-ul în loc să regenerezi
+      let parterElementsCache: any[] | null = null;
+      let parterConfigRoomsCache: any[] | null = null;
+
+
       // Generăm și salvăm fiecare etaj în ordine
       for (const floorKey of FLOOR_ORDER) {
         const floorRooms = byFloor[floorKey];
         if (!floorRooms || floorRooms.length === 0) continue;
 
+        // ── SUBSOL: se salvează în DB pentru BOM (coeficient 0.50 per Indicii cost INSSE) ──
+        // dar NU se generează plan 2D. Subsolul nu este nivel locuibil, nu are aceeași
+        // amprentă desenabilă în editor și nu intră în suprafața utilă (Legea 114/1996).
+        if (floorKey === 'subsol') {
+          const basementState = {
+            elements: [],  // fără elemente canvas
+            activeRooms: floorRooms.map((r, i) => ({ id: `ai-subsol-${i}`, ...r })),
+            dimensions: { widthM: 0, heightM: 0, wingWidthM: 0, wingLengthM: 0 },
+            houseShape,
+            streetOrientation,
+          };
+          await editorApi.saveFloor(projectId, floorKey, basementState as any, 'AI — subsol (BOM only)');
+          continue; // skip 2D generation
+        }
+
+        // FIX: Calculăm suprafața corectă PER ETAJ, nu împărțim totalul la numărul de etaje.
+        // Fiecare etaj are propria sa amprentă la sol, nu partajează aceeași suprafață.
+
+        const floorSqm = floorRooms.reduce((sum, r) => {
+          const avg = r.minSqm && r.maxSqm
+            ? (r.minSqm + r.maxSqm) / 2
+            : r.minSqm ?? r.maxSqm ?? 15;
+          return sum + avg;
+        }, 0);
+
+        const shapeMultiplier = LAYOUT_CONSTANTS.shape_multipliers[houseShape as keyof typeof LAYOUT_CONSTANTS.shape_multipliers] || 1;
+        const adjustedSqm = floorSqm / shapeMultiplier; // invert multiplier to get net floor area
+        const autoWidthM = Math.sqrt(adjustedSqm * (4/3));
+        const autoHeightM = adjustedSqm / autoWidthM;
+
+        const floorDims = {
+          widthM:     Math.round(autoWidthM * 10) / 10,
+          heightM:    Math.round(autoHeightM * 10) / 10,
+          wingWidthM:  Math.round(autoWidthM / 2.5),
+          wingLengthM: Math.round(autoHeightM / 2),
+        };
+
+        // Actualizăm store-ul cu dimensiunile parterului (etajul principal vizibil)
+        if (floorKey === 'parter') {
+          setDimensions(floorDims);
+        }
+
         const configRooms = floorRooms.map((r, i) => ({
           id: `ai-${floorKey}-${i}`,
+          type: r.type,
           label: r.label,
+          zone: r.zone ?? 'zi',
           ratioValue: r.weightRatio,
           // ── Proprietăți critice pentru generarea ferestrelor și ușilor ──
           naturalLight:    r.naturalLight    ?? false,
@@ -139,42 +188,49 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
           mustAdjacentTo:  r.mustAdjacentTo  ?? [],
         }));
 
-        const floorElements = await editorApi.generateConfiguratorLayout(projectId, houseShape, dims, configRooms, streetOrientation);
-        await editorApi.saveFloor(projectId, floorKey, floorElements, `AI — ${floorKey}`);
+        const floorElements = await editorApi.generateConfiguratorLayout(projectId, houseShape, floorDims, configRooms, streetOrientation);
+        
+        const fullState = {
+          elements: floorElements,
+          activeRooms: configRooms,
+          dimensions: floorDims,
+          houseShape: houseShape,
+          streetOrientation: streetOrientation
+        };
+
+        if (floorKey === 'parter') {
+          parterElementsCache = floorElements;
+          parterConfigRoomsCache = configRooms;
+        }
+
+        await editorApi.saveFloor(projectId, floorKey, fullState as any, `AI — ${floorKey}`);
       }
 
-      const parterRooms = byFloor['parter'].map(r => ({
-        type: r.type,
-        label: r.label,
-        zone: r.zone ?? 'zi',
-        weightRatio: r.weightRatio,
-        minSqm: r.minSqm,
-        maxSqm: r.maxSqm,
-        hasDoorTo: r.hasDoorTo ?? [],
-        mustAdjacentTo: r.mustAdjacentTo ?? [],
-        naturalLight: r.naturalLight ?? true,
-        orientation: r.orientation ?? [],
-        isCirculation: r.isCirculation ?? false,
-        hasStaircase: r.hasStaircase ?? false,
-      }));
-      const parterConfigRooms = byFloor['parter'].map((r, i) => ({
-        id: `ai-parter-${i}`,
-        label: r.label,
-        zone: r.zone ?? 'zi',
-        ratioValue: r.weightRatio,
-        // ── Proprietăți critice pentru generarea ferestrelor și ușilor ──
-        naturalLight:    r.naturalLight    ?? false,
-        hasDoorTo:       r.hasDoorTo       ?? [],
-        isCirculation:   r.isCirculation   ?? false,
-        hasStaircase:    r.hasStaircase    ?? false,
-        orientation:     r.orientation     ?? [],
-        minSqm:          r.minSqm          ?? undefined,
-        maxSqm:          r.maxSqm          ?? undefined,
-        mustAdjacentTo:  r.mustAdjacentTo  ?? [],
-      }));
-      const parterElements = await editorApi.generateConfiguratorLayout(projectId, houseShape, dims, parterConfigRooms, streetOrientation);
-      switchFloor('parter', parterElements);
-      setActiveRooms(parterRooms);
+      if (parterElementsCache && parterConfigRoomsCache) {
+        // Trimite obiectul complet cu dimensiunile corecte ale parterului
+        // altfel canvas-ul rămâne cu dimensiunile vechi și nu afișează nimic
+        const parterFloorRooms = byFloor['parter'] ?? [];
+        const parterSqm = parterFloorRooms.reduce((sum: number, r: any) => {
+          const avg = r.minSqm && r.maxSqm ? (r.minSqm + r.maxSqm) / 2 : r.minSqm ?? r.maxSqm ?? 15;
+          return sum + avg;
+        }, 0);
+        const sm = LAYOUT_CONSTANTS.shape_multipliers[houseShape as keyof typeof LAYOUT_CONSTANTS.shape_multipliers] || 1;
+        const aw = Math.sqrt((parterSqm / sm) * (4/3));
+        const ah = (parterSqm / sm) / aw;
+        const parterDims = {
+          widthM: Math.round(aw * 10) / 10,
+          heightM: Math.round(ah * 10) / 10,
+          wingWidthM: Math.round(aw / 2.5),
+          wingLengthM: Math.round(ah / 2),
+        };
+        switchFloor('parter', {
+          elements: parterElementsCache,
+          activeRooms: parterConfigRoomsCache,
+          dimensions: parterDims,
+          houseShape,
+          streetOrientation,
+        });
+      }
 
       onClose();
     } catch (e: any) {
@@ -347,6 +403,22 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    {/* Shape Selector */}
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <LayoutTemplate className="w-3.5 h-3.5" /> Forma Casei
+                      </label>
+                      <select
+                        value={houseShape}
+                        onChange={(e) => setHouseShape(e.target.value as any)}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all cursor-pointer"
+                      >
+                        {LAYOUT_CONSTANTS.shapes.map(s => (
+                          <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* CTA */}

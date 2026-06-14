@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Inbox, Clock, CheckCircle, FileText, XCircle, Send, Lock, Layers } from 'lucide-react';
+import { Inbox, Clock, CheckCircle, FileText, XCircle, Send, Lock, Layers, PlusCircle } from 'lucide-react';
 import { quoteApi, type Quote } from '../../api/quoteApi';
 import { apiPrivate } from '../../api/axios';
 import { useOutletContext } from 'react-router-dom';
@@ -16,7 +16,16 @@ export default function QuoteRequestsList() {
  const [executionDays, setExecutionDays] = useState<string>('');
  const [message, setMessage] = useState('');
  const [acceptsBOM, setAcceptsBOM] = useState(true);
+ const [bomVariations, setBomVariations] = useState<any[]>([]);
  const [isSubmitting, setIsSubmitting] = useState(false);
+
+ const addVariation = () => setBomVariations([...bomVariations, { formulaKey: '', suggestedMaterial: '', newPrice: '', note: '' }]);
+ const removeVariation = (index: number) => setBomVariations(bomVariations.filter((_, i) => i !== index));
+ const updateVariation = (index: number, field: string, value: string) => {
+   const updated = [...bomVariations];
+   updated[index] = { ...updated[index], [field]: value };
+   setBomVariations(updated);
+ };
 
  useEffect(() => {
  fetchQuotes();
@@ -44,7 +53,8 @@ export default function QuoteRequestsList() {
  totalAmount: Number(totalAmount),
  executionDays: Number(executionDays),
  message,
- acceptsBOM
+ acceptsBOM,
+ bomVariations: acceptsBOM ? undefined : bomVariations
  });
  alert('Oferta a fost trimisă cu succes!');
  setSelectedQuote(null);
@@ -85,6 +95,7 @@ export default function QuoteRequestsList() {
  setExecutionDays(q.executionDays?.toString() || '');
  setMessage(q.message || '');
  setAcceptsBOM(q.acceptsBOM !== false);
+ setBomVariations(q.bomVariations || []);
  }}
  className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
  selectedQuote?.id === q.id 
@@ -234,16 +245,107 @@ export default function QuoteRequestsList() {
  />
  </div>
 
- <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 ">
+ <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 transition-colors hover:border-buildorange">
  <input 
  type="checkbox" id="acceptsBOM"
  checked={acceptsBOM} onChange={e => setAcceptsBOM(e.target.checked)}
  className="w-5 h-5 rounded border-slate-300 text-buildorange focus:ring-buildorange"
  />
- <label htmlFor="acceptsBOM" className="text-sm font-medium text-slate-700 cursor-pointer">
+ <label htmlFor="acceptsBOM" className="text-sm font-medium text-slate-700 cursor-pointer flex-1">
  Sunt de acord cu devizul generat (BOM). Nu propun variante de materiale.
  </label>
  </div>
+
+ <AnimatePresence>
+ {!acceptsBOM && (
+   <motion.div 
+     initial={{ opacity: 0, height: 0 }} 
+     animate={{ opacity: 1, height: 'auto' }} 
+     exit={{ opacity: 0, height: 0 }} 
+     className="space-y-4 overflow-hidden"
+   >
+     <div className="bg-orange-50/50 border border-orange-200 p-5 rounded-xl">
+       <div className="flex justify-between items-center mb-4">
+         <div>
+           <h4 className="font-bold text-slate-900">Variații de Materiale</h4>
+           <p className="text-xs text-slate-500">Specificați alternativele pentru materialele din devizul original.</p>
+         </div>
+         <button 
+           type="button" 
+           onClick={addVariation} 
+           className="text-xs bg-white border border-slate-200 px-3 py-2 rounded-lg font-bold text-buildorange hover:border-buildorange transition-colors flex items-center gap-1 shadow-sm"
+         >
+            <PlusCircle className="w-4 h-4" /> Adaugă Substituție
+         </button>
+       </div>
+       
+       {bomVariations.length === 0 ? (
+          <div className="text-center p-6 bg-white rounded-lg border border-dashed border-orange-200">
+            <p className="text-sm text-slate-500 italic">Nu ați adăugat nicio variație. Folosiți butonul de mai sus.</p>
+          </div>
+       ) : (
+          <div className="space-y-3">
+            {bomVariations.map((v, i) => (
+              <div key={i} className="grid grid-cols-1 lg:grid-cols-12 gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm relative">
+                 <div className="lg:col-span-3">
+                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Înlocuiește (Din Deviz)</label>
+                   <select 
+                     className="w-full px-2 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded focus:ring-1 focus:ring-buildorange outline-none"
+                     value={v.formulaKey} 
+                     onChange={e => updateVariation(i, 'formulaKey', e.target.value)}
+                   >
+                      <option value="">Alege materialul...</option>
+                      {selectedQuote?.project?.bomItems?.map((b: any) => (
+                         <option key={b.id} value={b.formulaKey}>{b.material?.name || b.formulaKey}</option>
+                      ))}
+                   </select>
+                 </div>
+                 <div className="lg:col-span-3">
+                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Material Nou Sugerat</label>
+                   <input 
+                     className="w-full px-2 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded focus:ring-1 focus:ring-buildorange outline-none" 
+                     placeholder="Ex: Ytong 25cm" 
+                     value={v.suggestedMaterial} 
+                     onChange={e => updateVariation(i, 'suggestedMaterial', e.target.value)} 
+                   />
+                 </div>
+                 <div className="lg:col-span-2">
+                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Preț Nou</label>
+                   <input 
+                     type="number" 
+                     className="w-full px-2 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded focus:ring-1 focus:ring-buildorange outline-none" 
+                     placeholder="RON"
+                     value={v.newPrice} 
+                     onChange={e => updateVariation(i, 'newPrice', e.target.value)} 
+                   />
+                 </div>
+                 <div className="lg:col-span-3">
+                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Motiv / Notă</label>
+                   <input 
+                     className="w-full px-2 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded focus:ring-1 focus:ring-buildorange outline-none" 
+                     placeholder="Izolație superioară..." 
+                     value={v.note} 
+                     onChange={e => updateVariation(i, 'note', e.target.value)} 
+                   />
+                 </div>
+                 <div className="lg:col-span-1 flex items-end justify-center pb-1">
+                   <button 
+                     type="button" 
+                     onClick={() => removeVariation(i)} 
+                     className="text-slate-300 hover:text-red-500 transition-colors"
+                     title="Șterge"
+                   >
+                     <XCircle className="w-5 h-5"/>
+                   </button>
+                 </div>
+              </div>
+            ))}
+          </div>
+       )}
+     </div>
+   </motion.div>
+ )}
+ </AnimatePresence>
 
  <div className="pt-4 flex justify-end">
  <button

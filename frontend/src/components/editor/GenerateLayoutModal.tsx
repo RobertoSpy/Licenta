@@ -5,7 +5,7 @@ import { X, Wand2 } from 'lucide-react';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onGenerate: (area: number, style: string, bedrooms: number) => Promise<void>;
+  onGenerate: (area: number, style: string, familySize: number) => Promise<void>;
   initialArea: number;
   initialStyle: string;
 }
@@ -13,7 +13,7 @@ interface Props {
 export const GenerateLayoutModal: React.FC<Props> = ({ isOpen, onClose, onGenerate, initialArea, initialStyle }) => {
   const [area, setArea] = useState(initialArea || 80);
   const [style, setStyle] = useState(initialStyle || 'Modern');
-  const [bedrooms, setBedrooms] = useState(2);
+  const [familySize, setFamilySize] = useState(3);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,7 +23,7 @@ export const GenerateLayoutModal: React.FC<Props> = ({ isOpen, onClose, onGenera
     try {
       setIsGenerating(true);
       setError('');
-      await onGenerate(area, style, bedrooms);
+      await onGenerate(area, style, familySize);
       onClose();
     } catch (err: unknown) {
       setError((err instanceof Error ? err.message : null) || 'Eroare la generarea planului.');
@@ -90,15 +90,15 @@ export const GenerateLayoutModal: React.FC<Props> = ({ isOpen, onClose, onGenera
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                  Număr Dormitoare
+                  Număr Persoane (Membrii Familiei)
                 </label>
                 <div className="flex gap-2">
-                  {[1, 2, 3].map(num => (
+                  {[1, 2, 3, 4, 5].map(num => (
                     <button
                       key={num}
-                      onClick={() => setBedrooms(num)}
+                      onClick={() => setFamilySize(num)}
                       className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${
-                        bedrooms === num 
+                        familySize === num 
                           ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' 
                           : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
                       }`}

@@ -1,7 +1,7 @@
 {
   "_meta": {
     "version": "3.0.0",
-    "description": "Context-Aware BOM Rule Engine v3 — formule parametrice complete (fundație → finisaje → instalații). Toate coeficienții sunt bazați pe normative românești citate explicit în câmpul 'note' al fiecărei formule.",
+    "description": "Context-Aware BOM Rule Engine v3 — formule parametrice complete (fundație → finisaje → instalații). Toti coeficienții sunt bazați pe normative românești citate explicit în câmpul 'note' al fiecărei formule.",
     "normativeSources": [
       "P100-1/2013 Cap.8 (ductilitate seismică DCM/DCH — multiplicatori armătură)",
       "NE012-1:2022 §4.3 + Tab.5.2 + Tab.E.1 (beton egalizare, dozaje armătură, clase expunere)",
@@ -67,7 +67,7 @@
   "foundation_rebar": {
     "phase": "Fundație",
     "unit": "kg",
-    "formula": "perimeter_m * foundation_depth_m * base_rebar_kg_per_mc * seismic_multiplier",
+   "formula": "perimeter_m * foundation_width_m * foundation_depth_m * base_rebar_kg_per_mc * seismic_multiplier",
     "wastePercent": 8,
     "aiSuggestible": true,
     "note": "Cantitate armătură fundație (bare longitudinale + etrieri). base_rebar_kg_per_mc=15kg/mc conform NE012-1:2022 dozaj minim. seismic_multiplier crește cantitatea în zone DCM/DCH (P100-1/2013 Cap.8).",
@@ -95,7 +95,14 @@
     "formula": "(perimeter_m * floor_height_m * floors_count) - exterior_openings_sqm",
     "wastePercent": 5,
     "aiSuggestible": true,
-    "note": "Zidărie exterioară BCA 25cm. Se scade suprafața exactă a golurilor (ferestre + uși exterioare) extrasă din planul 2D. Conform CR6-2013 Art.5.2.",
+    "note": "Zidărie exterioară. Materialul implicit este BCA 25cm; se upgradează automat la cărămidă pentru zone seismice severe sau sol slab. Se scade suprafața golurilor. Conform CR6-2013 Art.5.2.",
+    "defaultMaterialCode": "STANDARD_BCA_25",
+    "upgrades": [
+      { "if": { "ag_gte": 0.30 },                          "use": "CARAMIDA_POROTHERM_38", "reason": "ag≥0.30g → DCH → cărămidă groasă P100-1/2013" },
+      { "if": { "ag_gte": 0.25 },                          "use": "CARAMIDA_POROTHERM_30", "reason": "ag≥0.25g → DCH limită → cărămidă CR6-2013" },
+      { "if": { "soil_type_weak": true, "ag_lt": 0.25 },  "use": "CARAMIDA_POROTHERM_30", "reason": "sol slab + seism mediu → cărămidă NP112-2014" },
+      { "if": { "frost_depth_cm_gt": 90 },                 "use": "BCA_YTONG_30",          "reason": "climă rece → BCA 30cm Mc-001-2022 §7.3" }
+    ],
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Structură",
@@ -108,7 +115,8 @@
     "formula": "interior_walls_m * floor_height_m",
     "wastePercent": 5,
     "aiSuggestible": true,
-    "note": "Zidărie interioară BCA 12.5cm. Lungimea pereților interiori extrasă din planul 2D. Conform CR6-2013 Art.5.3.",
+    "note": "Zidărie interioară BCA 12.5cm (default). Lungimea pereților interiori extrasă din planul 2D. Conform CR6-2013 Art.5.3.",
+    "defaultMaterialCode": "STANDARD_BCA_12",
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Structură",
@@ -166,7 +174,7 @@
   "slab_concrete": {
     "phase": "Planșeu",
     "unit": "mc",
-    "formula": "total_floor_area_sqm * 0.15 * (floors_count - 1)",
+   "formula": "total_floor_area_sqm * 12 * (floors_count - 1) * seismic_multiplier",
     "wastePercent": 8,
     "aiSuggestible": true,
     "note": "Planșeu beton armat 15cm grosime (h=150mm — valoare curentă conf. NE012-1:2022 pentru deschideri ≤5m). Formula se aplică doar pentru etajele superioare (floors_count-1).",
@@ -213,19 +221,7 @@
       "subcategory": "Structură"
     }
   },
-  "roof_insulation": {
-    "phase": "Acoperiș",
-    "unit": "mp",
-    "formula": "total_floor_area_sqm",
-    "wastePercent": 5,
-    "aiSuggestible": true,
-    "note": "Termoizolație pod: vată bazaltică 15cm la pardoseala podului (cea mai eficientă metodă pentru casa nelocuibilă la pod). Grosimea poate fi majorată de AI la 20cm pentru zone reci (frostDepth>90cm).",
-    "materialQuery": {
-      "type": "FREE_PREFERENCE",
-      "category": "Termoizolație",
-      "subcategory": "Acoperiș"
-    }
-  },
+
   "floor_screed": {
     "phase": "Finisaje",
     "unit": "mp",
@@ -284,7 +280,13 @@
     "formula": "count_windows",
     "wastePercent": 0,
     "aiSuggestible": true,
-    "note": "Ferestre PVC standard cu geam termoizolant 2K. Numărul extras din planul 2D. AI poate sugera tipologia (tripan, low-e) bazat pe zona climatică.",
+    "note": "Ferestre PVC standard cu geam termoizolant 2K (default). Upgrade automat la tripan pentru climă rece/energetic A, aluminiu pentru stil modern. Numărul extras din planul 2D.",
+    "defaultMaterialCode": "STANDARD_FEREASTRA_PVC",
+    "upgrades": [
+      { "if": { "house_style_in": ["Modern", "Industrial"] }, "use": "FEREASTRA_ALUMINIU",   "reason": "stil Modern/Industrial → aluminiu" },
+      { "if": { "energy_class": "A" },                        "use": "FEREASTRA_PVC_3K",    "reason": "clasă energetică A → tripan" },
+      { "if": { "frost_depth_cm_gt": 90 },                    "use": "FEREASTRA_PVC_3K",    "reason": "climă rece → tripan Mc-001-2022" }
+    ],
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Tâmplărie",
@@ -297,7 +299,8 @@
     "formula": "(perimeter_m * floor_height_m * floors_count) - exterior_openings_sqm",
     "wastePercent": 10,
     "aiSuggestible": true,
-    "note": "Izolație pereți exteriori",
+    "note": "Termoizolație pereți exteriori sistem ETICS. Materialul implicit EPS 10cm; AI poate sugera polistiren grafitat sau vată minerală bazaltică în funcție de buget și zonă climatică. Mc-001-2022 §7.2.",
+    "defaultMaterialCode": "polistiren-eps-10cm",
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Termoizolație",
@@ -310,7 +313,11 @@
     "formula": "total_floor_area_sqm",
     "wastePercent": 5,
     "aiSuggestible": true,
-    "note": "Termoizolație pod vată minerală bazaltică 15cm la pardoseala podului. Mc-001-2022 §7.3 — rezistență termică minimă R=3.7 m²K/W (zona III climatică). AI poate sugera upgrade 20cm pentru zone cu frost_depth>90cm.",
+    "note": "Termoizolație pod vată minerală bazaltică 15cm la pardoseala podului (default). Upgrade automat la 20cm pentru zone reci. Mc-001-2022 §7.3 — R≥3.7 m²K/W.",
+    "defaultMaterialCode": "vata-minerala-15cm",
+    "upgrades": [
+      { "if": { "frost_depth_cm_gt": 90 }, "use": "VATA_MINERALA_20", "reason": "climă rece → vată 20cm Mc-001-2022 §7.3" }
+    ],
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Termoizolație",
@@ -368,17 +375,32 @@
       "subcategory": "Hidroizolație"
     }
   },
-  "mortar_masonry": {
+"mortar_brick": {
     "phase": "Structură",
     "unit": "sac",
     "formula": "(perimeter_m * floor_height_m * floors_count - exterior_openings_sqm) * 3.5 + interior_walls_m * floor_height_m * 1.8",
     "wastePercent": 5,
-    "aiSuggestible": true,
-    "note": "Mortar zidărie pentru cărămidă (valoare implicită). CR 6-2013 Tab.3.1 — mortar M10 rost 12mm. Calcul: zidărie 25cm exterior → 22% vol. × 2000 kg/mc × 0.25m = 88 kg/mp → 3.5 saci/mp (25kg/sac). Interior 12.5cm → 1.8 saci/mp. IMPORTANT: AI sugerează override la ADEZIV_BCA_YTONG_SAC (1.4kg/mp = 0.056 saci/mp) dacă wall_exterior=BCA (rost subțire 1-3mm, CR 6-2013 §3.2.2(3)).",
+    "aiSuggestible": false,
+    "note": "Mortar clasic M10 pentru zidărie din cărămidă. Calcul bazat pe rost de 12mm conform CR 6-2013 Tab.3.1. Se aplică exclusiv dacă materialul structural ales este cărămida.",
+    "condition": { "formulaKey": "wall_exterior", "structuralType": "CARAMIDA" },
     "materialQuery": {
       "type": "FREE_PREFERENCE",
       "category": "Structură",
       "subcategory": "Mortar"
+    }
+  },
+  "adhesive_bca": {
+    "phase": "Structură",
+    "unit": "sac",
+    "formula": "(perimeter_m * floor_height_m * floors_count - exterior_openings_sqm) * 0.056 + interior_walls_m * floor_height_m * 0.028",
+    "wastePercent": 5,
+    "aiSuggestible": false,
+    "note": "Adeziv pat subțire (1-3mm) pentru zidărie BCA conform CR 6-2013 §3.2.2(3). Consum redus masiv comparativ cu cărămida (~1.4 kg/mp la exterior). Se aplică exclusiv dacă materialul structural este BCA.",
+    "condition": { "formulaKey": "wall_exterior", "structuralType": "BCA" },
+    "materialQuery": {
+      "type": "FREE_PREFERENCE",
+      "category": "Structură",
+      "subcategory": "Adeziv Zidărie"
     }
   },
   "roof_batten": {

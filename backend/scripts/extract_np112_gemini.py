@@ -56,12 +56,26 @@ def main() -> int:
     client = genai.Client(api_key=api_key)
     doc = fitz.open(pdf_path)
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as out:
-        out.write(f"# Extracted text from {pdf_path.name}\n\n")
-        out.write("Generated with Gemini Vision (page-by-page).\n")
+    start_page = 0
+    file_mode = "w"
+    
+    if output_path.exists():
+        content = output_path.read_text(encoding="utf-8")
+        import re
+        matches = re.findall(r"--- Page (\d+) ---", content)
+        if matches:
+            last_page = int(matches[-1])
+            start_page = last_page  # Because index is 0-based, last_page=125 means index 124 was processed. Next is 125.
+            file_mode = "a"
+            print(f"Resuming from page {start_page + 1}...")
 
-        for page_index in range(doc.page_count):
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open(file_mode, encoding="utf-8") as out:
+        if file_mode == "w":
+            out.write(f"# Extracted text from {pdf_path.name}\n\n")
+            out.write("Generated with Gemini Vision (page-by-page).\n")
+
+        for page_index in range(start_page, doc.page_count):
             page = doc.load_page(page_index)
             png_bytes = render_page_png_bytes(page, scale)
 

@@ -49,7 +49,8 @@ export async function searchHybrid(
   const hybridSql = isGeneral
     ? `
       WITH dense_search AS (
-        SELECT id, ROW_NUMBER() OVER (ORDER BY 1 - (embedding <=> $1::vector) DESC) as dense_rank
+        SELECT id, ROW_NUMBER() OVER (ORDER BY 1 - (embedding <=> $1::vector) DESC) as dense_rank,
+               1 - (embedding <=> $1::vector) as dense_score
         FROM "NormativeChunk"
         WHERE status != 'abrogat' AND source = ANY($2)
         ORDER BY 1 - (embedding <=> $1::vector) DESC
@@ -65,7 +66,8 @@ export async function searchHybrid(
       )
       SELECT n.id, n.source, n.agent, n.chapter, n.content, n.applicability,
              COALESCE(1.0 / (60 + ds.dense_rank), 0.0) +
-             COALESCE(1.0 / (60 + ss.sparse_rank), 0.0) as similarity
+             COALESCE(1.0 / (60 + ss.sparse_rank), 0.0) as similarity,
+             ds.dense_score as raw_dense_score
       FROM "NormativeChunk" n
       LEFT JOIN dense_search ds ON n.id = ds.id
       LEFT JOIN sparse_search ss ON n.id = ss.id
@@ -75,7 +77,8 @@ export async function searchHybrid(
     `
     : `
       WITH dense_search AS (
-        SELECT id, ROW_NUMBER() OVER (ORDER BY 1 - (embedding <=> $1::vector) DESC) as dense_rank
+        SELECT id, ROW_NUMBER() OVER (ORDER BY 1 - (embedding <=> $1::vector) DESC) as dense_rank,
+               1 - (embedding <=> $1::vector) as dense_score
         FROM "NormativeChunk"
         WHERE agent = $2 AND status != 'abrogat' AND source = ANY($3)
         ORDER BY 1 - (embedding <=> $1::vector) DESC
@@ -91,7 +94,8 @@ export async function searchHybrid(
       )
       SELECT n.id, n.source, n.agent, n.chapter, n.content, n.applicability,
              COALESCE(1.0 / (60 + ds.dense_rank), 0.0) +
-             COALESCE(1.0 / (60 + ss.sparse_rank), 0.0) as similarity
+             COALESCE(1.0 / (60 + ss.sparse_rank), 0.0) as similarity,
+             ds.dense_score as raw_dense_score
       FROM "NormativeChunk" n
       LEFT JOIN dense_search ds ON n.id = ds.id
       LEFT JOIN sparse_search ss ON n.id = ss.id
@@ -117,6 +121,9 @@ export async function searchHybrid(
   );
 
   console.log(`[denseSearch] agent=${agent}: ${finalResults.length} rezultate`);
+  finalResults.forEach((chunk: any, i: number) => {
+    console.log(`  [${i+1}] source="${chunk.source}" RRF=${chunk.similarity?.toFixed(3)} (CosSim=${chunk.raw_dense_score?.toFixed(3)}) | "${chunk.content.slice(0, 120).replace(/\n/g, ' ')}..."`);
+  });
   return finalResults;
 }
 

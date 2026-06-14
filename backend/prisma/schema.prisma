@@ -149,6 +149,7 @@ model Material {
   maxFloors            Int?     // Număr maxim etaje permise
   normativeCode        String?  // Sursa normativă, ex: "CR6-2013"
   performanceClass     String?  // "economic" | "mediu"
+  structuralType       String?  // "BCA" | "CARAMIDA" | null (pt. materiale non-structurale)
   
   // 2. Observabilitate și Siguranță (AI Governance)
   isVerified           Boolean  @default(false) // Necesită validare umană pt STRICT_NORMATIVE

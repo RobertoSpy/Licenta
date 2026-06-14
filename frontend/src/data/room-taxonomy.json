@@ -1,0 +1,17 @@
+{
+  "valid_types": ["hol", "living", "bucatarie", "dormitor", "baie", "wc", "camara", "birou", "sala_mese", "terasa", "debara"],
+  "valid_zones": ["distributie", "zi", "noapte", "tehnic"],
+  "valid_floors": ["parter", "etaj1"],
+  "default_rooms_ui": [
+    { "label": "Living",      "type": "living" },
+    { "label": "Bucătărie",   "type": "bucatarie" },
+    { "label": "Dormitor 1",  "type": "dormitor" },
+    { "label": "Dormitor 2",  "type": "dormitor" },
+    { "label": "Dormitor 3",  "type": "dormitor" },
+    { "label": "Baie",        "type": "baie" },
+    { "label": "WC",          "type": "wc" },
+    { "label": "Hol",         "type": "hol" },
+    { "label": "Debara",      "type": "debara" },
+    { "label": "Birou",       "type": "birou" }
+  ]
+}

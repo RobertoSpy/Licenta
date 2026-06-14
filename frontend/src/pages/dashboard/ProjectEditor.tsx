@@ -106,7 +106,7 @@ export const ProjectEditor: React.FC = () => {
   const { 
     elements, updateElement, markClean, isDirty, undo, redo, deleteSelected, 
     setTool, setZoom, initializeFromProject, activeFloor, switchFloor,
-    activeRooms, dimensions, houseShape, updateRoomRatio, regenerateLayout, setProjectId,
+    activeRooms, dimensions, houseShape, setProjectId,
     addManualOpening, deleteElement
   } = useEditorState();
   const rooms = useRoomCalculator(elements);
@@ -136,8 +136,6 @@ export const ProjectEditor: React.FC = () => {
     dimensions,
     houseShape,
     updateElement,
-    updateRoomRatio,
-    regenerateLayout,
     addManualOpening,
     deleteElement
   });
@@ -486,7 +484,7 @@ export const ProjectEditor: React.FC = () => {
         />
 
         {/* Panel Proprietăți (dreapta) - doar dacă nu e chat-ul deschis */}
-        {!isChatOpen && <EditorPropertiesPanel onRenameRequest={(id) => setLabelDialog({ id, x: 0, y: 0 })} rooms={roomsWithStatus} />}
+        {!isChatOpen && <EditorPropertiesPanel onRenameRequest={(id) => setLabelDialog({ id, x: 0, y: 0 })} rooms={roomsWithStatus} violationIssues={violationIssues} warningIssues={warningIssues} />}
       </div>
 
       {/* Dialog label cameră */}

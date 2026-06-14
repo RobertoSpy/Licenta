@@ -59,7 +59,7 @@ describe('adminController', () => {
     });
 
     it('returns 400 if scraping fails', async () => {
-      (scraperService.scrapeProductPage as jest.Mock).mockResolvedValue(null);
+      (scraperService.scrapeOne as jest.Mock).mockResolvedValue(null);
       const req: any = { body: { url: 'url', internalCode: 'C1', name: 'N1', category: 'C', unit: 'buc' } };
       const res = mockRes();
       await addMaterialFromUrl(req, res);
@@ -67,7 +67,7 @@ describe('adminController', () => {
     });
 
     it('returns 400 if scraped price is 0 and not in stock', async () => {
-      (scraperService.scrapeProductPage as jest.Mock).mockResolvedValue({ price: 0, inStock: false });
+      (scraperService.scrapeOne as jest.Mock).mockResolvedValue({ price: 0, inStock: false });
       const req: any = { body: { url: 'url', internalCode: 'C1', name: 'N1', category: 'C', unit: 'buc' } };
       const res = mockRes();
       await addMaterialFromUrl(req, res);
@@ -75,7 +75,7 @@ describe('adminController', () => {
     });
 
     it('creates material and price history on success', async () => {
-      (scraperService.scrapeProductPage as jest.Mock).mockResolvedValue({ price: 100, inStock: true, stockQuantity: 50 });
+      (scraperService.scrapeOne as jest.Mock).mockResolvedValue({ price: 100, inStock: true, stockQuantity: 50 });
       (prisma.material.create as jest.Mock).mockResolvedValue({ id: 1 });
       
       const req: any = { body: { url: 'url', internalCode: 'C1', name: 'N1', category: 'C', unit: 'buc' } };
@@ -88,7 +88,7 @@ describe('adminController', () => {
     });
 
     it('returns 500 on db error', async () => {
-      (scraperService.scrapeProductPage as jest.Mock).mockResolvedValue({ price: 100, inStock: true });
+      (scraperService.scrapeOne as jest.Mock).mockResolvedValue({ price: 100, inStock: true });
       (prisma.material.create as jest.Mock).mockRejectedValue(new Error('DB Error'));
       const req: any = { body: { url: 'url', internalCode: 'C1', name: 'N1', category: 'C', unit: 'buc' } };
       const res = mockRes();

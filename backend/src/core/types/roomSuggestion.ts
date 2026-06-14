@@ -17,7 +17,7 @@ export interface SuggestedRoom {
   isCirculation: boolean;   // true = hol/coridor → fără limită uși, alungit
   hasStaircase: boolean;    // true = în această cameră se plasează scara
   naturalLight: boolean;    // true = trebuie fereastră exterioară (NP057)
-  orientation: string[];    // ['S', 'SV'] — orientare solară recomandată NP057
+  orientation: string[];    
 }
 
 export interface RoomSuggestion {
@@ -36,5 +36,6 @@ export interface SuggestRoomsInput {
   streetOrientation: string;
   familySize: number;
   budgetCategory: 'economic' | 'mediu';
-  buildingPurpose: string;
+  /** (Opțional) Destinația finală (ex: "residential") */
+  buildingPurpose?: string;
 }

@@ -22,7 +22,7 @@ import quoteRoutes from './modules/quote/quoteRoutes';
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT;
 
 // ─────────────────────────────────────────────
 // 1. SECURITATE: Helmet setează HTTP security headers
@@ -35,7 +35,7 @@ app.use(helmet());
 //    de parsare body — cost minim per request respins
 // ─────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: process.env.FRONTEND_URL,
   credentials: true, // necesar pentru cookie-uri (Refresh Token)
 }));
 
@@ -90,3 +90,4 @@ app.use((_, res) => {
 app.listen(port, () => {
   console.log(`[Server] Running on port ${port}`);
 });
+ 

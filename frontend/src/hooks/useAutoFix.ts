@@ -12,8 +12,6 @@ interface AutoFixProps {
   dimensions: ConfiguratorDimensions;
   houseShape: string;
   updateElement: (id: string, changes: Partial<CanvasElement>) => void;
-  updateRoomRatio: (id: string, ratioValue: number) => void;
-  regenerateLayout: () => void;
   addManualOpening: (roomId: string, type: 'door' | 'window', side: 'top' | 'bottom' | 'left' | 'right') => void;
   deleteElement: (id: string) => void;
 }
@@ -26,8 +24,6 @@ export function useAutoFix({
   dimensions,
   houseShape,
   updateElement,
-  updateRoomRatio,
-  regenerateLayout,
   addManualOpening,
   deleteElement,
 }: AutoFixProps) {
@@ -156,17 +152,10 @@ export function useAutoFix({
           const r = activeRooms.find(ar => ar.id === v.targetId);
           return r?.label || 'Cameră';
         }),
-        message: 'Planul va fi redesenat (Treemap) pentru a garanta suprafețele minime legale.',
+        message: 'Planul trebuie redesenat (via Sugestie AI) pentru a garanta suprafețele minime legale.',
         onConfirm: () => {
-          newRooms.forEach(nr => {
-            const original = activeRooms.find(r => r.id === nr.id);
-            if (original && original.ratioValue !== nr.ratioValue) {
-              updateRoomRatio(nr.id, nr.ratioValue);
-            }
-          });
-          regenerateLayout();
           setPreviewModal(null);
-          // Optional: toast success
+          // Optional: Open AI modal automatically
         },
         onCancel: () => setPreviewModal(null)
       });

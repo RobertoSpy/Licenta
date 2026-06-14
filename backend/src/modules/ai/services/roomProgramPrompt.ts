@@ -1,9 +1,8 @@
 import conformityRules from '../../../data/conformity-rules.json';
+import roomTaxonomy from '../../../data/room-taxonomy.json';
+import budgetRules from '../../../data/budget-rules.json';
 import type { RoomSuggestion, SuggestRoomsInput, SuggestedRoom } from '../../../core/types/roomSuggestion';
-
-export const VALID_ROOM_TYPES = ['hol', 'living', 'bucatarie', 'dormitor', 'baie', 'wc', 'camara', 'birou', 'sala_mese', 'terasa', 'debara'] as const;
-export const VALID_ZONES = ['distributie', 'zi', 'noapte', 'tehnic'] as const;
-export const VALID_FLOORS = ['parter', 'etaj1'] as const;
+import { normalizeLabel } from '../../../core/services/layout/layoutUtils';
 
 export function buildRoomProgramPrompt(params: {
   input: SuggestRoomsInput;
@@ -18,6 +17,8 @@ export function buildRoomProgramPrompt(params: {
     'parter',
     ...Array.from({ length: input.totalFloors - 1 }, (_, i) => `etaj${i + 1}`),
   ].filter(Boolean).join(' + ');
+
+  const budgetRuleText = (budgetRules as any)[input.budgetCategory] || (budgetRules as any).mediu;
 
   return `Ești Zidario, expert în proiectare rezidențială română.
 Recomandă programul funcțional optim pentru o locuință.
@@ -35,24 +36,20 @@ DATE PROIECT:
 NORMATIVE ÎN VIGOARE (consultă și respectă obligatoriu):
 ${ragContext}
 
-RESTRICȚII MINIME LEGALE (din Legea 114 / NP057-2002):
+RESTRICȚII MINIME LEGALE:
 Te rugăm să respecți cu strictețe următoarele suprafețe minime pentru a nu genera un plan ilegal:
 ${(conformityRules as any).room_min_sqm.map((r: any) => `- ${r.targets.join('/')}: minim ${r.min_sqm} mp`).join('\n')}
 
 REGULI STRICTE DE BUGET (${input.budgetCategory.toUpperCase()}):
-${input.budgetCategory === 'economic' 
-  ? "- Spațiile trebuie să fie EXTREM DE EFICIENTE. Folosește suprafețe individuale FOARTE APROPIATE de minimul legal prevăzut de normativele primite în context.\n- FĂRĂ camere extravagante (fără dressinguri mari, fără multiple băi en-suite, fără birouri uriașe).\n- Dacă ai o suprafață totală permisă mare, mai bine adaugi un dormitor util în plus decât să faci un living disproporționat de uriaș."
-  : input.budgetCategory === 'mediu'
-  ? "- Balans între eficiență și confort. Depășește minimele legale din context cu 20-30% pentru confort sporit.\n- Permis un birou și un dressing dedicat. Băi decente, compartimentare aerisită."
-  : "- Fără restricții de eficiență extremă. Maximizează luxul și spațiul. Living-uri generoase care depășesc considerabil minimul legal, dormitoare matrimoniale cu baie și dressing propriu (en-suite).\n- Poți adăuga spații de relaxare, spălătorie, terase generoase."}
+${budgetRuleText}
 
 RĂSPUNDE DOAR CU JSON. ESTE STRICT OBLIGATORIU SĂ INCLUZI TOATE CÂMPURILE PENTRU FIECARE CAMERĂ (dacă nu ai o valoare, folosește null sau []):
 {
   "rooms": [
     {
-      "type": "hol",
-      "label": "Hol Intrare",
-      "weightRatio": 1.0,
+      "type": "TIP_CAMERA_AICI",
+      "label": "Nume Afișat",
+      "weightRatio": 2.5,
       "zone": "distributie",
       "floor": "parter",
       "isCirculation": true,
@@ -71,15 +68,13 @@ RĂSPUNDE DOAR CU JSON. ESTE STRICT OBLIGATORIU SĂ INCLUZI TOATE CÂMPURILE PEN
   "normativeNote": "..."
 }
 
-Tipuri valide 'type': ${VALID_ROOM_TYPES.join(', ')}
-Zone valide: ${VALID_ZONES.join(', ')}
-Floor valide: ${VALID_FLOORS.join(', ')}
-weightRatio: 0.5 (mic) → 4.0 (mare)`;
+Tipuri de bază recunoscute: ${roomTaxonomy.valid_types.join(', ')}
+Poți adăuga și alte tipuri funcționale specifice stilului arhitectural ales (ex: dressing, sala_sport, spalatorie, wine_cellar, home_cinema si altele) dacă sunt justificate de stilul ${input.houseStyle} și bugetul ${input.budgetCategory}.
+Orice tip nou trebuie să aibă zona validă din: ${roomTaxonomy.valid_zones.join(', ')}
+Floor valide: ${roomTaxonomy.valid_floors.join(', ')}
+weightRatio: 0.5 (mic) → 4.0 (mare) — proporția relativă față de celelalte camere`;
 }
 
-function normalizeLabel(label?: string): string {
-  return (label ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-}
 
 export function validateRoomSuggestion(parsed: RoomSuggestion, targetArea: number): RoomSuggestion {
   if (!parsed.rooms || !Array.isArray(parsed.rooms) || parsed.rooms.length === 0) {
@@ -91,6 +86,16 @@ export function validateRoomSuggestion(parsed: RoomSuggestion, targetArea: numbe
   }
 
   for (const room of parsed.rooms as SuggestedRoom[]) {
+    // 1. Clampare weightRatio
+    room.weightRatio = Math.min(Math.max(room.weightRatio ?? 1, 0.5), 4.0);
+
+    // 2. Validare open-world: Nu mai suprascriem tipul dacă e o cameră nouă
+    // Verificăm doar ca zona funcțională să fie corectă, indiferent de tip.
+    if (!roomTaxonomy.valid_zones.includes(room.zone as any)) {
+      room.zone = 'zi'; // fallback safe doar pentru zonă
+    }
+
+    // 4. Validare minim legal
     const rule = (conformityRules as any).room_min_sqm.find((r: any) => r.targets.includes(normalizeLabel(room.type)));
     if (rule && (room.minSqm === null || room.minSqm < rule.min_sqm)) {
       room.minSqm = rule.min_sqm;

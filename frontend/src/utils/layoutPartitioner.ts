@@ -1,6 +1,10 @@
 // frontend/src/utils/layoutPartitioner.ts
 // Frontend helper shared by the editor UI only.
 // The real layout generator lives in backend/src/core/services/layout/layoutPartitioner.ts.
+//
+// IMPORTANT: calculateShapeArea here is used ONLY for local UI display (showing approximate
+// area in the left panel). Layout generation always goes through the backend API.
+// If the backend formula changes, update this function too to keep UI estimates consistent.
 
 export interface ConfiguratorRoom {
   id: string;
@@ -24,6 +28,8 @@ export interface ConfiguratorDimensions {
   wingLengthM?: number;
 }
 
+/** Calculates the usable area for a given shape and bounding box.
+ *  Mirrors backend layoutUtils.calculateShapeArea — keep in sync if formulas change. */
 export function calculateShapeArea(shape: string, dims: ConfiguratorDimensions): number {
   const w = dims.widthM;
   const h = dims.heightM;

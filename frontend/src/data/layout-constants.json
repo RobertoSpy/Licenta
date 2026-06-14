@@ -1,0 +1,53 @@
+{
+  "pixels_per_meter": 20,
+  "offset_canvas_m": 2,
+  "wall": {
+    "exterior_thickness_m": 0.25,
+    "interior_thickness_m": 0.125
+  },
+  "door": {
+    "interior_m": 0.8,
+    "exterior_m": 0.9,
+    "bathroom_m": 0.7
+  },
+  "window": {
+    "standard_width_m": 1.2,
+    "day_room_ratio": 0.125,
+    "night_room_ratio": 0.10,
+    "standard_height_m": 1.5
+  },
+  "treemap": {
+    "gap_tolerance_rectangle": 0.18,
+    "gap_tolerance_complex": 0.35,
+    "min_overlap_m": 0.6,
+    "touches_threshold_m": 0.15
+  },
+  "terrace": {
+    "max_width_ratio": 0.6,
+    "max_width_m": 8,
+    "fallback_sqm": 15
+  },
+  "shape_multipliers": {
+    "rectangle": 1.0,
+    "l_shape": 1.35,
+    "u_shape": 1.5,
+    "t_shape": 1.25
+  },
+  "shapes": [
+    { "value": "rectangle", "label": "Dreptunghiulară (Eficient & Economic)" },
+    { "value": "l_shape", "label": "În formă de L (Protejează curtea)" },
+    { "value": "u_shape", "label": "În formă de U (Intimitate maximă)" },
+    { "value": "t_shape", "label": "În formă de T (Separare clară zone)" }
+  ],
+  "floors": [
+    { "key": "parter", "label": "Parter" },
+    { "key": "etaj1", "label": "Etaj 1" }
+  ],
+  "ratio_presets": [
+    { "value": 0.8, "label": "Foarte Mică" },
+    { "value": 1.2, "label": "Mică" },
+    { "value": 1.8, "label": "Medie" },
+    { "value": 2.5, "label": "Mare" },
+    { "value": 3.5, "label": "Foarte Mare" }
+  ]
+}

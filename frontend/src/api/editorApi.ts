@@ -1,26 +1,33 @@
 import { apiPrivate } from './axios';
 import type { CanvasElement } from '../hooks/useEditorState';
 
-export type FloorKey = 'parter' | 'etaj1';
+export type FloorKey = 'parter' | 'etaj1' | 'subsol';
 
 export const FLOOR_LABELS: Record<FloorKey, string> = {
   parter:   'Parter',
   etaj1:    'Etaj 1',
+  subsol:   'Subsol',
 };
 
 export interface GenerateLayoutPayload {
   projectId: number;
   totalFloorAreaSqm: number;
   style: string;
-  bedrooms: number;
+  familySize: number;
+  shape?: 'rectangle' | 'l_shape' | 'u_shape' | 't_shape';
 }
 
 export const editorApi = {
   async saveFloor(projectId: number, floor: FloorKey, state: any, label?: string): Promise<void> {
+    const isArray = Array.isArray(state);
+    const planJSON = isArray 
+      ? { elements: state, savedAt: Date.now() }
+      : { ...state, savedAt: Date.now() };
+
     await apiPrivate.post('/editor/snapshots', {
       projectId,
       floor,
-      planJSON: { ...state, savedAt: Date.now() },
+      planJSON,
       label,
     });
   },

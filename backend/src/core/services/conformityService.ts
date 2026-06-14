@@ -252,7 +252,11 @@ export const conformityService = {
     const corridorRuleJSON = getClearanceRule('L114_CORRIDOR_WIDTH', purpose);
     const doorRuleJSON = getClearanceRule('P118_DOOR_WIDTH', purpose);
 
-    const corridorMinM = corridorRuleRAG?.minValueM ?? corridorRuleJSON?.value ?? 1.2;
+    let corridorMinM = corridorRuleRAG?.minValueM ?? corridorRuleJSON?.value ?? 1.2;
+    // Limitator pentru clădiri rezidențiale: evităm regula de 2.1m din normativul de dizabilități (NP051)
+    if (purpose === 'residential' && corridorMinM > 1.5) {
+      corridorMinM = corridorRuleJSON?.value ?? 1.2;
+    }
     const doorMinM = doorRuleRAG?.minValueM ?? doorRuleJSON?.value ?? 0.8;
 
     // Verificare lățime coridor

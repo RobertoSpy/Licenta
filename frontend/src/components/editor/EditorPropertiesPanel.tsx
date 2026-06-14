@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useEditorState, pxToMeters } from '../../hooks/useEditorState';
-import { type ConformityRoom } from '../../hooks/useConformityCheck';
+import { type ConformityRoom, type ConformityRuleIssue } from '../../hooks/useConformityCheck';
 import { Trash2, Tag, Scale, Info, CheckCircle2, AlertTriangle, XCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import LAYOUT_CONSTANTS from '../../data/layout-constants.json';
 
 interface Props {
   onRenameRequest: (id: string) => void;
   rooms?: ConformityRoom[];
+  violationIssues?: ConformityRuleIssue[];
+  warningIssues?: ConformityRuleIssue[];
 }
 
 const statusConfig = {
@@ -15,16 +18,8 @@ const statusConfig = {
   error:   { icon: <XCircle className="w-4 h-4 text-red-500" />,          text: 'Neconformă legal', labelColor: 'text-red-700 bg-red-50 border-red-100' },
 };
 
-const RATIO_PRESETS = [
-  { value: 0.8, label: 'Foarte Mică' },
-  { value: 1.2, label: 'Mică' },
-  { value: 1.8, label: 'Medie' },
-  { value: 2.5, label: 'Mare' },
-  { value: 3.5, label: 'Foarte Mare' }
-];
-
-export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms = [] }) => {
-  const { elements, selectedId, selectElement, deleteElement, activeRooms, updateRoomRatio, addManualOpening, updateElement } = useEditorState();
+export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms = [], violationIssues = [], warningIssues = [] }) => {
+  const { elements, selectedId, selectElement, deleteElement, activeRooms, addManualOpening, updateElement } = useEditorState();
 
   const currentSelected = elements.find((el) => el.id === selectedId);
   const [selected, setSelected] = useState(currentSelected);
@@ -183,32 +178,7 @@ export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms 
                     </div>
                   )}
 
-                  {/* Pondere mărime (ratios) */}
-                  {selected.type === 'room' && activeRooms.find((r) => r.id === selected.id) && (
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Scale className="w-3.5 h-3.5 text-slate-400" /> Pondere Mărime
-                      </label>
-                      <div className="space-y-1.5">
-                        {RATIO_PRESETS.map((preset) => {
-                          const actRoom = activeRooms.find((r) => r.id === selected.id);
-                          return (
-                            <button
-                              key={preset.value}
-                              onClick={() => updateRoomRatio(selected.id, preset.value)}
-                              className={`w-full text-left px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
-                                actRoom?.ratioValue === preset.value
-                                  ? 'border-orange-500 bg-orange-50 text-orange-700'
-                                  : 'border-slate-100 hover:bg-slate-50 text-slate-600'
-                              }`}
-                            >
-                              {preset.label} (x{preset.value})
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+
 
                   {/* Dimensiuni calculate */}
                   <div className="space-y-2">
@@ -248,15 +218,21 @@ export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms 
                             {statusDetails.icon}
                             <span>{statusDetails.text}</span>
                           </div>
-                          {conformityData?.minRequiredSqm && (
-                            <div className="text-[11px] leading-relaxed pt-1.5 border-t border-current/10 font-medium">
-                              {status === 'ok' ? (
-                                <p>Camera respectă suprafața utilă minimă de <strong>{conformityData.minRequiredSqm} m²</strong> conform Legii 114/1996.</p>
-                              ) : (
-                                <p>Suprafața utilă de <strong>{totalSqm} m²</strong> este sub minimul de <strong>{conformityData.minRequiredSqm} m²</strong>. Mărește ponderea mărimii sau dimensiunea casei.</p>
-                              )}
-                            </div>
-                          )}
+                          <div className="text-[11px] leading-relaxed pt-1.5 border-t border-current/10 font-medium space-y-2">
+                            {status === 'ok' ? (
+                              <p>Camera respectă standardele minime conform Legii 114/1996.</p>
+                            ) : (
+                              // Găsim problemele specifice acestei camere
+                              [...violationIssues, ...warningIssues]
+                                .filter(issue => issue.targetId === selected.id)
+                                .map((issue, idx) => (
+                                  <div key={idx} className="flex flex-col gap-0.5">
+                                    <span className="font-bold">{issue.message}</span>
+                                    <span className="opacity-80">{issue.suggestion}</span>
+                                  </div>
+                                ))
+                            )}
+                          </div>
                         </div>
                       </div>
                     );

@@ -108,8 +108,9 @@ function semanticChunk(text: string, source: string): SemanticChunk[] {
   if (!config) throw new Error(`Normativ necunoscut în registry: ${source}`);
 
   const chunks: SemanticChunk[] = [];
+  // Support both Markdown headers (# Title) and traditional Romanian legal headers
   const headerPattern =
-    /(?=\n\s*(?:\d+\.\d+(?:\.\d+(?:\.\d+)?)?|Art(?:icolul?)?\.?\s*\d+|CAPITOLUL\s+(?:\d+|[IVX]+)|Cap(?:itolul?)?\.?\s+(?:\d+|[IVX]+)|Anexa\s+(?:[Nn]r\.)?\s*[A-Z\d]+|[A-G]\.\s+[A-Z])[^\n]*\n)/gi;
+    /(?=\n\s*(?:#{1,4}\s+|(?:\d+\.\d+(?:\.\d+(?:\.\d+)?)?|Art(?:icolul?)?\.?\s*\d+|CAPITOLUL\s+(?:\d+|[IVX]+)|Cap(?:itolul?)?\.?\s+(?:\d+|[IVX]+)|Anexa\s+(?:[Nn]r\.)?\s*[A-Z\d]+|[A-G]\.\s+[A-Z]))[^\n]*\n)/gi;
 
   const rawSections = text.split(headerPattern).filter(s => s.trim().length > 0);
 

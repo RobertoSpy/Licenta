@@ -242,6 +242,33 @@ export const bomService = {
     const materials = await prisma.material.findMany();
     const overrides = await prisma.projectMaterialOverride.findMany({ where: { projectId } });
 
+    // ─── Construim map: formulaKey → structuralType al materialului ales ────────────────
+    // Citim structuralType direct din DB (câmpul nou) — fără regex, fără hardcode.
+    const selectedStructuralTypes = new Map<string, string>();
+    for (const override of overrides) {
+      const mat = materials.find(m => m.id === override.materialId);
+      if (mat && (mat as any).structuralType) {
+        selectedStructuralTypes.set(override.formulaKey, (mat as any).structuralType);
+      }
+    }
+    // Default pentru wall_exterior: BCA (conform defaultMaterialCode din bom-formulas.json)
+    if (!selectedStructuralTypes.has('wall_exterior')) {
+      selectedStructuralTypes.set('wall_exterior', 'BCA');
+    }
+    console.log(`[BOM] Material structural wall_exterior: ${selectedStructuralTypes.get('wall_exterior')}`);
+
+    // ─── Context pentru evaluatorul de upgrades ────────────────────────────────────
+    const ag = project.seismicZone ? parseFloat(project.seismicZone.replace('g', '')) : 0;
+    const frostDepthCm = project.frostDepthCm ?? 80;
+    const isWeakSoil = project.soilType ? /argi|lut|loess|praf|turb|umpl/i.test(project.soilType) : false;
+    const upgradeCtx = {
+      ag,
+      frostDepthCm,
+      isWeakSoil,
+      houseStyle:  project.houseStyle  ?? '',
+      energyClass: project.energyClass ?? '',
+    };
+
     // 9. Evaluăm fiecare formulă
     const bomItems: Prisma.ProjectBOMCreateManyInput[] = [];
     let totalEstimatedCost = 0;
@@ -250,10 +277,17 @@ export const bomService = {
       // Sărim meta-blocul
       if (formulaKey === '_meta') continue;
 
+      // ─── Evaluare generică a condiției declarative din JSON ───────────────────────
+      // Niciun formulaKey hardcodat — engine-ul evaluează regula descrisă în JSON.
+      if (formula.condition) {
+        const { formulaKey: refKey, structuralType: required } = formula.condition;
+        const actual = selectedStructuralTypes.get(refKey) ?? 'BCA';
+        if (actual !== required) continue;
+      }
+
       try {
         const rawQuantity = evaluateFormula(formula.formula, vars);
         if (!isFinite(rawQuantity) || rawQuantity <= 0) {
-          // Cantitate 0 este normală (ex: etaje suplimentare când floors_count=1)
           if (rawQuantity < 0) console.warn(`[BOM] Formula ${formulaKey} a produs cantitate negativă: ${rawQuantity}`);
           continue;
         }
@@ -261,33 +295,43 @@ export const bomService = {
         const quantityWithWaste = rawQuantity * (1 + formula.wastePercent / 100);
         const finalQty = Math.ceil(quantityWithWaste * 100) / 100;
 
-        // 10. Selectăm materialul dinamic folosind materialSelector
-        const query: MaterialQuery = formula.materialQuery;
+        // 10. Selectăm materialul — priorități:
+        //   1. Override manual (prioritate absolută)
+        //   2. defaultMaterialCode + upgrades din JSON (data-driven)
+        //   3. materialSelector (NORMATIVE_BUDGET / FREE_PREFERENCE)
         let material: any = null;
 
-        if (query) {
-          // Motorul de upgrade (STRICT_NORMATIVE depinde de acest engineCode)
-          let engineCode: string | undefined = undefined;
-          if (query.engineKey === 'concreteCode') engineCode = ctxWithPlan.concreteCode;
-          if (query.engineKey === 'rebarCode') engineCode = ctxWithPlan.rebarCode;
-          // Pt upgrade-uri din materialSelector.ts
-          let projectSeismicZoneFloat: number | undefined = undefined;
-          if (project.seismicZone) {
-             projectSeismicZoneFloat = parseFloat(project.seismicZone.replace('g', ''));
-          }
-
-          material = await selectMaterialForBOM(query, (project as any).budgetCategory || 'mediu', engineCode, projectSeismicZoneFloat);
-        }
-
-        // Override manual (are prioritate absolută)
+        // 10a. Override manual
         const override = overrides.find(o => o.formulaKey === formulaKey);
         if (override) {
-          const overrideMat = materials.find(m => m.id === override.materialId);
-          if (overrideMat) material = overrideMat;
+          material = materials.find(m => m.id === override.materialId) ?? null;
+        }
+
+        // 10b. defaultMaterialCode + upgrades (data-driven, fără hardcode în TS)
+        if (!material && formula.defaultMaterialCode) {
+          const resolvedCode = resolveUpgradedMaterialCode(formula, upgradeCtx);
+          material = materials.find(m => m.internalCode === resolvedCode) ?? null;
+          if (!material) {
+            // Fallback la materialSelector dacă codul nu e în catalog
+            console.warn(`[BOM] defaultMaterialCode "${resolvedCode}" nu există în catalog, fall back la selector`);
+          }
+        }
+
+        // 10c. materialSelector (STRICT_NORMATIVE / NORMATIVE_BUDGET / FREE_PREFERENCE)
+        if (!material) {
+          const query: MaterialQuery = formula.materialQuery;
+          if (query) {
+            let engineCode: string | undefined = undefined;
+            if (query.engineKey === 'concreteCode') engineCode = ctxWithPlan.concreteCode;
+            if (query.engineKey === 'rebarCode')    engineCode = ctxWithPlan.rebarCode;
+            let projectSeismicZoneFloat: number | undefined = undefined;
+            if (project.seismicZone) projectSeismicZoneFloat = ag;
+            material = await selectMaterialForBOM(query, (project as any).budgetCategory || 'mediu', engineCode, projectSeismicZoneFloat);
+          }
         }
 
         if (!material) {
-          console.warn(`[BOM] ❌ Niciun material conform găsit pentru formula "${formulaKey}". (query: ${JSON.stringify(query)})`);
+          console.warn(`[BOM] ❌ Niciun material conform găsit pentru formula "${formulaKey}". (query: ${JSON.stringify(formula.materialQuery)})`);
           continue;
         }
 
@@ -369,6 +413,41 @@ export const bomService = {
     ].join('\n');
   },
 };
+
+// ─────────────────────────────────────────────────────────────────
+// HELPER PRIVAT — rezolvă defaultMaterialCode + upgrades din JSON
+//
+// Evaluează lista de upgrades din bom-formulas.json și returnează
+// internalCode-ul materialului potrivit contextului proiectului.
+// ZERO hardcodare în TypeScript — toate regulile sunt în JSON.
+// ─────────────────────────────────────────────────────────────────
+
+interface UpgradeContext {
+  ag: number;
+  frostDepthCm: number;
+  isWeakSoil: boolean;
+  houseStyle: string;
+  energyClass: string;
+}
+
+function resolveUpgradedMaterialCode(
+  formula: { defaultMaterialCode: string; upgrades?: Array<{ if: Record<string, any>; use: string }> },
+  ctx: UpgradeContext
+): string {
+  for (const upgrade of (formula.upgrades ?? [])) {
+    const cond = upgrade.if;
+    // Toate condițiile din obiectul `if` trebuie să fie adevărate (AND logic)
+    if (cond.ag_gte           !== undefined && ctx.ag < cond.ag_gte)                        continue;
+    if (cond.ag_lt            !== undefined && ctx.ag >= cond.ag_lt)                        continue;
+    if (cond.frost_depth_cm_gt !== undefined && ctx.frostDepthCm <= cond.frost_depth_cm_gt) continue;
+    if (cond.soil_type_weak   !== undefined && ctx.isWeakSoil !== cond.soil_type_weak)      continue;
+    if (cond.energy_class     !== undefined && ctx.energyClass !== cond.energy_class)       continue;
+    if (cond.house_style_in   !== undefined && !cond.house_style_in.includes(ctx.houseStyle)) continue;
+    // Toate condițiile satisfăcute → prima regulă câștigă
+    return upgrade.use;
+  }
+  return formula.defaultMaterialCode;
+}
 
 // ─────────────────────────────────────────────────────────────────
 // HELPER PRIVAT — construiește un item BOM cu nota completă

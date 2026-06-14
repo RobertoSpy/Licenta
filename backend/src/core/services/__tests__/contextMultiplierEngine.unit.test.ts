@@ -15,8 +15,9 @@ describe('contextMultiplierEngine', () => {
     it('parses seismicZone properly and selects rule', () => {
       const result = buildContextMultipliers({ seismicZone: '0.35g' });
       expect(result.seismic_multiplier).toBe(1.60); // DCH, ag >= 0.35
-      expect(result.exteriorWallCode).toBe('CARAMIDA_POROTHERM_38');
-      expect(result.rebarCode).toBe('STANDARD_FIER_14');
+      // rebarCode rămâne în contextMultiplierEngine (STRICT_NORMATIVE P100-1/2013)
+      expect(result.rebarCode).toBe('STANDARD_FIER_14'); // ag>=0.30 → fier 14mm
+      // Nota: exteriorWallCode, windowsCode etc. au fost mutate în bom-formulas.json
     });
 
     it('selects rule for ag=0.30g', () => {
@@ -65,9 +66,8 @@ describe('contextMultiplierEngine', () => {
       const result = buildContextMultipliers({ frostDepthCm: 100 });
       expect(result.concreteCode).toBe('STANDARD_BETON_C25_30');
       expect(result.concreteClass).toBe('C25/30-XF2');
-      expect(result.exteriorWallCode).toBe('BCA_YTONG_30');
-      expect(result.insulationRoofCode).toBe('VATA_MINERALA_20');
-      expect(result.windowsCode).toBe('FEREASTRA_PVC_3K');
+      // Nota: exteriorWallCode, insulationRoofCode, windowsCode au fost mutate
+      // în bom-formulas.json ca defaultMaterialCode + upgrades (data-driven).
     });
 
     it('handles basement logic correctly', () => {
@@ -76,12 +76,14 @@ describe('contextMultiplierEngine', () => {
       expect(result.concrete_note).toContain('[SĂPĂTURĂ/FUNDAȚIE ADÂNCĂ pt. SUBSOL (2.8m)]');
     });
 
-    it('determines windows code based on style and energy class', () => {
+    it('rebarCode rămâne STANDARD_FIER_12 pentru zone fără seism ridicat', () => {
       const result = buildContextMultipliers({ houseStyle: 'Modern' });
-      expect(result.windowsCode).toBe('FEREASTRA_ALUMINIU');
+      expect(result.rebarCode).toBe('STANDARD_FIER_12');
+      // Nota: windowsCode (FEREASTRA_ALUMINIU) a fost mutat în bom-formulas.json upgrades.
 
       const result2 = buildContextMultipliers({ energyClass: 'A' });
-      expect(result2.windowsCode).toBe('FEREASTRA_PVC_3K');
+      expect(result2.rebarCode).toBe('STANDARD_FIER_12');
+      // Nota: windowsCode (FEREASTRA_PVC_3K) a fost mutat în bom-formulas.json upgrades.
     });
 
     it('calculates foundation width taking floors into account', () => {

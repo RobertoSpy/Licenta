@@ -13,6 +13,7 @@ interface BaselineMaterial {
   description: string;
   isDefault: boolean;
   storeUrl?: string | null;
+  structuralType?: string | null; // "BCA" | "CARAMIDA" | null
 }
 
 const BASELINE_MATERIALS: BaselineMaterial[] = [
@@ -94,42 +95,48 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
     name: 'BCA Ytong 25cm D3',
     category: 'Structură', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 65,
     description: 'Ușor, izolant termic, recomandat ag≤0.25g, sol stabil.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-thermo-nf-599-x-250-x-199-mm-lxgxh/p/6053253'
+    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-thermo-nf-599-x-250-x-199-mm-lxgxh/p/6053253',
+    structuralType: 'BCA',
   },
   {
     internalCode: 'BCA_YTONG_30',
     name: 'BCA Ytong 30cm D4',
     category: 'Structură', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 75,
     description: 'Mai gros, clasă energetică mai bună, recomandat climă rece.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-thermo-nf-599-x-300-x-199-mm-lxgxh/p/6053254'
+    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-thermo-nf-599-x-300-x-199-mm-lxgxh/p/6053254',
+    structuralType: 'BCA',
   },
   {
     internalCode: 'CARAMIDA_POROTHERM_30',
     name: 'Cărămidă Porotherm 30cm',
     category: 'Structură', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 80,
     description: 'Tradițional, mai rezistent seismic pe sol slab.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295'
+    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295',
+    structuralType: 'CARAMIDA',
   },
   {
     internalCode: 'CARAMIDA_POROTHERM_38',
     name: 'Cărămidă Porotherm 38cm',
     category: 'Structură', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 95,
     description: 'Pentru climă rece, izolație termică superioară din masă.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295'
+    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295',
+    structuralType: 'CARAMIDA',
   },
   {
     internalCode: 'STANDARD_BCA_12',
     name: 'BCA Ytong 12.5cm',
     category: 'Structură', subcategory: 'Pereți interiori', unit: 'mp', pricePerUnit: 38,
     description: 'Standard despărțitor, greutate redusă pe planșeu.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-interio-nf-599-x-150-x-199-mm-lxgxh/p/6053251'
+    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-interio-nf-599-x-150-x-199-mm-lxgxh/p/6053251',
+    structuralType: 'BCA',
   },
   {
     internalCode: 'CARAMIDA_12',
     name: 'Cărămidă 12.5cm',
     category: 'Structură', subcategory: 'Pereți interiori', unit: 'mp', pricePerUnit: 45,
     description: 'Mai bună izolație fonică între camere.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295'
+    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295',
+    structuralType: 'CARAMIDA',
   },
   {
     internalCode: 'GIPS_CARTON_12',
@@ -353,6 +360,7 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
     category: 'Structură', subcategory: 'Mortar', unit: 'sac', pricePerUnit: 18,
     description: 'Mortar pentru utilizare generală (G) clasa M10 — prescripție CR 6-2013 Tab.3.1 (compoziție 1:2.5 ciment:nisip). Rost de 12mm conform CR 6-2013 §3.2.2(4). Standard pentru zidărie din cărămidă. 1 sac = ~12L mortar proaspăt.',
     isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/mortare-zidarie/c/296',
+    structuralType: 'CARAMIDA',
   },
   {
     internalCode: 'MORTAR_ZIDARIE_M5_SAC',
@@ -837,28 +845,31 @@ async function main() {
       await prisma.material.update({
         where: { internalCode: mat.internalCode },
         data: {
-          name:        mat.name,
-          description: mat.description,
-          storeUrl:    mat.storeUrl || null,
-        },
+          name:           mat.name,
+          subcategory:    mat.subcategory,
+          description:    mat.description,
+          storeUrl:       mat.storeUrl || null,
+          structuralType: mat.structuralType ?? null,
+        } as any, // structuralType e în schema.prisma; types se regenerează după migrate
       });
       console.log(`  [UPDATE] ${mat.internalCode}`);
       updated++;
     } else {
       await prisma.material.create({
         data: {
-          internalCode: mat.internalCode,
-          name:         mat.name,
-          category:     mat.category,
-          subcategory:  mat.subcategory,
-          unit:         mat.unit,
-          pricePerUnit: mat.pricePerUnit,
-          description:  mat.description,
-          isDefault:    mat.isDefault,
-          brand:        null,
-          storeUrl:     mat.storeUrl || null,
-          uValue:       null,
-        },
+          internalCode:   mat.internalCode,
+          name:           mat.name,
+          category:       mat.category,
+          subcategory:    mat.subcategory,
+          unit:           mat.unit,
+          pricePerUnit:   mat.pricePerUnit,
+          description:    mat.description,
+          isDefault:      mat.isDefault,
+          brand:          null,
+          storeUrl:       mat.storeUrl || null,
+          uValue:         null,
+          structuralType: mat.structuralType ?? null,
+        } as any, // structuralType e în schema.prisma; types se regenerează după migrate
       });
       console.log(`  [CREATE] ${mat.internalCode}`);
       created++;
@@ -907,8 +918,8 @@ async function main() {
   // Rulăm sincronizarea cu web scraper-ul automat
   console.log(`\n[seedBaselineMaterials] Rulare Web Scraper & Vectorizare...`);
   try {
-    const syncRes = await scraperService.syncAllMaterials(true);
-    console.log(`[seedBaselineMaterials] Scraper OK: ${syncRes.updated} materiale actualizate, ${syncRes.failed} erori.`);
+    const syncResult = await scraperService.syncAllMaterials({ generateEmbeddings: true });
+    console.log(`[seedBaselineMaterials] Scraper OK: ${syncResult.updated} materiale actualizate, ${syncResult.failed} erori.`);
   } catch(e) {
     console.error(`[seedBaselineMaterials] Eroare la scraper sync:`, e);
   }
