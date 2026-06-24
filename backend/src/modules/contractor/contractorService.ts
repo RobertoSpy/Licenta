@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma';
 
 export const contractorService = {
-  async getContractors(county?: string, specializations?: string[]) {
+  async getContractors(county?: string, specializations?: string[], page: number = 1, limit: number = 20) {
     const whereClause: any = {
       isVerified: true,
       isActive: true,
@@ -17,7 +17,10 @@ export const contractorService = {
       };
     }
 
-    return prisma.contractorProfile.findMany({
+    const total = await prisma.contractorProfile.count({ where: whereClause });
+    const skip = (page - 1) * limit;
+
+    const data = await prisma.contractorProfile.findMany({
       where: whereClause,
       include: {
         user: { select: { name: true, email: true } },
@@ -25,7 +28,19 @@ export const contractorService = {
       orderBy: {
         avgRating: 'desc',
       },
+      skip,
+      take: limit,
     });
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   },
 
   async getContractorById(id: number) {
@@ -127,10 +142,18 @@ export const contractorService = {
    * Returnează proiectele pentru care constructorul a câștigat oferta (status ACCEPTED).
    * userId = user-ul logat (CONTRACTOR)
    */
-  async getAcceptedProjects(userId: number) {
-    // Găsim profilul constructorului
+  async getAcceptedProjects(userId: number, page: number = 1, limit: number = 10) {
     const profile = await prisma.contractorProfile.findUnique({ where: { userId } });
-    if (!profile) return [];
+    if (!profile) return { data: [], pagination: { total: 0, page, limit, totalPages: 0 } };
+
+    const total = await prisma.contractorQuote.count({
+      where: {
+        contractorId: profile.id,
+        status: 'ACCEPTED'
+      }
+    });
+
+    const skip = (page - 1) * limit;
 
     const quotes = await prisma.contractorQuote.findMany({
       where: {
@@ -144,18 +167,28 @@ export const contractorService = {
           }
         }
       },
+      skip,
+      take: limit,
       orderBy: { updatedAt: 'desc' }
     });
 
-    return quotes.map(q => ({
-      id: q.project.id,
-      name: (q.project as any).title ?? `Proiect #${q.project.id}`,
-      county: (q.project as any).county ?? null,
-      buildingPurpose: (q.project as any).buildingPurpose ?? null,
-      totalArea: (q.project as any).totalArea ?? null,
-      createdAt: q.project.createdAt,
-      user: q.project.user,
-      totalAmount: q.totalAmount
-    }));
+    return {
+      data: quotes.map(q => ({
+        id: q.project.id,
+        name: (q.project as any).title ?? `Proiect #${q.project.id}`,
+        county: (q.project as any).county ?? null,
+        buildingPurpose: (q.project as any).buildingPurpose ?? null,
+        totalArea: (q.project as any).totalArea ?? null,
+        createdAt: q.project.createdAt,
+        user: q.project.user,
+        totalAmount: q.totalAmount
+      })),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   }
 };

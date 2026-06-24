@@ -23,15 +23,15 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, scale: 0.8, y: 20 },
-  visible: { 
-    opacity: 1, 
-    scale: 1, 
+  visible: {
+    opacity: 1,
+    scale: 1,
     y: 0,
-    transition: { 
-      type: "spring" as const, 
-      stiffness: 300, 
-      damping: 20, 
-      mass: 0.8 
+    transition: {
+      type: "spring" as const,
+      stiffness: 300,
+      damping: 20,
+      mass: 0.8
     }
   },
   exit: {
@@ -71,10 +71,10 @@ export const Step3Regulations = ({ data, updateData }: Props) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-body: JSON.stringify({
-  message: `Fă o sinteză tehnică, dar prietenoasă, a proiectului (max 5-6 rânduri) pentru un om non-tehnic. Ai datele: Județ ${data.county}, zonă seismică ${data.seismicZone}, adâncime îngheț ${data.frostDepthCm}cm. Casa are stil arhitectural ${data.houseStyle}, cu regim de înălțime P+${data.upperFloorsCount}${data.hasBasement ? ' și subsol' : ''}. Integrează aspecte despre arhitectură (cum influențează terenul și stilul ales structura de rezistență și compartimentarea), eficiență energetică (certificat energetic / norme NZEB) și un scurt sfat despre estimarea financiară/costul materialelor. Amintește-i că trebuie să ceară Certificatul de Urbanism de la primărie (maxim admis tehnic național: P+${data.maxAllowedFloors}). Nu pune întrebări la final.`,
-  screenContext: 'wizard',
-  contextString: `
+        body: JSON.stringify({
+          message: `Fă o sinteză tehnică, dar prietenoasă, a proiectului (max 5-6 rânduri) pentru un om non-tehnic. Ai datele: Județ ${data.county}, zonă seismică ${data.seismicZone}, adâncime îngheț ${data.frostDepthCm}cm. Casa are stil arhitectural ${data.houseStyle}, cu regim de înălțime P+${data.upperFloorsCount}${data.hasBasement ? ' și subsol' : ''}. Integrează aspecte despre arhitectură (cum influențează terenul și stilul ales structura de rezistență și compartimentarea), eficiență energetică (certificat energetic / norme NZEB) și un scurt sfat despre estimarea financiară/costul materialelor. Amintește-i că trebuie să ceară Certificatul de Urbanism de la primărie (maxim admis tehnic național: P+${data.maxAllowedFloors}). Nu pune întrebări la final.`,
+          screenContext: 'wizard',
+          contextString: `
     Județ: ${data.county}
     Localitate: ${data.locality}
     Zonă seismică: ${data.seismicZone}
@@ -85,7 +85,7 @@ body: JSON.stringify({
     Subsol: ${data.hasBasement ? 'Da' : 'Nu'}
     Etaje superioare: ${data.upperFloorsCount}
   `.trim()
-})
+        })
       });
 
       if (!response.body) return;
@@ -121,8 +121,8 @@ body: JSON.stringify({
   };
 
   // Determinarea limitei administrative de etaje (logica determinista)
-const maxFloors = data.maxAllowedFloors ?? 4;
-  
+  const maxFloors = data.maxAllowedFloors ?? 4;
+
   useEffect(() => {
     if (maxFloors !== data.maxAllowedFloors) {
       updateData({ maxAllowedFloors: maxFloors, minFoundationDepthCm: (data.frostDepthCm || 90) + 10 });
@@ -133,7 +133,7 @@ const maxFloors = data.maxAllowedFloors ?? 4;
     return (
       <div className="h-full flex flex-col items-center justify-center space-y-8 p-10">
         <div className="relative">
-          <motion.div 
+          <motion.div
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
             className="w-24 h-24 border-4 border-slate-200 border-t-buildorange rounded-full"
@@ -146,7 +146,7 @@ const maxFloors = data.maxAllowedFloors ?? 4;
           <h2 className="text-2xl font-black text-slate-800 tracking-tight">Predicting...</h2>
           <p className="text-slate-500 font-medium">Interogăm normativele P100-1/2013 și NP112 pentru locația ta.</p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-3xl">
           {[1, 2, 3].map(i => (
             <div key={i} className="h-32 bg-slate-100 animate-pulse rounded-2xl" />
@@ -157,7 +157,7 @@ const maxFloors = data.maxAllowedFloors ?? 4;
   }
 
   return (
-    <motion.div 
+    <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -172,7 +172,7 @@ const maxFloors = data.maxAllowedFloors ?? 4;
         {/* Card Seismicitate */}
         <motion.div variants={itemVariants} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform">
-             <ShieldCheck className="w-16 h-16 text-emerald-600" />
+            <ShieldCheck className="w-16 h-16 text-emerald-600" />
           </div>
           <p className="text-xs font-bold text-slate-400 uppercase mb-1">Zona Seismică (ag)</p>
           <p className="text-3xl font-black text-slate-900">{data.seismicZone || '0.20g'}</p>
@@ -184,7 +184,7 @@ const maxFloors = data.maxAllowedFloors ?? 4;
         {/* Card Fundație */}
         <motion.div variants={itemVariants} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform">
-             <Ruler className="w-16 h-16 text-blue-600" />
+            <Ruler className="w-16 h-16 text-blue-600" />
           </div>
           <p className="text-xs font-bold text-slate-400 uppercase mb-1">Cota minimă Fundare</p>
           <p className="text-3xl font-black text-slate-900">-{data.minFoundationDepthCm || 90} cm</p>
@@ -196,7 +196,7 @@ const maxFloors = data.maxAllowedFloors ?? 4;
         {/* Card Regim Inaltime */}
         <motion.div variants={itemVariants} className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:scale-125 transition-transform">
-             <AlertTriangle className="w-16 h-16 text-amber-400" />
+            <AlertTriangle className="w-16 h-16 text-amber-400" />
           </div>
           <p className="text-xs font-bold text-slate-400 uppercase mb-1">Limită Regim Înălțime</p>
           <p className="text-3xl font-black text-amber-400">P + {maxFloors - 1}</p>
@@ -205,40 +205,40 @@ const maxFloors = data.maxAllowedFloors ?? 4;
       </div>
 
       {/* Banner avertizare CU — după grid-ul cu 3 carduri */}
-<motion.div
-  variants={itemVariants}
-  className="bg-amber-50 border border-amber-200 rounded-2xl p-5"
->
-  <div className="flex items-start gap-3">
-    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-    <div>
-      <p className="font-semibold text-amber-800 text-sm">
-        Limita afișată este tehnică națională
-      </p>
-      <p className="text-amber-700 text-sm mt-1">
-        Normativele naționale permit maximum{' '}
-        <strong>P+{data.maxAllowedFloors}</strong> pentru zona ta. 
-        Primăria <strong>{data.locality}</strong>, județul{' '}
-        <strong>{data.county}</strong> poate impune restricții 
-        mai stricte prin PUG (Plan Urbanistic General).
-      </p>
-      <p className="text-amber-600 text-xs mt-2">
-        Obține <strong>Certificatul de Urbanism</strong> înainte 
-        de a demara proiectarea — termen legal 30 zile, 
-        taxă 5-30 RON, temei Legea 50/1991.
-      </p>
-    </div>
-  </div>
-</motion.div>
+      <motion.div
+        variants={itemVariants}
+        className="bg-amber-50 border border-amber-200 rounded-2xl p-5"
+      >
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold text-amber-800 text-sm">
+              Limita afișată este tehnică națională
+            </p>
+            <p className="text-amber-700 text-sm mt-1">
+              Normativele naționale permit maximum{' '}
+              <strong>P+{data.maxAllowedFloors}</strong> pentru zona ta.
+              Primăria <strong>{data.locality}</strong>, județul{' '}
+              <strong>{data.county}</strong> poate impune restricții
+              mai stricte prin PUG (Plan Urbanistic General).
+            </p>
+            <p className="text-amber-600 text-xs mt-2">
+              Obține <strong>Certificatul de Urbanism</strong> înainte
+              de a demara proiectarea — termen legal 30 zile,
+              taxă 5-30 RON, temei Legea 50/1991.
+            </p>
+          </div>
+        </div>
+      </motion.div>
 
       {/* AI Explanation Box with backdrop blur effects requested */}
-      <motion.div 
+      <motion.div
         variants={itemVariants}
         className="bg-white/60 backdrop-blur-xl border border-slate-200 rounded-3xl p-8 relative overflow-hidden shadow-sm"
       >
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-slate-900 rounded-xl">
-             <Brain className="w-5 h-5 text-amber-400" />
+            <Brain className="w-5 h-5 text-amber-400" />
           </div>
           <h3 className="text-lg font-bold text-slate-900">Analiza Expertului Zidario (AI)</h3>
           {isAiLoading && <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />}
@@ -249,7 +249,7 @@ const maxFloors = data.maxAllowedFloors ?? 4;
             {aiExplanation || (isAiLoading ? "Zidario analizează datele..." : "")}
           </p>
         </div>
-        
+
         {/* Visual decoration */}
         <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-amber-400/5 blur-3xl rounded-full" />
       </motion.div>

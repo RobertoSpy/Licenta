@@ -95,7 +95,7 @@ export const editorRepository = {
     let totalArea: number | null = null;
     try {
       const floorsCount = published.project.totalFloors || 1;
-      const res = extractMetricsFromSnapshot(published.planJSON, floorsCount, 0.9, 0.5);
+      const res = extractMetricsFromSnapshot([published.planJSON], floorsCount);
       if (res.fromSnapshot) {
         totalArea = res.metrics.totalFloorAreaSqm;
       }

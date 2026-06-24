@@ -70,16 +70,23 @@ function ContractorProjectsView() {
   const [acceptedProjects, setAcceptedProjects] = useState<AcceptedProject[]>([]);
   const [pendingQuotes, setPendingQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
       try {
         const [projRes, quotesRes] = await Promise.all([
-          apiPrivate.get('/contractors/me/accepted-projects'),
+          apiPrivate.get('/contractors/me/accepted-projects', { params: { page, limit: 12 } }),
           quoteApi.getContractorQuotes()
         ]);
-        setAcceptedProjects(projRes.data);
+        if (projRes.data?.data) {
+          setAcceptedProjects(projRes.data.data);
+          setTotalPages(projRes.data.pagination?.totalPages || 1);
+        } else {
+          setAcceptedProjects(projRes.data);
+        }
         setPendingQuotes(quotesRes.filter((q: Quote) => q.status === 'PENDING'));
       } catch (err) {
         console.error(err);
@@ -88,7 +95,7 @@ function ContractorProjectsView() {
       }
     };
     fetchAll();
-  }, []);
+  }, [page]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-10">
@@ -179,6 +186,31 @@ function ContractorProjectsView() {
               </motion.div>
             ))}
           </motion.div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center mt-8">
+            <span className="text-sm text-slate-500 font-medium">
+              Pagina {page} din {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl font-medium text-slate-700 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+              >
+                Înapoi
+              </button>
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl font-medium text-slate-700 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+              >
+                Înainte
+              </button>
+            </div>
+          </div>
         )}
       </section>
 
@@ -271,6 +303,8 @@ export const MyProjects = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
 
@@ -286,8 +320,15 @@ export const MyProjects = () => {
     (async () => {
       setIsLoading(true);
       try {
-        const res = await apiPrivate.get('/projects');
-        if (!cancelled) setProjects(res.data);
+        const res = await apiPrivate.get('/projects', { params: { page, limit: 12 } });
+        if (!cancelled) {
+          if (res.data?.data) {
+            setProjects(res.data.data);
+            setTotalPages(res.data.pagination?.totalPages || 1);
+          } else {
+            setProjects(res.data as any);
+          }
+        }
       } catch (err) {
         console.error("Eroare preluare proiecte:", err);
       } finally {
@@ -451,6 +492,31 @@ export const MyProjects = () => {
             </motion.div>
           ))}
         </motion.div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center mt-8">
+          <span className="text-sm text-slate-500 font-medium">
+            Pagina {page} din {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={page === 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="px-4 py-2 bg-white border border-slate-200 rounded-xl font-medium text-slate-700 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+            >
+              Înapoi
+            </button>
+            <button
+              disabled={page === totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="px-4 py-2 bg-white border border-slate-200 rounded-xl font-medium text-slate-700 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+            >
+              Înainte
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

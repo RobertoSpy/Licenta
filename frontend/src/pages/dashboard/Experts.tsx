@@ -26,11 +26,11 @@ export const Experts = () => {
     const fetchContractors = async () => {
       setLoading(true);
       try {
-        const data = await contractorApi.getContractors(
+        const response = await contractorApi.getContractors(
           countyFilter || undefined,
           selectedSpecialization ? [selectedSpecialization] : undefined
         );
-        setContractors(data);
+        setContractors(Array.isArray(response) ? response : (response.data || []));
       } catch (err) {
         console.error('Eroare la preluarea experților:', err);
       } finally {
@@ -47,7 +47,8 @@ export const Experts = () => {
       const fetchProjectsAndProfile = async () => {
         try {
           const res = await apiPrivate.get('/projects');
-          const publishedProjects = res.data.filter((p: any) => p.isPublishedForBidding);
+          const projectsArray = Array.isArray(res.data) ? res.data : (res.data.data || []);
+          const publishedProjects = projectsArray.filter((p: any) => p.isPublishedForBidding);
           setProjects(publishedProjects);
 
           const profileData = await contractorApi.getContractorById(selectedContractor.id);
@@ -290,7 +291,24 @@ export const Experts = () => {
                     </select>
                   </div>
 
-                  {selectedProjectObj && selectedProjectObj.constructionPhases && (
+                  {selectedProjectObj && selectedProjectObj.constructionPhases && (() => {
+                    const hasGeneral = selectedContractor.specializations.includes(ContractorSpecialization.CONSTRUCTII_GENERALE);
+                    const contractorSpecLabels = selectedContractor.specializations.map(s => SPECIALIZATION_LABELS[s]);
+                    const availablePhases = selectedProjectObj.constructionPhases.filter((phase: any) => {
+                      if (hasGeneral) return true;
+                      const baseName = phase.name.replace(/^\d+\.\s*/, '');
+                      return contractorSpecLabels.includes(baseName);
+                    });
+
+                    if (availablePhases.length === 0) {
+                      return (
+                        <div className="p-4 bg-orange-50 border border-orange-200 text-orange-800 rounded-xl mb-4 text-sm font-medium">
+                          Acest constructor nu are specializări compatibile cu etapele proiectului.
+                        </div>
+                      );
+                    }
+
+                    return (
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block text-sm font-bold text-slate-700">2. Alege Etapele (pe care le ofertează)</label>
@@ -298,20 +316,20 @@ export const Experts = () => {
                           <input 
                             type="checkbox" 
                             className="w-4 h-4 text-buildorange rounded border-slate-300 focus:ring-buildorange"
-                            checked={selectedPhases.length > 0 && selectedProjectObj.constructionPhases.filter((p: any) => !p.contractorId).every((p: any) => selectedPhases.includes(p.id))}
+                            checked={selectedPhases.length > 0 && availablePhases.filter((p: any) => !p.contractorId).every((p: any) => selectedPhases.includes(p.id))}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedPhases(selectedProjectObj.constructionPhases.filter((p: any) => !p.contractorId).map((p: any) => p.id));
+                                setSelectedPhases(availablePhases.filter((p: any) => !p.contractorId).map((p: any) => p.id));
                               } else {
                                 setSelectedPhases([]);
                               }
                             }}
                           />
-                          <span className="text-xs font-bold text-slate-600">Construcții Generale (Bifează tot ce e disponibil)</span>
+                          <span className="text-xs font-bold text-slate-600">Selectează Toate Disponibile</span>
                         </label>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-white border border-slate-200 rounded-xl">
-                        {selectedProjectObj.constructionPhases.map((phase: any) => {
+                        {availablePhases.map((phase: any) => {
                           const isAwarded = !!phase.contractorId;
                           return (
                           <label key={phase.id} className={`flex items-center gap-2 p-2 rounded-lg ${isAwarded ? 'opacity-50 cursor-not-allowed bg-slate-100' : 'hover:bg-slate-50 cursor-pointer'}`}>
@@ -330,7 +348,7 @@ export const Experts = () => {
                         )})}
                       </div>
                     </div>
-                  )}
+                  )})()}
 
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">3. Mesaj (Opțional)</label>

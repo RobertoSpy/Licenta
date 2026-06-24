@@ -2,7 +2,7 @@ import { extractMetricsFromSnapshot } from '../planMetricsExtractor';
 
 describe('planMetricsExtractor', () => {
   it('returns fallback if planJSON is invalid', () => {
-    const res = extractMetricsFromSnapshot(null, 2, 1, 0.5);
+    const res = extractMetricsFromSnapshot(null, 2);
     expect(res.fromSnapshot).toBe(false);
     expect(res.metrics.totalFloorAreaSqm).toBe(200); // 100 * 2 floors
     expect(res.metrics.perimeterM).toBe(40);
@@ -10,7 +10,7 @@ describe('planMetricsExtractor', () => {
 
   it('returns fallback if no rooms are found', () => {
     const planJSON = { elements: [{ type: 'wall', x: 0, y: 0, width: 100, height: 10 }] };
-    const res = extractMetricsFromSnapshot(planJSON, 1, 1, 0.5);
+    const res = extractMetricsFromSnapshot(planJSON, 1);
     expect(res.fromSnapshot).toBe(false);
   });
 
@@ -26,7 +26,7 @@ describe('planMetricsExtractor', () => {
       ]
     };
 
-    const res = extractMetricsFromSnapshot(planJSON, 1, 1.2, 0.6);
+    const res = extractMetricsFromSnapshot(planJSON, 1);
     expect(res.fromSnapshot).toBe(true);
     expect(res.metrics.totalFloorAreaSqm).toBe(100);
     expect(res.metrics.perimeterM).toBe(10); // Since we have 1 wall of 10m
@@ -48,7 +48,7 @@ describe('planMetricsExtractor', () => {
       ]
     };
 
-    const res = extractMetricsFromSnapshot(planJSON, 1, 1, 0.5);
+    const res = extractMetricsFromSnapshot(planJSON, 1);
     expect(res.metrics.countExteriorDoors).toBe(1);
   });
 
@@ -62,7 +62,7 @@ describe('planMetricsExtractor', () => {
       ]
     };
 
-    const res = extractMetricsFromSnapshot(planJSON, 1, 1, 0.5);
+    const res = extractMetricsFromSnapshot(planJSON, 1);
     expect(res.metrics.countExteriorDoors).toBe(0);
     expect(res.metrics.countInteriorDoors).toBe(1);
   });
@@ -78,7 +78,7 @@ describe('planMetricsExtractor', () => {
 
     // Bbox should be 0,0 to 200,200 => 10m x 10m.
     // perimeter fallback = 2 * (10 + 10) = 40.
-    const res = extractMetricsFromSnapshot(planJSON, 1, 1, 0.5);
+    const res = extractMetricsFromSnapshot(planJSON, 1);
     expect(res.metrics.perimeterM).toBe(40);
   });
 });

@@ -5,7 +5,7 @@ import { aiApi } from '../api/aiApi';
 
 export interface ConfiguratorRoom {
   id: string;
-  type?: string;
+  type?: string;        // tipul semantic al AI (dormitor, living, hol, baie etc.)
   label: string;
   ratioValue: number;
   minSqm?: number;
@@ -121,7 +121,7 @@ interface EditorStore {
   // Actions
   addElement: (el: Omit<CanvasElement, 'id'>) => CanvasElement;
   updateElement: (id: string, changes: Partial<CanvasElement>) => void;
-  deleteElement: (id: string) => void;
+  deleteElement: (id: string, options?: { makeVirtual?: boolean }) => void;
   deleteSelected: () => void;
   selectElement: (id: string | null) => void;
   setTool: (tool: ToolType) => void;
@@ -201,7 +201,7 @@ export const useEditorState = create<EditorStore>((set, get) => ({
   switchFloor: (floor, state) => {
     // Verificăm dacă state este doar un array de elemente (backward compatibility)
     const elements = Array.isArray(state) ? state : (state.elements ?? []);
-    
+
     set((prev) => ({
       activeFloor: floor,
       elements,
@@ -238,12 +238,51 @@ export const useEditorState = create<EditorStore>((set, get) => ({
     }));
   },
 
-  deleteElement: (id) => {
+  deleteElement: (id, options) => {
     get().pushToUndo();
     const { elements, activeRooms, addedOpenings, userDeletedOpenings } = get();
-    
+
     const target = elements.find(el => el.id === id);
     if (!target) return;
+
+    let nextElements = elements;
+
+    // --- LOGICA HIBRIDA: Dacă ștergem o ușă interioară, peretele devine open-space ---
+    if (target.type === 'door') {
+      const targetCX = target.x + target.width / 2;
+      const targetCY = target.y + target.height / 2;
+
+      // Find the wall that this door intersects
+      const intersectingWall = nextElements.find(el => {
+        if (el.type !== 'wall') return false;
+        // Check if door center is inside the wall bounding box (with some margin)
+        return (
+          targetCX >= el.x - 5 && targetCX <= el.x + el.width + 5 &&
+          targetCY >= el.y - 5 && targetCY <= el.y + el.height + 5
+        );
+      });
+
+      if (intersectingWall && options?.makeVirtual) {
+        nextElements = nextElements.map(el => 
+          el.id === intersectingWall.id 
+            ? { ...el, metadata: { ...el.metadata, isVirtualBoundary: true } }
+            : el
+        );
+      } else if (!intersectingWall && options?.makeVirtual) {
+        // Dacă e ușă interioară (nu atinge perete exterior), punem un perete virtual în locul ei pentru open-space
+        const virtualWall: CanvasElement = {
+          id: uuidv4(),
+          type: 'wall',
+          x: target.x,
+          y: target.y,
+          width: target.width,
+          height: target.height,
+          rotation: target.rotation,
+          metadata: { isVirtualBoundary: true }
+        };
+        nextElements = [...nextElements, virtualWall];
+      }
+    }
 
     let nextAdded = [...addedOpenings];
     const nextDeleted = [...userDeletedOpenings];
@@ -251,30 +290,25 @@ export const useEditorState = create<EditorStore>((set, get) => ({
 
     if (target.type === 'room') {
       nextActiveRooms = activeRooms.filter((r) => r.id !== id);
-    } else if (target.type === 'door' || target.type === 'window') {
+    } else if (target.type === 'door' || target.type === 'window' || target.type === 'staircase') {
       // Check if it was manually added
       const isAdded = addedOpenings.some(o => o.id === id);
       if (isAdded) {
         nextAdded = addedOpenings.filter(o => o.id !== id);
       } else {
-        // Automatically generated opening - mark coordinate as user-deleted so it is skipped during auto-generation
-        nextDeleted.push({ x: target.x, y: target.y, type: target.type });
+        // Automatically generated opening - mark coordinate for user deletion
+        nextDeleted.push({ type: target.type, x: target.x, y: target.y });
       }
     }
 
     set({
-      elements: elements.filter((el) => el.id !== id),
-      activeRooms: nextActiveRooms,
+      elements: nextElements.filter((el) => el.id !== id),
       addedOpenings: nextAdded,
       userDeletedOpenings: nextDeleted,
-      selectedId: get().selectedId === id ? null : get().selectedId,
+      activeRooms: nextActiveRooms,
+      selectedId: null,
       isDirty: true,
     });
-
-    // FIX: Nu mai apelăm regenerateLayout() la ștergerea unei camere.
-    // Regenerarea înlocuiește TOATE elementele (pereți, uși, ferestre) cu un plan nou-gol,
-    // distrugând planul generat de AI sau editat manual.
-    // Utilizatorul poate apăsa manual "Regenerează" din panel dacă vrea recalcul.
   },
 
   deleteSelected: () => {
@@ -332,21 +366,21 @@ export const useEditorState = create<EditorStore>((set, get) => ({
   setHouseShape: (newShape) => {
     get().pushToUndo();
     const { houseShape: oldShape, dimensions } = get();
-    
+
     if (oldShape !== newShape) {
       const oldArea = calculateShapeArea(oldShape, dimensions);
       const tempNewArea = calculateShapeArea(newShape, dimensions);
-      
+
       if (tempNewArea > 0 && oldArea > 0) {
         const scale = Math.sqrt(oldArea / tempNewArea);
-        
+
         const newDims = {
           widthM: parseFloat((dimensions.widthM * scale).toFixed(1)),
           heightM: parseFloat((dimensions.heightM * scale).toFixed(1)),
           wingWidthM: parseFloat(((dimensions.wingWidthM ?? 4) * scale).toFixed(1)),
           wingLengthM: parseFloat(((dimensions.wingLengthM ?? 4) * scale).toFixed(1))
         };
-        
+
         set({ houseShape: newShape, dimensions: newDims, isDirty: true });
       } else {
         set({ houseShape: newShape, isDirty: true });
@@ -358,25 +392,25 @@ export const useEditorState = create<EditorStore>((set, get) => ({
     get().pushToUndo();
     const { dimensions: oldDims, elements } = get();
     const newDims = { ...oldDims, ...dims };
-    
+
     // BUG 1 FIX - SCALARE PROPORȚIONALĂ ÎN LOC DE REGENERARE
     const scaleX = newDims.widthM / oldDims.widthM;
     const scaleY = newDims.heightM / oldDims.heightM;
-    
+
     const newElements = elements.map(el => {
       const nx = el.x * scaleX;
       const ny = el.y * scaleY;
-      
+
       if (el.type === 'room' || el.type === 'terasa') {
         return { ...el, x: nx, y: ny, width: el.width * scaleX, height: el.height * scaleY };
       } else if (el.type === 'wall') {
         const isHorizontal = el.width > el.height;
-        return { 
-          ...el, 
-          x: nx, 
-          y: ny, 
-          width: isHorizontal ? el.width * scaleX : el.width, 
-          height: isHorizontal ? el.height : el.height * scaleY 
+        return {
+          ...el,
+          x: nx,
+          y: ny,
+          width: isHorizontal ? el.width * scaleX : el.width,
+          height: isHorizontal ? el.height : el.height * scaleY
         };
       } else {
         // door, window, staircase
@@ -391,11 +425,11 @@ export const useEditorState = create<EditorStore>((set, get) => ({
     if (id1 === id2) return;
     get().pushToUndo();
     const { elements } = get();
-    
+
     // BUG 2 FIX - SWAP DOAR PE COORDONATE LOCALE (FĂRĂ REGENERARE)
     const el1 = elements.find(el => el.id === id1);
     const el2 = elements.find(el => el.id === id2);
-    
+
     if (el1 && el2 && el1.type === 'room' && el2.type === 'room') {
       const newElements = elements.map(el => {
         if (el.id === id1) {
@@ -491,17 +525,41 @@ export const useEditorState = create<EditorStore>((set, get) => ({
     const opening: CanvasElement = {
       id: uuidv4(),
       type,
-      x: newCenterX - w / 2, 
-      y: newCenterY - h / 2, 
-      width: w, 
-      height: h, 
+      x: newCenterX - w / 2,
+      y: newCenterY - h / 2,
+      width: w,
+      height: h,
       rotation: 0
     };
 
+    let nextElements = [...elements, opening];
+
+    // --- LOGICA HIBRIDA: Dacă adăugăm o ușă, reconstruim zidul ---
+    if (type === 'door') {
+      const openingCX = newCenterX;
+      const openingCY = newCenterY;
+
+      const intersectingWall = elements.find(el => {
+        if (el.type !== 'wall') return false;
+        return (
+          openingCX >= el.x - 5 && openingCX <= el.x + el.width + 5 &&
+          openingCY >= el.y - 5 && openingCY <= el.y + el.height + 5
+        );
+      });
+
+      if (intersectingWall && intersectingWall.metadata?.isVirtualBoundary) {
+        nextElements = nextElements.map(el =>
+          el.id === intersectingWall.id
+            ? { ...el, metadata: { ...el.metadata, isVirtualBoundary: false } }
+            : el
+        );
+      }
+    }
+
     const newAdded = [...addedOpenings, opening];
-    set({ 
+    set({
       addedOpenings: newAdded,
-      elements: [...elements, opening],
+      elements: nextElements,
       isDirty: true
     });
   },
@@ -510,8 +568,9 @@ export const useEditorState = create<EditorStore>((set, get) => ({
     get().pushToUndo();
     const newRooms: ConfiguratorRoom[] = rooms.map((r: any, i: number) => ({
       id: `ai-${Date.now()}-${i}`,
+      type: r.type,       // salvăm type-ul semantic de la AI!
       label: r.label,
-      zone: r.zone ?? 'zi',
+      zone: r.zone,
       ratioValue: r.weightRatio,
       minSqm: r.minSqm,
       maxSqm: r.maxSqm,

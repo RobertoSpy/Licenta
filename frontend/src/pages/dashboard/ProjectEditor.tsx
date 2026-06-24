@@ -11,10 +11,13 @@ import { EditorRoomsPanel } from '../../components/editor/EditorRoomsPanel';
 import { EditorPropertiesPanel } from '../../components/editor/EditorPropertiesPanel';
 import { EditorConformityAlert } from '../../components/editor/EditorConformityAlert';
 import { EditorVersionHistory } from '../../components/editor/EditorVersionHistory';
+import { AiRoomSuggestModal } from '../../components/editor/AiRoomSuggestModal';
 import { EditorChatSidebar } from '../../components/editor/EditorChatSidebar';
+import { useZidarioChat } from '../../hooks/useZidarioChat';
+import { AIChatBubble } from '../../components/ai/AIChatBubble';
 import { apiPrivate } from '../../api/axios';
 import { editorApi, FLOOR_LABELS, type FloorKey } from '../../api/editorApi';
-import { ArrowLeft, Layers, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Layers, ChevronRight, ChevronLeft } from 'lucide-react';
 import Konva from 'konva';
 import { pxToMeters } from '../../hooks/useEditorState';
 
@@ -79,6 +82,45 @@ const RoomLabelDialog: React.FC<RoomLabelDialogProps> = ({ id, onConfirm, onCanc
   );
 };
 
+// Dialog pentru ștergere ușă
+interface DeleteDoorDialogProps {
+  onConfirm: (makeVirtual: boolean) => void;
+  onCancel: () => void;
+}
+
+const DeleteDoorDialog: React.FC<DeleteDoorDialogProps> = ({ onConfirm, onCancel }) => {
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-96 space-y-4">
+        <h3 className="text-lg font-black text-slate-900">Ștergere Ușă</h3>
+        <p className="text-sm text-slate-600">Cum dorești să tratezi spațiul rămas după ștergerea ușii?</p>
+        <div className="grid grid-cols-1 gap-3 mt-4">
+          <button
+            onClick={() => onConfirm(false)}
+            className="p-3 text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-400 hover:bg-slate-100 transition-all text-left flex flex-col"
+          >
+            <span className="text-slate-900 font-bold">Zidește golul</span>
+            <span className="text-xs font-normal text-slate-500 mt-0.5">Se păstrează peretele plin (închide camera)</span>
+          </button>
+          <button
+            onClick={() => onConfirm(true)}
+            className="p-3 text-sm font-semibold text-buildorange bg-orange-50 border border-orange-200 rounded-xl hover:border-orange-500 hover:bg-orange-100 transition-all text-left flex flex-col"
+          >
+            <span className="font-bold">Transformă în Open-Space</span>
+            <span className="text-xs font-normal opacity-80 mt-0.5">Se demolează peretele (fără cost de zidărie)</span>
+          </button>
+        </div>
+        <button
+          onClick={onCancel}
+          className="w-full text-xs text-slate-400 hover:text-slate-700 transition-colors mt-2"
+        >
+          Anulează (Esc)
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ============================================================
 // Pagina principală editor
 // ============================================================
@@ -95,19 +137,24 @@ export const ProjectEditor: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [projectTitle, setProjectTitle] = useState('Proiect');
   const [projectData, setProjectData] = useState<Record<string, unknown>>({});
-  const [isChatOpen, setIsChatOpen] = useState(true);
   const [isSwitchingFloor, setIsSwitchingFloor] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [canGoNext, setCanGoNext] = useState(false);
+  const [canGoNext, setCanGoNext] = useState(true); // Dacă nu mai e chat-ul blocant, putem da continuare mereu (sau lăsăm validarea în altă parte)
 
   // Stare dialog label
   const [labelDialog, setLabelDialog] = useState<{ id: string; x: number; y: number } | null>(null);
+  
+  // Stare dialog ștergere ușă
+  const [deleteDoorId, setDeleteDoorId] = useState<string | null>(null);
+
+  // Stare panel stânga mobile
+  const [isRoomsPanelOpen, setIsRoomsPanelOpen] = useState(window.innerWidth > 768);
 
   const { 
     elements, updateElement, markClean, isDirty, undo, redo, deleteSelected, 
     setTool, setZoom, initializeFromProject, activeFloor, switchFloor,
     activeRooms, dimensions, houseShape, setProjectId,
-    addManualOpening, deleteElement
+    addManualOpening, deleteElement,
+    isAiModalOpen, setAiModalOpen
   } = useEditorState();
   const rooms = useRoomCalculator(elements);
   const doors = elements
@@ -140,6 +187,14 @@ export const ProjectEditor: React.FC = () => {
     deleteElement
   });
 
+  // Zidario Chat
+  const projectContext = {
+    elements: elements.length,
+    violations: violations.length,
+    warnings: warnings.length
+  };
+  const chatState = useZidarioChat('editor', projectId, projectContext);
+
   // Auto-save
   useEditorAutoSave(projectId);
 
@@ -169,7 +224,16 @@ export const ProjectEditor: React.FC = () => {
       if (e.ctrlKey && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
       if (e.ctrlKey && e.key === 's') { e.preventDefault(); handleManualSave(); return; }
       if (e.ctrlKey && e.key === '0') { e.preventDefault(); setZoom(1); return; }
-      if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected(); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') { 
+        const { selectedId, elements } = useEditorState.getState();
+        const target = elements.find(el => el.id === selectedId);
+        if (target?.type === 'door') {
+          setDeleteDoorId(target.id);
+        } else {
+          deleteSelected();
+        }
+        return; 
+      }
       if (e.key === 'v' || e.key === 'V') { setTool('select'); return; }
       if (e.key === 'r' || e.key === 'R') { setTool('room'); return; }
       if (e.key === 'w' || e.key === 'W') { setTool('wall'); return; }
@@ -290,13 +354,13 @@ export const ProjectEditor: React.FC = () => {
     try {
       const response = await apiPrivate.post(
         `/export/plan-pdf/${projectId}`,
-        { planPngBase64: pngBase64 },
+        { planPngBase64: pngBase64, activeFloor },
         { responseType: 'blob' }
       );
       const url = URL.createObjectURL(response.data);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `plan-parter-${projectTitle}.pdf`;
+      link.download = `plan-${activeFloor}-${projectTitle}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -411,11 +475,11 @@ export const ProjectEditor: React.FC = () => {
         onSave={handleManualSave}
         onExportPNG={handleExportPNG}
         onExportPDF={handleExportPDF}
-        isChatOpen={isChatOpen}
-        onToggleChat={() => setIsChatOpen(!isChatOpen)}
+        isChatOpen={false}
+        onToggleChat={() => {}}
         isSaving={isSaving}
         lastSaved={lastSaved}
-        unreadCount={unreadCount}
+        unreadCount={0}
         versionHistory={
           <EditorVersionHistory
             projectId={projectId}
@@ -428,9 +492,22 @@ export const ProjectEditor: React.FC = () => {
       />
 
       {/* Main layout: Panel stânga | Canvas | Panel dreapta */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Panel Camere (stânga) */}
-        <EditorRoomsPanel rooms={roomsWithStatus} projectId={projectId} projectData={projectData} />
+        <div className={`
+          absolute md:relative z-20 h-full transition-transform duration-300 ease-in-out flex
+          ${isRoomsPanelOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}>
+          <EditorRoomsPanel rooms={roomsWithStatus} projectId={projectId} projectData={projectData} />
+          
+          {/* Buton de toggle atașat de panou (Mobile) */}
+          <button
+            onClick={() => setIsRoomsPanelOpen(!isRoomsPanelOpen)}
+            className="md:hidden absolute top-1/2 -right-10 w-10 h-12 bg-white border border-l-0 border-slate-200 rounded-r-xl shadow-md flex items-center justify-center text-slate-600 hover:text-indigo-600 transition-colors"
+          >
+            {isRoomsPanelOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+          </button>
+        </div>
 
         {/* Canvas zona */}
         <div ref={containerRef} className="flex-1 relative overflow-hidden bg-slate-50">
@@ -457,9 +534,6 @@ export const ProjectEditor: React.FC = () => {
                 ⚠ {warnings.length} cameră aproape de limită
               </div>
             )}
-            <div className="bg-white/80 backdrop-blur-sm border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm">
-              1 celulă = 1m real
-            </div>
           </div>
         </div>
 
@@ -473,18 +547,21 @@ export const ProjectEditor: React.FC = () => {
           />
         </div>
 
-        {/* Panou Lateral: Copilot AI */}
-        <EditorChatSidebar
-          projectId={projectId}
-          projectData={projectData}
-          isOpen={isChatOpen}
-          onToggle={() => setIsChatOpen(false)}
-          onUnreadChange={(count) => setUnreadCount(count)}
-          onCanGoNextChange={(can) => setCanGoNext(can)}
+        {/* Panel Proprietăți (dreapta) */}
+        <EditorPropertiesPanel 
+          onRenameRequest={(id) => setLabelDialog({ id, x: 0, y: 0 })} 
+          onDeleteRequest={(id) => {
+            const target = elements.find(el => el.id === id);
+            if (target?.type === 'door') {
+              setDeleteDoorId(target.id);
+            } else {
+              deleteElement(id);
+            }
+          }}
+          rooms={roomsWithStatus} 
+          violationIssues={violationIssues} 
+          warningIssues={warningIssues} 
         />
-
-        {/* Panel Proprietăți (dreapta) - doar dacă nu e chat-ul deschis */}
-        {!isChatOpen && <EditorPropertiesPanel onRenameRequest={(id) => setLabelDialog({ id, x: 0, y: 0 })} rooms={roomsWithStatus} violationIssues={violationIssues} warningIssues={warningIssues} />}
       </div>
 
       {/* Dialog label cameră */}
@@ -495,6 +572,17 @@ export const ProjectEditor: React.FC = () => {
           y={labelDialog.y}
           onConfirm={handleLabelConfirm}
           onCancel={() => setLabelDialog(null)}
+        />
+      )}
+
+      {/* Dialog ștergere ușă */}
+      {deleteDoorId && (
+        <DeleteDoorDialog
+          onConfirm={(makeVirtual) => {
+            deleteElement(deleteDoorId, { makeVirtual });
+            setDeleteDoorId(null);
+          }}
+          onCancel={() => setDeleteDoorId(null)}
         />
       )}
 
@@ -546,6 +634,23 @@ export const ProjectEditor: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* AI Room Suggestion Modal */}
+      <AiRoomSuggestModal
+        projectId={projectId}
+        projectData={projectData}
+        isOpen={isAiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+      />
+
+      {/* Zidario Chat Bubble */}
+      <AIChatBubble
+        messages={chatState.messages}
+        isStreaming={chatState.isStreaming}
+        onSendMessage={chatState.sendMessage}
+        unreadCount={chatState.unreadCount}
+        onMarkAsRead={chatState.markAsRead}
+      />
 
     </div>
   );

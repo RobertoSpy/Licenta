@@ -54,9 +54,9 @@ describe('AI Agent Router Module', () => {
       expect(agents).toContain('financial');
     });
 
-    it('ar trebui sa asigure fallback [legal] daca ecranul nu exista si nici regexul nu prinde', async () => {
+    it('ar trebui sa asigure fallback [general] daca ecranul nu exista si nici regexul nu prinde', async () => {
       const agents = await detectRequiredAgents('Salut', 'unknown_screen');
-      expect(agents).toContain('legal');
+      expect(agents).toContain('general');
     });
 
     it('ar trebui sa introduca asistentul "deviz" si "materiale" cand se pune o intrebare legata de costuri', async () => {
@@ -71,7 +71,7 @@ describe('AI Agent Router Module', () => {
     it('ar trebui sa respinga agentul daca similaritatea cosinus este 0.592 (sub pragul de 0.60)', async () => {
       const agents = await detectRequiredAgents('intrebare_sub_limita', 'unknown_screen');
       expect(agents).not.toContain('geotehnic');
-      expect(agents).toContain('legal');
+      expect(agents).toContain('general');
     });
 
     it('ar trebui sa admita agentul daca similaritatea cosinus este 0.649 (peste pragul de 0.60)', async () => {

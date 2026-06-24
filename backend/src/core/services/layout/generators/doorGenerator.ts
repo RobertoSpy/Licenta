@@ -23,7 +23,7 @@ export function generateInternalDoors(
   function canAddDoor(roomId: string): boolean {
     const roomDef = indoorRooms.find(ar => ar.id === roomId);
     if (roomDef?.isCirculation || roomDef?.zone === 'distributie') return true;
-    return (doorCounts[roomId] || 0) < 2;
+    return (doorCounts[roomId] || 0) < LAYOUT_CONSTANTS.door.max_per_room;
   }
   
   function incrementDoor(r1: string, r2: string) {

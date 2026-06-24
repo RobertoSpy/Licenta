@@ -164,6 +164,23 @@ export async function searchMaterialsHybrid(
   return results;
 }
 
+export async function searchHybridMultiAgent(
+  question: string,
+  agents: AgentType[],
+  limit: number = 8,
+  buildingPurpose: BuildingPurpose = 'residential'
+): Promise<NormativeChunk[]> {
+  const allSources = [
+    ...new Set(
+      agents.flatMap(a => AGENT_SOURCES_BY_PURPOSE[buildingPurpose]?.[a] ?? [])
+    )
+  ];
+  
+  if (allSources.length === 0) return [];
+
+  return searchHybrid(question, 'general', limit, allSources, buildingPurpose);
+}
+
 // ─────────────────────────────────────────────────────────────────
 // EXPORT OBJECT — interfața legacy pentru compatibilitate cu
 // orice caller care importă `ragService.searchRelevantChunks`

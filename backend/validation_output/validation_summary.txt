@@ -1,0 +1,17 @@
+ZIDARIO AI — Raport de Validare Semantică
+Data: 23.06.2026, 15:57:53
+
+=== EVALUARE AUTOMATĂ (keyword matching) ===
+Total interogări : 20
+CORECT   (auto)  : 15 (75.0%)
+PARȚIAL  (auto)  : 4 (20.0%)
+GREȘIT   (auto)  : 1 (5.0%)
+EROARE           : 0
+Scor auto ponderat: 85.0%
+
+=== EVALUARE MANUALĂ ===
+Deschide validation_results.csv în Excel și completează:
+  - Coloana E (Rating Manual): CORECT / PARTIAL / GRESIT
+  - Coloana F (Nota): justificare scurtă pentru PARTIAL / GRESIT
+
+Metodologie: Hibrid automat + manual (standard NLP evaluation)

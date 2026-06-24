@@ -139,10 +139,10 @@ describe('ContractorService', () => {
         } as any
       ]);
 
-      const result = await contractorService.getAcceptedProjects(1);
+      const res = await contractorService.getAcceptedProjects(1);
       
-      expect(result).toHaveLength(1);
-      const proj = result[0];
+      expect(res.data).toHaveLength(1);
+      const proj = res.data[0];
       
       // Verifica ce contine
       expect(proj.id).toBe(5);

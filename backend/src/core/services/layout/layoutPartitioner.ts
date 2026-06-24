@@ -14,7 +14,7 @@ import {
   LAYOUT_CONSTANTS
 } from './layoutTypes';
 
-import { uuidv4, normalizeLabel, isDayRoom } from './layoutUtils';
+import { uuidv4, normalizeLabel, calculateShapeArea } from './layoutUtils';
 
 // Re-export types so that consumers of layoutPartitioner don't break
 export * from './layoutTypes';
@@ -98,7 +98,7 @@ export function generateConfiguratorLayout(
     outerWallLines.push({ x1: xM + widthM, y1: yM, x2: xM + widthM, y2: yM + heightM });
     outerWallLines.push({ x1: xM, y1: yM + heightM, x2: xM + widthM, y2: yM + heightM });
     outerWallLines.push({ x1: xM, y1: yM, x2: xM, y2: yM + heightM });
-  } else {
+  } else { 
     // t_shape
     const h1 = Math.min(wingLengthM, heightM / 2.2);
     const w2 = Math.min(wingWidthM, widthM - 2);
@@ -136,36 +136,49 @@ export function generateConfiguratorLayout(
   );
 
   // 3. Distribute rooms to shape bounding boxes
-  const partitionedRooms: Array<{ id: string; label: string; bbox: BBoxM }> = [];
+  const partitionedRooms: Array<{ id: string; label: string; bbox: BBoxM; type?: string }> = [];
 
   if (shapesBBoxes.length === 1) {
     // Rectangle
     partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[0], indoorRooms, streetOrientation));
   } else {
     // L, U, or T - multiple bounding boxes
-    const dayRooms = indoorRooms.filter(r => isDayRoom(r));
-    const nightRooms = indoorRooms.filter(r => !isDayRoom(r));
+    // Grupare dinamică după zonele AI (fără hardcodări de "zi" sau "noapte")
+    const zonesMap = new Map<string, ConfiguratorRoom[]>();
+    for (const r of indoorRooms) {
+      const z = r.zone?.toLowerCase() || 'default_zone';
+      if (!zonesMap.has(z)) zonesMap.set(z, []);
+      zonesMap.get(z)!.push(r);
+    }
+    
+    // Sortăm zonele după numărul de camere (descrescător) ca să punem zona cea mai complexă în corpul principal (shapesBBoxes[0])
+    const sortedZones = Array.from(zonesMap.values()).sort((a, b) => b.length - a.length);
 
     if (shape === 'l_shape' || shape === 't_shape') {
-      if (dayRooms.length > 0 && nightRooms.length > 0) {
-        partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[0], dayRooms, streetOrientation));
-        partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[1], nightRooms, streetOrientation));
+      if (sortedZones.length >= 2) {
+        // Alocăm prima zonă către box 0, și restul către box 1
+        partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[0], sortedZones[0], streetOrientation));
+        const restRooms = sortedZones.slice(1).flat();
+        partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[1], restRooms, streetOrientation));
       } else {
         const half = Math.ceil(indoorRooms.length / 2);
         partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[0], indoorRooms.slice(0, half), streetOrientation));
         partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[1], indoorRooms.slice(half), streetOrientation));
       }
     } else {
-      // U-shape: 3 bounding boxes: 0 (left), 1 (center/bottom), 2 (right)
-      if (dayRooms.length > 0) {
-        partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[1], dayRooms, streetOrientation));
-
-        const half = Math.ceil(nightRooms.length / 2);
-        const leftRooms = nightRooms.slice(0, half);
-        const rightRooms = nightRooms.slice(half);
-
-        if (leftRooms.length > 0) partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[0], leftRooms, streetOrientation));
-        if (rightRooms.length > 0) partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[2], rightRooms, streetOrientation));
+      // U-shape: 3 bounding boxes
+      if (sortedZones.length >= 3) {
+        partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[0], sortedZones[0], streetOrientation));
+        partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[1], sortedZones[1], streetOrientation));
+        const restRooms = sortedZones.slice(2).flat();
+        partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[2], restRooms, streetOrientation));
+      } else if (sortedZones.length === 2) {
+        partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[1], sortedZones[0], streetOrientation)); // Centru
+        
+        const restRooms = sortedZones[1];
+        const half = Math.ceil(restRooms.length / 2);
+        if (half > 0) partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[0], restRooms.slice(0, half), streetOrientation));
+        if (half < restRooms.length) partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[2], restRooms.slice(half), streetOrientation));
       } else {
         const third = Math.ceil(indoorRooms.length / 3);
         partitionedRooms.push(...zoneBasedTreemap(shapesBBoxes[0], indoorRooms.slice(0, third), streetOrientation));
@@ -199,20 +212,23 @@ export function generateConfiguratorLayout(
       height: rh,
       rotation: 0,
       wallThicknessCm: ARCHITECTURAL_STANDARDS.WALL.EXTERIOR_THICKNESS * 100,
+      metadata: {
+        roomType: pr.type
+      }
     });
   }
 
   // 6. Windows
   elements.push(...generateWindows(partitionedRooms, indoorRooms, outerWallLines, offsetM, thickPx));
 
-  // 7. Terraces
+  // 7. Terraces — always rendered, using fallback area if AI didn't set minSqm/maxSqm
   let terraceOffset = offsetM + heightM; // start at bottom edge of house
   for (const tr of terraceRooms) {
-    if (!tr.minSqm && !tr.maxSqm) continue;
-    const area = (tr.minSqm && tr.maxSqm)
+    // Nu mai sărim terasa — folosim fallback_sqm dacă AI nu a specificat suprafața
+    const area = (tr.minSqm != null && tr.maxSqm != null)
       ? (tr.minSqm + tr.maxSqm) / 2
-      : (tr.minSqm || tr.maxSqm || LAYOUT_CONSTANTS.terrace.fallback_sqm) as number;
-    const tw = Math.min(widthM * LAYOUT_CONSTANTS.terrace.max_width_ratio, LAYOUT_CONSTANTS.terrace.max_width_m); // max 8m width or 60% of house
+      : (tr.minSqm ?? tr.maxSqm ?? LAYOUT_CONSTANTS.terrace.fallback_sqm);
+    const tw = Math.min(widthM * LAYOUT_CONSTANTS.terrace.max_width_ratio, LAYOUT_CONSTANTS.terrace.max_width_m);
     const th = area / tw;
     const tx = offsetM + (widthM / 2) - (tw / 2); // centered at bottom
 

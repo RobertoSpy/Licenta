@@ -9,7 +9,9 @@ import {
   getAllMaterials,
   updateMaterial,
   deleteMaterial,
+  syncSingleMaterial,
   reseedNormatives,
+  getTaxonomy,
   toggleContractorVerification
 } from './adminController';
 import { protect } from '../../core/middleware/authMiddleware';
@@ -34,8 +36,10 @@ router.post('/materials/manual', addMaterialManual);
 router.post('/materials/import-csv', upload.single('csvFile'), importMaterialsCsv);
 router.put('/materials/:id', updateMaterial);
 router.delete('/materials/:id', deleteMaterial);
+router.post('/materials/:id/sync', syncSingleMaterial);
 router.post('/scrape/sync', syncDedemanMaterials);
 
 router.post('/normatives/reseed', reseedNormatives);
+router.get('/taxonomy', getTaxonomy);
 
 export default router;

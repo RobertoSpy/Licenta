@@ -626,7 +626,7 @@ export const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-6 mt-8 pt-8 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-4">
           <p>© {new Date().getFullYear()} Zidario.ro. Toate drepturile rezervate.</p>
           <div className="flex gap-4">
-            <span>Powered by AI & BuildWise Engine</span>
+            <span>Powered by AI & Zidario Engine</span>
           </div>
         </div>
       </footer>

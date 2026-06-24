@@ -212,11 +212,36 @@ export default function MyQuotesClient() {
                           </div>
                         )}
 
-                        <div className="mt-4 pt-4 border-t border-slate-200">
-                          <span className="text-emerald-600 text-sm flex items-center gap-1">
-                            <CheckCircle className="h-4 w-4" /> Oferta include materialele din deviz (BOM).
-                          </span>
-                        </div>
+                        {!q.acceptsBOM && q.bomVariations && q.bomVariations.length > 0 ? (
+                          <div className="mt-4 pt-4 border-t border-slate-200">
+                            <div className="text-amber-600 text-sm flex items-center gap-1 font-bold mb-3">
+                              <XCircle className="h-4 w-4" /> Oferta include alternative la materialele din deviz (BOM):
+                            </div>
+                            <div className="space-y-3">
+                              {q.bomVariations.map((v: any, idx: number) => (
+                                <div key={idx} className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-sm">
+                                  <div className="font-bold text-amber-900 mb-1">
+                                    Alternativă propusă: {v.suggestedMaterial}
+                                  </div>
+                                  <div className="text-amber-800 mb-1">
+                                    <span className="font-semibold">Preț nou/unitate:</span> {v.newPrice} RON
+                                  </div>
+                                  {v.note && (
+                                    <div className="text-amber-700 italic">
+                                      " {v.note} "
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-4 pt-4 border-t border-slate-200">
+                            <span className="text-emerald-600 text-sm flex items-center gap-1 font-bold">
+                              <CheckCircle className="h-4 w-4" /> Oferta include exact materialele din deviz (BOM).
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ) : q.status === 'REJECTED' ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-red-400 space-y-2">

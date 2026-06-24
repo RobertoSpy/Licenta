@@ -27,10 +27,12 @@ export interface ContractorProfile {
 
 export const contractorApi = {
   // Pentru clienți
-  getContractors: async (county?: string, specializations?: ContractorSpecialization[]): Promise<ContractorProfile[]> => {
+  getContractors: async (county?: string, specializations?: ContractorSpecialization[], page: number = 1, limit: number = 20): Promise<{ data: ContractorProfile[], pagination: { total: number, page: number, limit: number, totalPages: number } }> => {
     const params = new URLSearchParams();
     if (county) params.append('county', county);
     if (specializations && specializations.length > 0) params.append('specializations', specializations.join(','));
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
     
     const { data } = await apiPrivate.get('/contractors', { params });
     return data;

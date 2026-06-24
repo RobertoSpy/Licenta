@@ -8,7 +8,9 @@
   "door": {
     "interior_m": 0.8,
     "exterior_m": 0.9,
-    "bathroom_m": 0.7
+    "bathroom_m": 0.7,
+    "max_per_room": 2,
+    "standard_height_m": 2.1
   },
   "window": {
     "standard_width_m": 1.2,

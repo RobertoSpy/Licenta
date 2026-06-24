@@ -7,8 +7,11 @@ export const getContractors = async (req: Request, res: Response) => {
     const { county, specializations } = req.query;
     const specArray = specializations ? (specializations as string).split(',') : undefined;
     
-    const contractors = await contractorService.getContractors(county as string, specArray);
-    res.json(contractors);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const result = await contractorService.getContractors(county as string, specArray, page, limit);
+    res.json(result);
   } catch (error) {
     console.error('getContractors error:', error);
     res.status(500).json({ message: 'Eroare la preluarea constructorilor' });
@@ -97,8 +100,10 @@ export const addReview = async (req: AuthRequest, res: Response) => {
 
 export const getAcceptedProjects = async (req: AuthRequest, res: Response) => {
   try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
     const userId = req.user!.id;
-    const projects = await contractorService.getAcceptedProjects(userId);
+    const projects = await contractorService.getAcceptedProjects(userId, page, limit);
     res.json(projects);
   } catch (error) {
     console.error('getAcceptedProjects error:', error);

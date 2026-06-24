@@ -7,6 +7,7 @@ import LAYOUT_CONSTANTS from '../../data/layout-constants.json';
 
 interface Props {
   onRenameRequest: (id: string) => void;
+  onDeleteRequest: (id: string) => void;
   rooms?: ConformityRoom[];
   violationIssues?: ConformityRuleIssue[];
   warningIssues?: ConformityRuleIssue[];
@@ -18,8 +19,8 @@ const statusConfig = {
   error:   { icon: <XCircle className="w-4 h-4 text-red-500" />,          text: 'Neconformă legal', labelColor: 'text-red-700 bg-red-50 border-red-100' },
 };
 
-export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms = [], violationIssues = [], warningIssues = [] }) => {
-  const { elements, selectedId, selectElement, deleteElement, activeRooms, addManualOpening, updateElement } = useEditorState();
+export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, onDeleteRequest, rooms = [], violationIssues = [], warningIssues = [] }) => {
+  const { elements, selectedId, selectElement, activeRooms, addManualOpening, updateElement } = useEditorState();
 
   const currentSelected = elements.find((el) => el.id === selectedId);
   const [selected, setSelected] = useState(currentSelected);
@@ -50,7 +51,7 @@ export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms 
                   </h3>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => deleteElement(selected.id)}
+                      onClick={() => onDeleteRequest(selected.id)}
                       className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                       title={`Șterge ${selected.type === 'door' ? 'Ușă' : 'Fereastră'}`}
                     >
@@ -99,7 +100,7 @@ export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms 
 
                   <div className="pt-4 border-t border-slate-100">
                     <button
-                      onClick={() => deleteElement(selected.id)}
+                      onClick={() => onDeleteRequest(selected.id)}
                       className="w-full py-2 px-3 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl border border-red-200 transition-all flex items-center justify-center gap-1.5 shadow-sm"
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Șterge {selected.type === 'door' ? 'Ușă' : 'Fereastră'}
@@ -116,7 +117,7 @@ export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms 
                   </h3>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => deleteElement(selected.id)}
+                      onClick={() => onDeleteRequest(selected.id)}
                       className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                       title={`Șterge ${selected.type === 'wall' ? 'Peretele' : 'Camera'}`}
                     >
@@ -175,6 +176,38 @@ export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms 
                         <Tag className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span className="truncate">{selected.label ?? 'Cameră'}</span>
                       </button>
+                    </div>
+                  )}
+
+                  {/* Quick Add Openings */}
+                  {selected.type === 'room' && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                        Adaugă Manual (Click)
+                      </label>
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <span className="text-xs font-bold text-slate-700 block">+ Adaugă Ușă</span>
+                          <div className="flex gap-1.5">
+                            <button onClick={() => addManualOpening(selected.id, 'door', 'top')} className="flex-1 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-600 hover:border-sky-500 hover:text-sky-600 transition-colors" title="Nord (Sus)">N</button>
+                            <button onClick={() => addManualOpening(selected.id, 'door', 'bottom')} className="flex-1 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-600 hover:border-sky-500 hover:text-sky-600 transition-colors" title="Sud (Jos)">S</button>
+                            <button onClick={() => addManualOpening(selected.id, 'door', 'right')} className="flex-1 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-600 hover:border-sky-500 hover:text-sky-600 transition-colors" title="Est (Dreapta)">E</button>
+                            <button onClick={() => addManualOpening(selected.id, 'door', 'left')} className="flex-1 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-600 hover:border-sky-500 hover:text-sky-600 transition-colors" title="Vest (Stânga)">V</button>
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs font-bold text-slate-700 block">+ Adaugă Fereastră</span>
+                          <div className="flex gap-1.5">
+                            <button onClick={() => addManualOpening(selected.id, 'window', 'top')} className="flex-1 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-600 hover:border-sky-500 hover:text-sky-600 transition-colors" title="Nord (Sus)">N</button>
+                            <button onClick={() => addManualOpening(selected.id, 'window', 'bottom')} className="flex-1 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-600 hover:border-sky-500 hover:text-sky-600 transition-colors" title="Sud (Jos)">S</button>
+                            <button onClick={() => addManualOpening(selected.id, 'window', 'right')} className="flex-1 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-600 hover:border-sky-500 hover:text-sky-600 transition-colors" title="Est (Dreapta)">E</button>
+                            <button onClick={() => addManualOpening(selected.id, 'window', 'left')} className="flex-1 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-600 hover:border-sky-500 hover:text-sky-600 transition-colors" title="Vest (Stânga)">V</button>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight pt-1">
+                        Selectează punctul cardinal pentru a adăuga golul direct pe peretele dorit.
+                      </p>
                     </div>
                   )}
 
@@ -238,53 +271,7 @@ export const EditorPropertiesPanel: React.FC<Props> = ({ onRenameRequest, rooms 
                     );
                   })()}
 
-                  {/* Adăugare Deschideri */}
-                  {selected.type === 'room' && (
-                    <div className="space-y-2 pt-4 border-t border-slate-100">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                        Adaugă Deschideri Manual
-                      </label>
-                      <div className="space-y-3">
-                        {/* Geamuri */}
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-bold text-slate-500 block uppercase tracking-wider">Geamuri</span>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            {(['top', 'bottom', 'left', 'right'] as const).map((side) => {
-                              const sideLabels = { top: 'Sus', bottom: 'Jos', left: 'Stânga', right: 'Dreapta' };
-                              return (
-                                <button
-                                  key={side}
-                                  onClick={() => addManualOpening(selected.id, 'window', side)}
-                                  className="py-1.5 px-2 text-[10px] font-bold rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50 text-slate-600 transition-all text-center"
-                                >
-                                  + {sideLabels[side]}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Uși */}
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-bold text-slate-500 block uppercase tracking-wider">Uși</span>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            {(['top', 'bottom', 'left', 'right'] as const).map((side) => {
-                              const sideLabels = { top: 'Sus', bottom: 'Jos', left: 'Stânga', right: 'Dreapta' };
-                              return (
-                                <button
-                                  key={side}
-                                  onClick={() => addManualOpening(selected.id, 'door', side)}
-                                  className="py-1.5 px-2 text-[10px] font-bold rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50 text-slate-600 transition-all text-center"
-                                >
-                                  + {sideLabels[side]}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {/* End of Properties */}
                 </div>
               </>
             )}

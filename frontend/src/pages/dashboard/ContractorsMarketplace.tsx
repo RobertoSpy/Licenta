@@ -12,6 +12,8 @@ export default function ContractorsMarketplace() {
   const [contractors, setContractors] = useState<ContractorProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [county, setCounty] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [selectedSpec, setSelectedSpec] = useState<ContractorSpecialization | ''>('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -36,11 +38,19 @@ export default function ContractorsMarketplace() {
   const fetchContractors = async () => {
     setLoading(true);
     try {
-      const data = await contractorApi.getContractors(
+      const res = await contractorApi.getContractors(
         county || undefined, 
-        selectedSpec ? [selectedSpec] : undefined
+        selectedSpec ? [selectedSpec] : undefined,
+        page,
+        20
       );
-      setContractors(data);
+      if (res.data) {
+        setContractors(res.data);
+        setTotalPages(res.pagination?.totalPages || 1);
+      } else {
+        // fallback legacy if API hasn't restarted yet
+        setContractors(res as any);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -50,7 +60,7 @@ export default function ContractorsMarketplace() {
 
   useEffect(() => {
     fetchContractors();
-  }, [county, selectedSpec]);
+  }, [county, selectedSpec, page]);
 
   const toggleSelection = (id: number) => {
     setSelectedIds(prev => 
@@ -229,6 +239,31 @@ export default function ContractorsMarketplace() {
               </div>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center mt-6">
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            Pagina {page} din {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={page === 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-white disabled:opacity-50 transition-colors hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              Înapoi
+            </button>
+            <button
+              disabled={page === totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-white disabled:opacity-50 transition-colors hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              Înainte
+            </button>
+          </div>
         </div>
       )}
 

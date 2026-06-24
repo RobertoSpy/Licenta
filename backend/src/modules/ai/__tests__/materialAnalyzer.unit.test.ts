@@ -28,16 +28,12 @@ describe('materialAnalyzer', () => {
 
   describe('analyzeMaterial', () => {
     it('ar trebui sa returneze rezultatul parsat din Gemini', async () => {
-      (prisma.material.findMany as jest.Mock).mockResolvedValue([
-        { internalCode: 'BCA_25' },
-        { internalCode: 'CARAMIDA_30' }
-      ]);
 
       const mockResponse = {
         text: JSON.stringify({
-          standardCode: 'BCA_25',
-          category: 'Zidărie',
-          subcategory: 'Pereți exteriori',
+          category: 'Structură',
+          subcategory: 'EXTERIOR_WALL_25CM',
+          structuralType: 'BCA',
           unit: 'mc',
           uValue: 0.45,
           pros: 'Izoleaza bine',
@@ -52,16 +48,16 @@ describe('materialAnalyzer', () => {
 
       const result = await materialAnalyzer.analyzeMaterial('Ytong Forte 25', 500, 'http://test');
 
-      expect(prisma.material.findMany).toHaveBeenCalled();
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-2.5-pro',
           contents: expect.stringContaining('Ytong Forte 25'),
         })
       );
       
       expect(result).not.toBeNull();
-      expect(result?.standardCode).toBe('BCA_25');
+      expect(result?.subcategory).toBe('EXTERIOR_WALL_25CM');
+      expect(result?.structuralType).toBe('BCA');
       expect(result?.brand).toBe('Ytong');
       expect(result?.uValue).toBe(0.45);
     });

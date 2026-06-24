@@ -4,10 +4,11 @@ import { Material } from '@prisma/client';
 export type MaterialQueryType = 'STRICT_NORMATIVE' | 'NORMATIVE_BUDGET' | 'FREE_PREFERENCE' | 'CONDITIONAL_NORMATIVE';
 
 export interface MaterialQuery {
-  type: MaterialQueryType;
+  type?: MaterialQueryType;
   engineKey?: string; // used for STRICT_NORMATIVE
   category?: string;
-  subcategory?: string;
+  subcategory?: string; // semantic role code
+  internalCode?: string; // specific material code
   constraints?: {
     maxUValue?: number;
     minStrength?: number;
@@ -17,21 +18,38 @@ export interface MaterialQuery {
 
 export async function selectMaterialForBOM(
   query: MaterialQuery,
-  budgetCategory: 'economic' | 'mediu',
+  budgetCategory: string,
   engineSuggestedCode?: string,
   projectSeismicZoneFloat?: number // e.g. 0.25 from "0.25g"
 ): Promise<Material | null> {
   
-  // 1. STRICT_NORMATIVE: Ignorăm bugetul, respectăm strict motorul (ex. C25/30)
+  // 1. STRICT_NORMATIVE: Respectăm strict codul motorului (care acum este o subcategorie, ex: CONCRETE_C25_30)
   if (query.type === 'STRICT_NORMATIVE') {
     if (!engineSuggestedCode) {
       throw new Error(`Lipsă engineSuggestedCode pentru ${query.engineKey}`);
     }
-    const material = await prisma.material.findUnique({
-      where: { internalCode: engineSuggestedCode }
+    const conformingMaterials = await prisma.material.findMany({
+      where: { internalCode: engineSuggestedCode, inStock: true },
+      orderBy: { pricePerUnit: 'asc' }
     });
-    // Fallback logic handled in bomService if null
-    return material;
+
+    if (!conformingMaterials.length) {
+      return null;
+    }
+
+    const totalItems = conformingMaterials.length;
+    const budgetStrategy: Record<string, number> = {
+      economic: 0,
+      mediu: Math.floor((totalItems - 1) / 2),
+      premium: totalItems - 1
+    };
+
+    const selectedIndex = budgetStrategy[budgetCategory];
+    if (selectedIndex === undefined) {
+      throw new Error(`Budget category "${budgetCategory}" este invalidă sau lipsește.`);
+    }
+
+    return conformingMaterials[selectedIndex];
   }
 
   // Definim filtrele de bază
@@ -41,6 +59,9 @@ export async function selectMaterialForBOM(
   };
   if (query.subcategory) {
     whereClause.subcategory = query.subcategory;
+  }
+  if (query.internalCode) {
+    whereClause.internalCode = query.internalCode;
   }
 
   // 2. NORMATIVE_BUDGET: Aplicăm constrângerile + sortăm funcție de buget
@@ -65,9 +86,7 @@ export async function selectMaterialForBOM(
 
   // 3. FREE_PREFERENCE: Nicio constrângere suplimentară, doar sortare
 
-  const orderByClause: any = budgetCategory === 'economic' 
-    ? { pricePerUnit: 'asc' } 
-    : { pricePerUnit: 'asc' };
+  const orderByClause: any = { pricePerUnit: 'asc' };
 
   const conformingMaterials = await prisma.material.findMany({
     where: whereClause,
@@ -78,10 +97,19 @@ export async function selectMaterialForBOM(
     return null; // Va fi logat și va sări formula respectivă în bomService
   }
 
-  // Extragem materialul corect din listă
-  if (budgetCategory === 'mediu') {
-    return conformingMaterials[Math.floor(conformingMaterials.length / 2)];
+  const totalItems = conformingMaterials.length;
+  
+  const budgetStrategy: Record<string, number> = {
+    economic: 0,                                      // Primul element (cel mai ieftin)
+    mediu: Math.floor((totalItems - 1) / 2),          // Elementul median
+    premium: totalItems - 1                           // Elementul cel mai scump
+  };
+
+  const selectedIndex = budgetStrategy[budgetCategory];
+  
+  if (selectedIndex === undefined) {
+    throw new Error(`Budget category "${budgetCategory}" este invalidă sau lipsește.`);
   }
 
-  return conformingMaterials[0];
+  return conformingMaterials[selectedIndex];
 }

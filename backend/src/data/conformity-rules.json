@@ -120,7 +120,11 @@
       "targets": [
         "debara",
         "spatiumdepozitare",
-        "camaredepozitare"
+        "camaredepozitare",
+        "debaraspatiudepozitare",
+        "spatdepozitare",
+        "depozitare",
+        "magazie"
       ],
       "min_sqm": 1.5,
       "severity": "warning",

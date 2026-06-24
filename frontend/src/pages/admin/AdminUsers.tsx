@@ -6,16 +6,23 @@ export default function AdminUsers() {
   const [users, setUsers] = useState<UserDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [page]);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const data = await adminApi.getUsers();
-      setUsers(data);
+      const res = await adminApi.getUsers(page, 20);
+      if (res.data) {
+        setUsers(res.data);
+        setTotalPages(res.pagination?.totalPages || 1);
+      } else {
+        setUsers(res); // fallback legacy
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -165,6 +172,31 @@ export default function AdminUsers() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center mt-6">
+            <span className="text-sm text-slate-400">
+              Pagina {page} din {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded text-white disabled:opacity-50"
+              >
+                Înapoi
+              </button>
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded text-white disabled:opacity-50"
+              >
+                Înainte
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { embeddingService } from '../../modules/ai/services/embeddingService';
 puppeteer.use(StealthPlugin());
 
 export interface ScrapedData {
+  title: string;
   price: number;
   inStock: boolean;
   stockQuantity: number | null;
@@ -65,6 +66,10 @@ export async function scrapeDedemanProduct(url: string): Promise<ScrapedData | n
     });
 
     const data = await page.evaluate(() => {
+      // ── TITLU ───────────────────────────────────────────────────────────────
+      const titleEl = document.querySelector('h1, .product-title, [itemprop="name"]');
+      const title = titleEl?.textContent?.trim() || 'Produs Fără Titlu';
+
       // ── PRET ────────────────────────────────────────────────────────────────
       // Dedeman foloseste mai multi selectori in functie de pagina/promotie
       const priceSelectors = [
@@ -77,16 +82,45 @@ export async function scrapeDedemanProduct(url: string): Promise<ScrapedData | n
         '.regular-price .price',
       ];
 
+      // Curata pretul
       let rawPrice = '';
       for (const sel of priceSelectors) {
         const el = document.querySelector(sel);
-        if (el?.textContent?.trim()) {
-          rawPrice = el.textContent.trim();
-          break;
+        if (el) {
+          // Cloneaza elementul pentru a nu strica DOM-ul original
+          const clone = el.cloneNode(true) as HTMLElement;
+          
+          // Daca are atribut content cu pretul deja formatat (ex. Mathaus)
+          const valueEl = clone.querySelector('[content]');
+          if (valueEl && valueEl.getAttribute('content')) {
+            const contentVal = valueEl.getAttribute('content');
+            if (contentVal && !isNaN(parseFloat(contentVal))) {
+              rawPrice = contentVal;
+              break;
+            }
+          }
+
+          // Înlocuiește <sup> cu punct pentru zecimale
+          clone.querySelectorAll('sup').forEach(sup => {
+            sup.textContent = '.' + sup.textContent;
+          });
+          
+          if (clone.textContent?.trim()) {
+            // Extragem prima bucata care arata a pret (ex: "535.90 lei ... 836.00 lei" -> "535.90")
+            // Match pe format RO (ex: 1.234,56 sau 1234.56)
+            const text = clone.textContent.trim();
+            const match = text.match(/(\d+(?:[.,]\d+)*)/);
+            if (match) {
+              rawPrice = match[1];
+            } else {
+              rawPrice = text;
+            }
+            break;
+          }
         }
       }
 
-      // Curata pretul: "1.234,56 Lei" → 1234.56
+      // Curata pretul final extras: "1.234,56" → 1234.56
       const priceNum = parseFloat(
         rawPrice
           .replace(/[^\d,\.]/g, '')   // pastreaza doar cifre, virgula, punct
@@ -155,7 +189,7 @@ export async function scrapeDedemanProduct(url: string): Promise<ScrapedData | n
         });
       }
 
-      return { price, inStock, stockQuantity, description, specifications };
+      return { title, price, inStock, stockQuantity, description, specifications };
     });
 
     if (data.price === 0) {
@@ -253,14 +287,19 @@ export const scraperService = {
 
       const scraped = await scrapeDedemanProduct(mat.storeUrl);
 
-      if (!scraped) {
+      if (!scraped || scraped.price === 0) {
         failed++;
-        // Adauga delay mai mare dupa esec (posibil rate limit temporar)
+        console.warn(`[Scraper] Sincronizare eșuată sau preț invalid pentru: ${mat.name}. Prețul vechi este păstrat.`);
+        // Marcăm produsul ca indisponibil temporar în caz de eroare pagină, dar nu distrugem prețul istoric
+        await prisma.material.update({
+          where: { id: mat.id },
+          data: { inStock: false }
+        });
         await new Promise(r => setTimeout(r, delayMs * 2));
         continue;
       }
 
-      // Actualizeaza materialul
+      // Actualizeaza materialul (folosind datele și prețul valid)
       await prisma.material.update({
         where: { id: mat.id },
         data: {
@@ -283,15 +322,15 @@ export const scraperService = {
         },
       });
 
-      // Genereaza embedding pentru RAG daca e cerut
+      // Genereaza embedding pentru RAG daca e cerut (ASINCRON, fire-and-forget)
       if (generateEmbeddings) {
-        await saveMaterialEmbedding(
+        saveMaterialEmbedding(
           mat.id,
           mat.name,
           scraped.description || mat.description || '',
           scraped.specifications,
           'dedeman-scrape'
-        );
+        ).catch(err => console.error(`[RAG-Async-Error] Pentru materialul ${mat.id}:`, err.message));
       }
 
       updated++;

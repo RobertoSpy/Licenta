@@ -42,7 +42,6 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
   };
 
   return (
-    <>
       <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden shrink-0 shadow-sm">
 
         {/* Scrollable controls */}
@@ -53,20 +52,17 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
           <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
             <Home className="w-3.5 h-3.5 text-slate-400" /> 1. Forma Casei
           </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {LAYOUT_CONSTANTS.shapes.map((shape) => (
-              <button
-                key={shape.value}
-                onClick={() => setHouseShape(shape.value as any)}
-                className={`py-2 px-3 text-xs font-bold rounded-xl border text-center transition-all ${
-                  houseShape === shape.value
-                    ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm shadow-orange-100'
-                    : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
-                }`}
-              >
-                {shape.label.split(' (')[0]}
-              </button>
-            ))}
+          <div className="grid grid-cols-1 gap-2">
+            {LAYOUT_CONSTANTS.shapes
+              .filter((shape) => shape.value === houseShape)
+              .map((shape) => (
+                <div
+                  key={shape.value}
+                  className="py-2 px-3 text-xs font-bold rounded-xl border text-center transition-all border-orange-500 bg-orange-50 text-orange-700 shadow-sm shadow-orange-100 cursor-default"
+                >
+                  {shape.label.split(' (')[0]}
+                </div>
+              ))}
           </div>
         </div>
 
@@ -176,6 +172,35 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
               </div>
             )}
           </div>
+          <div className="bg-slate-50/50 rounded-2xl p-3 border border-slate-100 text-xs font-semibold text-slate-600 mt-2">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Inventar Elemente</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex justify-between bg-white px-2 py-1.5 rounded-lg border border-slate-100 shadow-sm">
+                <span>Pereți Ext.:</span>
+                <span className="font-bold text-slate-800">
+                  {useEditorState.getState().elements.filter(e => e.type === 'wall' && !e.metadata?.isVirtualBoundary).length}
+                </span>
+              </div>
+              <div className="flex justify-between bg-white px-2 py-1.5 rounded-lg border border-slate-100 shadow-sm">
+                <span>Pereți Int.:</span>
+                <span className="font-bold text-slate-800">
+                  {rooms.length > 1 ? (rooms.length - 1 - useEditorState.getState().elements.filter(e => e.type === 'wall' && e.metadata?.isVirtualBoundary).length) : 0}
+                </span>
+              </div>
+              <div className="flex justify-between bg-white px-2 py-1.5 rounded-lg border border-slate-100 shadow-sm">
+                <span>Uși:</span>
+                <span className="font-bold text-slate-800">
+                  {useEditorState.getState().elements.filter(e => e.type === 'door').length}
+                </span>
+              </div>
+              <div className="flex justify-between bg-white px-2 py-1.5 rounded-lg border border-slate-100 shadow-sm">
+                <span>Ferestre:</span>
+                <span className="font-bold text-slate-800">
+                  {useEditorState.getState().elements.filter(e => e.type === 'window').length}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Active room status items */}
@@ -209,14 +234,5 @@ export const EditorRoomsPanel: React.FC<Props> = ({ rooms, projectId, projectDat
 
       </div>
     </div>
-
-      {/* AI Room Suggestion Modal */}
-      <AiRoomSuggestModal
-        projectId={projectId}
-        projectData={projectData}
-        isOpen={isAiModalOpen}
-        onClose={() => setAiModalOpen(false)}
-      />
-    </>
   );
 };

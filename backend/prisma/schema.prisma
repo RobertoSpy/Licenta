@@ -136,12 +136,17 @@ model Material {
   unit         String   // "mp" | "mc" | "buc" | "kg" | "ml"
   pricePerUnit Float    // RON (prețul de bază din seedMaterials, actualizat prin scraping)
   brand        String?  // "Ytong" | "Tondach" | "Porta Doors"
+  storeName    String?  @default("Generic") // "Dedeman" | "Leroy Merlin" | "Mathaus"
   storeUrl     String?  // URL produs direct în magazin
   description  String?  // scurtă descriere tehnică
   uValue       Float?   // coeficient transmitanță termică (W/m²K) pentru calcul energetic
   isDefault    Boolean  @default(false) // materialul implicit pentru categoria sa
   inStock      Boolean  @default(true)
   stockQuantity Float?
+
+  // 0. Date de Împachetare (Packaging)
+  packagingUnit  String?  // ex: "kg", "L", "buc"
+  packagingValue Float?   // ex: 25, 10
 
   // 1. Metadate Normative (Extrase via RAG/LLM)
   compressiveStrength  Float?   // N/mm² — pt CR6-2013
@@ -174,7 +179,7 @@ model Material {
 // 3.1 Chunks RAG pentru materiale (Fișe tehnice)
 model MaterialChunk {
   id         Int      @id @default(autoincrement())
-  materialId Int
+  materialId Int      @unique
   material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
   content    String   // fișa tehnică text
   source     String   // "dedeman-scrape" | "manual" | "pdf-producator"

@@ -194,14 +194,15 @@ export const deleteSnapshot = async (req: Request, res: Response) => {
 
 /**
  * POST /api/editor/validate-conformity
- * Body: { rooms: [{ id, label?, usableSqm, widthM?, heightM? }], doors?: [{ id, widthM }] }
+ * Body: { rooms: [{ id, label?, usableSqm, widthM?, heightM? }], doors?: [{ id, widthM }], virtualBoundaries?: [{ roomIdA, roomIdB }] }
  * Response: { rooms, violations, warnings }
  */
 export const validateConformity = async (req: Request, res: Response) => {
   try {
-    const { rooms, doors, buildingPurpose } = req.body as {
+    const { rooms, doors, virtualBoundaries, buildingPurpose } = req.body as {
       rooms?: Array<{ id: string; label?: string; usableSqm: number; widthM?: number; heightM?: number }>;
       doors?: Array<{ id: string; widthM: number }>;
+      virtualBoundaries?: Array<{ roomIdA: string; roomIdB: string }>;
       buildingPurpose?: string;
     };
 
@@ -210,7 +211,7 @@ export const validateConformity = async (req: Request, res: Response) => {
       return;
     }
 
-    const results = await conformityService.evaluateRooms(rooms, { doors, buildingPurpose });
+    const results = await conformityService.evaluateRooms(rooms, { doors, virtualBoundaries, buildingPurpose });
     res.json(results);
   } catch (err) {
     console.error('[editorController] validateConformity:', err);

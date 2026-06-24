@@ -231,7 +231,9 @@ Returnează DOAR rezumatul, fără introducere sau formulă de încheiere.
     familySize: number,
     budgetCategory: BudgetCategory,
     houseAreaSqm: number,
-    totalFloors: number
+    totalFloors: number,
+    userRefinementText?: string,
+    previousRooms?: SuggestedRoom[]
   ): Promise<RoomSuggestion> {
     const response = await apiPrivate.post('/ai/suggest-rooms', {
       projectId,
@@ -239,6 +241,8 @@ Returnează DOAR rezumatul, fără introducere sau formulă de încheiere.
       budgetCategory,
       houseAreaSqm,
       totalFloors,
+      userRefinementText,
+      previousRooms,
     });
     return response.data as RoomSuggestion;
   },

@@ -47,6 +47,7 @@ export interface ProjectMetrics {
   countExteriorDoors: number;
   countInteriorDoors: number;
   countWindows: number;
+  countCorners?: number;
   exteriorOpeningsSqm: number;
 }
 
@@ -59,13 +60,19 @@ export function calcFoundationSpec(
   frostDepthCm: number | null | undefined,
   soilType?: string | null
 ): FoundationSpec {
-  const frost = frostDepthCm ?? 80;
-  const severeFrost = frost > 90;
+  if (!frostDepthCm) {
+    return {
+      concreteClass: 'Necunoscută',
+      minDepthCm: 0,
+      note: 'Adâncime îngheț nespecificată → nu se poate determina clasa betonului.',
+    };
+  }
+  const severeFrost = frostDepthCm > 90;
   const concreteClass = severeFrost ? 'C25/30-XF2' : 'C20/25-XC2';
-  const minDepthCm = Math.max(frost + 10, 80);
+  const minDepthCm = Math.max(frostDepthCm + 10, 80);
   const note = severeFrost
-    ? `Adâncime îngheț ${frost}cm (>90cm) → zonă cu îngheț sever → NE012-1-2022 impune minim C25/30 clasa XF2`
-    : `Adâncime îngheț ${frost}cm → îngheț normal → NE012-1-2022 permite C20/25 clasa XC2`;
+    ? `Adâncime îngheț ${frostDepthCm}cm (>90cm) → zonă cu îngheț sever → NE012-1-2022 impune minim C25/30 clasa XF2`
+    : `Adâncime îngheț ${frostDepthCm}cm → îngheț normal → NE012-1-2022 permite C20/25 clasa XC2`;
   return { concreteClass, minDepthCm, note };
 }
 
@@ -174,7 +181,28 @@ export const bomService = {
 
     const floorsCount = Math.max(1, project.totalFloors || 1);
 
-    // 2. Multiplicatori contextuali (determinist)
+    // 2. Extragere metrici din ultimele PlanSnapshot-uri salvate pentru fiecare etaj
+    const floors = ['subsol', 'parter', 'etaj1'];
+    const allSnapshots = await Promise.all(
+      floors.map(floor => 
+        prisma.planSnapshot.findFirst({
+          where: { projectId, floor },
+          orderBy: { createdAt: 'desc' }
+        })
+      )
+    );
+    const validSnapshots = allSnapshots.filter(s => s !== null).map(s => s!.planJSON);
+
+    if (validSnapshots.length === 0) {
+      throw new Error('Nu există un plan 2D salvat. Salvează planul din editor înainte de generarea devizului.');
+    }
+
+    const extraction = extractMetricsFromSnapshot(
+      validSnapshots,
+      floorsCount
+    );
+
+    // 3. Multiplicatori contextuali (determinist)
     const ctxInput: ProjectContextInput = {
       seismicZone:  project.seismicZone,
       soilType:     project.soilType,
@@ -184,32 +212,19 @@ export const bomService = {
       houseStyle:   project.houseStyle,
       energyClass:  project.energyClass,
     };
-    const ctx = buildContextMultipliers(ctxInput);
 
-    // 3. Extragere metrici din ultimul PlanSnapshot salvat (indiferent dacă e publicat explicit)
-    const snapshot = await prisma.planSnapshot.findFirst({
-      where: { projectId, floor: 'parter' },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (!snapshot) {
-      throw new Error('Nu există un plan 2D salvat. Salvează planul din editor înainte de generarea devizului.');
-    }
-    const extraction = extractMetricsFromSnapshot(
-      snapshot?.planJSON ?? null,
-      floorsCount,
-      ctx.frost_depth_m,
-      ctx.foundation_width_m,
-    );
-
-    // 4. Recalculăm count_corners_and_intersections cu datele reale din snapshot
     const ctxWithPlan = buildContextMultipliers(ctxInput, {
       interiorWallsM:     extraction.metrics.interiorWallsM,
       countWindows:       extraction.metrics.countWindows,
       countExteriorDoors: extraction.metrics.countExteriorDoors,
+      countCorners:       extraction.metrics.countCorners,
     });
 
-    // 5. Asamblare variabile complete pentru evaluator
+    // 4. Asamblare variabile complete pentru evaluator
     const metrics = extraction.metrics;
+    // Injectăm valorile inginerești calculate în metrics
+    metrics.foundationDepthM = ctxWithPlan.frost_depth_m;
+    metrics.foundationWidthM = ctxWithPlan.foundation_width_m;
     const vars: FormulaVariables = {
       perimeter_m:                    metrics.perimeterM,
       foundation_width_m:             ctxWithPlan.foundation_width_m,
@@ -232,7 +247,7 @@ export const bomService = {
     // 6. Log diagnostic
     console.log(`[BOM] Proiect #${projectId} — ${project.seismicZone ?? 'ag?'} | sol: ${project.soilType ?? '?'} | îngheț: ${project.frostDepthCm ?? '?'}cm`);
     console.log(`[BOM] seismic_mult=${ctxWithPlan.seismic_multiplier} | soil_mult=${ctxWithPlan.soil_concrete_multiplier} | beton=${ctxWithPlan.concreteClass}`);
-    console.log(`[BOM] ${extraction.fromSnapshot ? '✅ Metrici din snapshot' : '⚠️ Metrici estimate (fără snapshot)'}`);
+    console.log(`[BOM] ${extraction.fromSnapshot ? ' Metrici din snapshot' : ' Metrici estimate (fără snapshot)'}`);
 
     // 7. Citim formulele
     const formulasPath = path.join(__dirname, '../../data/bom-formulas.json');
@@ -241,21 +256,6 @@ export const bomService = {
     // 8. Citim materialele și override-urile din DB
     const materials = await prisma.material.findMany();
     const overrides = await prisma.projectMaterialOverride.findMany({ where: { projectId } });
-
-    // ─── Construim map: formulaKey → structuralType al materialului ales ────────────────
-    // Citim structuralType direct din DB (câmpul nou) — fără regex, fără hardcode.
-    const selectedStructuralTypes = new Map<string, string>();
-    for (const override of overrides) {
-      const mat = materials.find(m => m.id === override.materialId);
-      if (mat && (mat as any).structuralType) {
-        selectedStructuralTypes.set(override.formulaKey, (mat as any).structuralType);
-      }
-    }
-    // Default pentru wall_exterior: BCA (conform defaultMaterialCode din bom-formulas.json)
-    if (!selectedStructuralTypes.has('wall_exterior')) {
-      selectedStructuralTypes.set('wall_exterior', 'BCA');
-    }
-    console.log(`[BOM] Material structural wall_exterior: ${selectedStructuralTypes.get('wall_exterior')}`);
 
     // ─── Context pentru evaluatorul de upgrades ────────────────────────────────────
     const ag = project.seismicZone ? parseFloat(project.seismicZone.replace('g', '')) : 0;
@@ -268,6 +268,30 @@ export const bomService = {
       houseStyle:  project.houseStyle  ?? '',
       energyClass: project.energyClass ?? '',
     };
+
+    // ─── Construim map: formulaKey → structuralType al materialului ales ────────────────
+    // Citim structuralType direct din DB (câmpul nou) — fără regex, fără hardcode.
+    const selectedStructuralTypes = new Map<string, string>();
+    for (const override of overrides) {
+      const mat = materials.find(m => m.id === override.materialId);
+      if (mat && (mat as any).structuralType) {
+        selectedStructuralTypes.set(override.formulaKey, (mat as any).structuralType);
+      }
+    }
+    // Default pentru wall_exterior: determinat din defaultRoleCode + upgrades
+    if (!selectedStructuralTypes.has('wall_exterior')) {
+      const wallFormula = formulasJson['wall_exterior'];
+      let fallback = 'BCA';
+      if (wallFormula?.defaultRoleCode) {
+        const resolvedCode = resolveUpgradedMaterialCode(wallFormula, upgradeCtx);
+        const defaultMat = materials.find(m => m.subcategory === resolvedCode || m.internalCode === resolvedCode);
+        if (defaultMat && (defaultMat as any).structuralType) {
+          fallback = (defaultMat as any).structuralType;
+        }
+      }
+      selectedStructuralTypes.set('wall_exterior', fallback);
+    }
+    console.log(`[BOM] Material structural wall_exterior: ${selectedStructuralTypes.get('wall_exterior')}`);
 
     // 9. Evaluăm fiecare formulă
     const bomItems: Prisma.ProjectBOMCreateManyInput[] = [];
@@ -307,13 +331,14 @@ export const bomService = {
           material = materials.find(m => m.id === override.materialId) ?? null;
         }
 
-        // 10b. defaultMaterialCode + upgrades (data-driven, fără hardcode în TS)
-        if (!material && formula.defaultMaterialCode) {
+        // 10b. defaultRoleCode + upgrades (data-driven, fără hardcode în TS)
+        if (!material && formula.defaultRoleCode) {
           const resolvedCode = resolveUpgradedMaterialCode(formula, upgradeCtx);
-          material = materials.find(m => m.internalCode === resolvedCode) ?? null;
+          const isExactCode = resolvedCode.toUpperCase() === resolvedCode && resolvedCode.includes('_');
+          const roleQuery: MaterialQuery = isExactCode ? { internalCode: resolvedCode } : { subcategory: resolvedCode };
+          material = await selectMaterialForBOM(roleQuery, (project as any).budgetCategory || 'mediu', undefined);
           if (!material) {
-            // Fallback la materialSelector dacă codul nu e în catalog
-            console.warn(`[BOM] defaultMaterialCode "${resolvedCode}" nu există în catalog, fall back la selector`);
+            console.warn(`[BOM] Rolul "${resolvedCode}" nu are materiale în catalog.`);
           }
         }
 
@@ -326,12 +351,12 @@ export const bomService = {
             if (query.engineKey === 'rebarCode')    engineCode = ctxWithPlan.rebarCode;
             let projectSeismicZoneFloat: number | undefined = undefined;
             if (project.seismicZone) projectSeismicZoneFloat = ag;
-            material = await selectMaterialForBOM(query, (project as any).budgetCategory || 'mediu', engineCode, projectSeismicZoneFloat);
+            material = await selectMaterialForBOM(query, (project as any).budgetCategory, engineCode, projectSeismicZoneFloat);
           }
         }
 
         if (!material) {
-          console.warn(`[BOM] ❌ Niciun material conform găsit pentru formula "${formulaKey}". (query: ${JSON.stringify(formula.materialQuery)})`);
+          console.warn(`[BOM]   Niciun material conform găsit pentru formula "${formulaKey}". (query: ${JSON.stringify(formula.materialQuery)})`);
           continue;
         }
 
@@ -384,8 +409,6 @@ export const bomService = {
     return this.calculateBOM(projectId);
   },
 
-  // ── HELPER: returnează contextul BOM pentru AI (folosit de agentOrchestrator) ──
-
   getBOMContextForAI(projectId: number, project: {
     seismicZone?: string | null;
     soilType?: string | null;
@@ -401,13 +424,17 @@ export const bomService = {
       totalFloors:  project.totalFloors,
       houseStyle:   project.houseStyle,
       energyClass:  project.energyClass,
+    }, { 
+      // Omit planMetrics aici deoarece acest block de context
+      // e gândit doar să informeze agentul AI despre riscurile de șantier.
+      countCorners: 4
     });
 
     return [
       '[MULTIPLICATORI BOM — CALCULAȚI DETERMINIST]',
-      `  seismic_multiplier: ${ctx.seismic_multiplier} (${ctx.seismic_note})`,
-      `  soil_concrete_multiplier: ${ctx.soil_concrete_multiplier} (${ctx.soil_note})`,
-      `  Clasa beton fundație aplicată automat: ${ctx.concreteClass} (${ctx.concrete_note})`,
+      `  seismic_multiplier: ${ctx.seismic_multiplier}`,
+      `  soil_concrete_multiplier: ${ctx.soil_concrete_multiplier}`,
+      `  Clasa beton fundație aplicată automat: ${ctx.concreteClass}`,
       `  foundation_width_m: ${ctx.foundation_width_m}m`,
       `  frost_depth_m: ${ctx.frost_depth_m}m`,
     ].join('\n');
@@ -430,8 +457,8 @@ interface UpgradeContext {
   energyClass: string;
 }
 
-function resolveUpgradedMaterialCode(
-  formula: { defaultMaterialCode: string; upgrades?: Array<{ if: Record<string, any>; use: string }> },
+function   resolveUpgradedMaterialCode(
+  formula: { defaultRoleCode: string; upgrades?: Array<{ if: Record<string, any>; useRoleCode: string }> },
   ctx: UpgradeContext
 ): string {
   for (const upgrade of (formula.upgrades ?? [])) {
@@ -444,9 +471,9 @@ function resolveUpgradedMaterialCode(
     if (cond.energy_class     !== undefined && ctx.energyClass !== cond.energy_class)       continue;
     if (cond.house_style_in   !== undefined && !cond.house_style_in.includes(ctx.houseStyle)) continue;
     // Toate condițiile satisfăcute → prima regulă câștigă
-    return upgrade.use;
+    return upgrade.useRoleCode;
   }
-  return formula.defaultMaterialCode;
+  return formula.defaultRoleCode;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -466,19 +493,12 @@ function buildBOMItem(
 ): Prisma.ProjectBOMCreateManyInput {
   const totalPrice = parseFloat((finalQty * material.pricePerUnit).toFixed(2));
 
-  // ─── Nota tehnică internă (pentru deviz complet, log, export) ───
-  const noteparts = [
+  // Nota tehnică — DOAR formula normativă + calculul cantității
+  // Contextul seismic/sol NU se stochează aici — e disponibil din project.*
+  const note = [
     formula.note,
-    `Q_brut=${rawQuantity.toFixed(3)} ${formula.unit ?? ''} × (1+${formula.wastePercent}% rebut) = ${finalQty.toFixed(2)} ${formula.unit ?? ''}`,
-    ctx.seismic_multiplier !== 1.0 ? ctx.seismic_note : null,
-    ctx.soil_concrete_multiplier !== 1.0 ? ctx.soil_note : null,
-    extraNote || null,
+    `Q=${rawQuantity.toFixed(3)} + ${formula.wastePercent}% rebut = ${finalQty.toFixed(2)} ${formula.unit ?? ''}`,
   ].filter(Boolean).join(' | ');
-
-  // ─── Explicație afișată în UI — tehnică + accesibilă ────────────
-  const finalNote = formula.note
-    ? `${noteparts} ||EXPLAIN|| 📐 ${formula.note}`
-    : noteparts;
 
   return {
     projectId,
@@ -488,6 +508,6 @@ function buildBOMItem(
     quantity:   finalQty,
     unitPrice:  material.pricePerUnit,
     totalPrice,
-    note:       finalNote,
+    note,
   };
 }

@@ -31,7 +31,7 @@ export const DashboardLayout = () => {
           <div className="bg-buildorange p-2 rounded-lg">
             <Building2 className="w-6 h-6 text-white" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-slate-900">BuildWise</span>
+          <span className="text-xl font-bold tracking-tight text-slate-900">Zidario</span>
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
@@ -76,7 +76,7 @@ export const DashboardLayout = () => {
             <div className="bg-buildorange p-1.5 rounded-lg ml-1">
               <Building2 className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-slate-900">BuildWise</span>
+            <span className="font-bold text-slate-900">Zidario</span>
           </div>
           <Button variant="ghost" size="sm" onClick={logout}>
             <LogOut className="w-5 h-5" />
@@ -99,7 +99,7 @@ export const DashboardLayout = () => {
                   <div className="bg-buildorange p-1.5 rounded-lg">
                     <Building2 className="w-5 h-5 text-white" />
                   </div>
-                  <span className="font-bold text-slate-900">BuildWise</span>
+                  <span className="font-bold text-slate-900">Zidario</span>
                 </div>
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 text-slate-400 hover:text-slate-900">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>

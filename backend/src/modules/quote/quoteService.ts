@@ -115,11 +115,14 @@ export const quoteService = {
     });
   },
 
-  async getQuotesForContractor(userId: number) {
+  async getQuotesForContractor(userId: number, page: number = 1, limit: number = 20) {
     const profile = await prisma.contractorProfile.findUnique({ where: { userId } });
     if (!profile) throw new Error('Contractor profile not found');
 
-    return prisma.contractorQuote.findMany({
+    const total = await prisma.contractorQuote.count({ where: { contractorId: profile.id } });
+    const skip = (page - 1) * limit;
+
+    const data = await prisma.contractorQuote.findMany({
       where: { contractorId: profile.id },
       include: {
         project: {
@@ -131,8 +134,20 @@ export const quoteService = {
         },
         phases: true
       },
+      skip,
+      take: limit,
       orderBy: { createdAt: 'desc' }
     });
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   },
 
   async submitQuote(quoteId: number | undefined, contractorUserId: number, data: { projectId?: number, selectedPhases?: number[], totalAmount: number, executionDays: number, message?: string, acceptsBOM: boolean, bomVariations?: any, selfInitiated?: boolean }) {

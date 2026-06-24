@@ -116,7 +116,7 @@ export const BOMPhaseCard = ({
                         : 'border-slate-100 hover:border-buildorange/30 hover:bg-orange-50/20'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                       {/* Info material */}
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-slate-900 text-sm leading-snug">{item.material.name}</p>
@@ -129,31 +129,32 @@ export const BOMPhaseCard = ({
                         ) : fallbackNote ? (
                           <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">{fallbackNote}</p>
                         ) : null}
-                      {/* Calcul vizual */}
-                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
-                          {item.quantity} {item.material.unit}
-                        </span>
-                        <span className="text-slate-300 text-xs">×</span>
-                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
-                          {ron(item.unitPrice)}/{item.material.unit}
-                        </span>
-                        <span className="text-slate-300 text-xs">=</span>
-                        <span className="text-xs font-bold text-slate-800 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-md">
-                          {ron(item.totalPrice)}
-                        </span>
-                      </div>
-                    </div>
 
-                    {/* Buton Schimbă — vizibil doar dacă nu e confirmată */}
-                    {!isConfirmed && (
-                      <button
-                        onClick={() => setSelectedItem(item)}
-                        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold text-buildorange bg-orange-50 px-3 py-2 rounded-xl border border-orange-100 hover:bg-orange-100 flex items-center gap-1.5"
-                      >
-                        🔄 Schimbă
-                      </button>
-                    )}
+                        {/* Calcul vizual */}
+                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                          <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                            {item.quantity} {item.material.unit}
+                          </span>
+                          <span className="text-slate-300 text-xs">×</span>
+                          <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                            {ron(item.unitPrice)}/{item.material.unit}
+                          </span>
+                          <span className="text-slate-300 text-xs">=</span>
+                          <span className="text-xs font-bold text-slate-800 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-md">
+                            {ron(item.totalPrice)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Buton Schimbă — vizibil doar dacă nu e confirmată */}
+                      {!isConfirmed && (
+                        <button
+                          onClick={() => setSelectedItem(item)}
+                          className="shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-xs font-bold text-buildorange bg-orange-50 px-3 py-2 rounded-xl border border-orange-100 hover:bg-orange-100 flex items-center justify-center gap-1.5 w-full sm:w-auto mt-2 sm:mt-0"
+                        >
+                          🔄 Schimbă
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

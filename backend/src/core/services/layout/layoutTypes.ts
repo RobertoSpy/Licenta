@@ -8,6 +8,7 @@ export interface CanvasElement {
   height: number;
   rotation: number;
   wallThicknessCm?: number;
+  metadata?: Record<string, any>;
 }
 
 import constants from '../../../data/layout-constants.json';

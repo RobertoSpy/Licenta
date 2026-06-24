@@ -472,7 +472,7 @@ Nu folosi un ton de marketing, ci unul strict ingineresc (izolație termică, re
    */
   async suggestRooms(req: Request, res: Response): Promise<void> {
     try {
-      const { projectId, familySize, budgetCategory, houseAreaSqm } = req.body;
+      const { projectId, familySize, budgetCategory, houseAreaSqm, totalFloors, userRefinementText, previousRooms } = req.body;
 
       if (!projectId || !familySize || !budgetCategory || !houseAreaSqm) {
         res.status(400).json({ error: 'projectId, familySize, budgetCategory și houseAreaSqm sunt obligatorii.' });
@@ -500,14 +500,16 @@ Nu folosi un ton de marketing, ci unul strict ingineresc (izolație termică, re
 
       const suggestion = await suggestRoomProgram({
         houseAreaSqm:     Number(houseAreaSqm),
-        plotAreaSqm:      project.plotAreaSqm       ?? 300,
-        houseStyle:       project.houseStyle         ?? 'Modern',
-        totalFloors:      project.totalFloors        ?? 1,
+        plotAreaSqm:      project.plotAreaSqm,
+        houseStyle:       project.houseStyle,
+        totalFloors:      totalFloors ? Number(totalFloors) : (project.totalFloors ?? 1),
         hasBasement:      project.hasBasement,
-        streetOrientation: project.streetOrientation ?? 'S',
+        streetOrientation: project.streetOrientation,
         familySize:       familySizeNum,
         budgetCategory:   budgetCategory as 'economic' | 'mediu',
         buildingPurpose:  project.buildingPurpose    ?? 'residential',
+        userRefinementText,
+        previousRooms,
       });
 
       res.json(suggestion);

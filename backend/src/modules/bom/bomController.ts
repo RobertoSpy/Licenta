@@ -11,36 +11,36 @@ const BOM_PHASE_ORDER: BomPhaseKey[] = [
   'fundatie',
   'structura',
   'planseu',
-  'termoizolatie',
   'acoperis',
-  'tamplarie',
-  'instalatii',
   'finisaje',
-  'exterior'
+  'tamplarie',
+  'termoizolatie',
+  'instalatii_electrice',
+  'instalatii_sanitare'
 ];
 
 const BOM_PHASE_KEYWORDS: Record<BomPhaseKey, RegExp> = {
   fundatie: /fundati|fundare|radier|talpa|elevati|cota zero|soclu|izolare la sol/i,
   structura: /structur|stalp|stâlp|grinda|grindă|armatura|armătur|beton armat|zidarie|zidărie|caramida|cărămid|bca|blocuri/i,
   planseu: /planseu|planșeu|placa|placă|coroana|centura/i,
-  termoizolatie: /termoizol|izolat|izolați|polistiren|vata|vată|etics|hidroizol|bariera vapori/i,
   acoperis: /acoperis|acoperiș|sarpanta|șarpant|invelitoare|învelitoare|tabla|țiglă/i,
-  tamplarie: /tamplarie|tâmplărie|fereastr|geam|usa|ușă|glaf/i,
-  instalatii: /instalati|instalați|electri|sanitar|termic|ventil|clima|teava|țeavă|cablu|priza|priză/i,
   finisaje: /finisaj|tencuial|vopsea|pardoseala|gresie|faianta|faianță|parchet|glet|lavabil/i,
-  exterior: /amenajar|exterior|trotuar|pavaj|curte|gard|bordur/i,
+  tamplarie: /tamplarie|tâmplărie|fereastr|geam|usa|ușă|glaf/i,
+  termoizolatie: /termoizol|izolat|izolați|polistiren|vata|vată|etics|hidroizol|bariera vapori/i,
+  instalatii_electrice: /instalati|instalați|electri|cablu|priza|priză|curent|tablou/i,
+  instalatii_sanitare: /sanitar|termic|ventil|clima|teava|țeavă|apa|canalizare|incalzire/i,
 };
 
 const BOM_PHASE_LABELS: Record<BomPhaseKey, string> = {
   fundatie: 'Fundație',
   structura: 'Structură',
   planseu: 'Planșeu & Coroană',
-  termoizolatie: 'Termoizolație & Hidroizolație',
   acoperis: 'Acoperiș',
-  tamplarie: 'Tâmplărie',
-  instalatii: 'Instalații',
   finisaje: 'Finisaje',
-  exterior: 'Amenajări Exterioare',
+  tamplarie: 'Tâmplărie',
+  termoizolatie: 'Termoizolație & Hidroizolație',
+  instalatii_electrice: 'Instalații Electrice',
+  instalatii_sanitare: 'Instalații Sanitare și Termice',
 };
 
 
@@ -400,6 +400,7 @@ export const bomAdvisorChat = async (req: Request, res: Response): Promise<void>
         seismicZone: true, frostDepthCm: true,
         soilType: true, buildingPurpose: true,
         totalFloors: true, totalFloorAreaSqm: true,
+        houseStyle: true, budgetCategory: true,
       }
     });
 
@@ -417,6 +418,8 @@ export const bomAdvisorChat = async (req: Request, res: Response): Promise<void>
       project.soilType          ? `Tip sol: ${project.soilType}`                           : null,
       project.totalFloors       ? `Niveluri: ${project.totalFloors}`                       : null,
       project.totalFloorAreaSqm ? `Suprafață planșee: ${project.totalFloorAreaSqm} mp`    : null,
+      project.houseStyle        ? `Stil arhitectural: ${project.houseStyle}`               : null,
+      project.budgetCategory    ? `Buget: ${project.budgetCategory}`                       : null,
     ].filter(Boolean);
 
     const bomItems = await prisma.projectBOM.findMany({
@@ -425,15 +428,12 @@ export const bomAdvisorChat = async (req: Request, res: Response): Promise<void>
     });
 
     const bomText = bomItems.map(item => {
-      const noteParts = item.note?.split('||EXPLAIN||') || [];
-      const explanation = noteParts.length > 1 ? noteParts[1].trim() : '';
-      const materialDesc = item.material?.description ? ` | Info material: ${item.material.description}` : '';
-      return `- Faza: ${item.phase} | Material: ${item.material?.name} | Cantitate: ${item.quantity} ${item.material?.unit} ${explanation ? '| Motivare: ' + explanation : ''}${materialDesc}`;
+      return `  - [${item.phase}] ${item.material?.name}: ${item.quantity} ${item.material?.unit} = ${item.totalPrice} RON`;
     }).join('\n');
 
-    const contextString = contextLines.length > 0
-      ? `Date proiect:\n${contextLines.join('\n')}\n\nMATERIALE CALCULATE (Deviz):\n${bomText}`
-      : `Date proiect indisponibile.\n\nMATERIALE CALCULATE (Deviz):\n${bomText}`;
+    let contextString = contextLines.length > 0
+      ? `CONTEXT PROIECT (date din Fazele 1-4):\n${contextLines.join('\n')}\n\nDEVIZ CURENT:\n${bomText}\n\nRăspunde explicând deciziile tehnice folosind datele de mai sus și normativele din RAG. Nu inventa valori.`
+      : `Date proiect indisponibile.\n\nDEVIZ CURENT:\n${bomText}`;
 
     // SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
@@ -464,23 +464,9 @@ export const bomAdvisorChat = async (req: Request, res: Response): Promise<void>
       const currentCompleted = phaseState.completedPhases.includes(phaseState.activePhase);
 
       if (desiredOrder > currentOrder && !currentCompleted) {
-        // Blocăm avansarea până confirmă etapa curentă
-        res.write('event: phase\n');
-        res.write(`data: ${JSON.stringify({
-          phase: phaseState.activePhase,
-          completedPhases: phaseState.completedPhases
-        })}\n\n`);
-        res.write('event: message\n');
-        res.write(`data: ${JSON.stringify({
-          text: `Înainte să trecem mai departe, vreau să confirmăm etapa curentă (${BOM_PHASE_LABELS[phaseState.activePhase]}). Apasă „Confirmă etapa” sau scrie "confirm" dacă ai înțeles.`
-        })}\n\n`);
-        res.write('event: done\n');
-        res.write('data: [DONE]\n\n');
-        res.end();
-        return;
-      }
-
-      if (desiredOrder !== currentOrder && (currentCompleted || desiredOrder <= currentOrder)) {
+        // În loc să blocăm răspunsul (UX negativ), instruim AI-ul să răspundă, dar să îi amintească utilizatorului de confirmare.
+        contextString += `\n\nATENȚIE PENTRU ZIDARIO: Utilizatorul întreabă despre materiale dintr-o etapă diferită sau viitoare (${detectedPhase}), dar nu a confirmat încă etapa curentă (${phaseState.activePhase}). Răspunde la întrebarea sa tehnică, apoi la finalul răspunsului roagă-l prietenos să confirme etapa curentă (apăsând butonul sau scriind "confirm") înainte să mergeți oficial mai departe.`;
+      } else if (desiredOrder !== currentOrder && (currentCompleted || desiredOrder <= currentOrder)) {
         phaseState = {
           ...phaseState,
           activePhase: detectedPhase

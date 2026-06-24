@@ -24,22 +24,22 @@ interface Props {
 }
 
 const BUDGET_OPTIONS: { value: BudgetCategory; label: string; desc: string; color: string }[] = [
-  { value: 'economic', label: 'Economic',  desc: 'Camere esențiale, suprafețe minime', color: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
-  { value: 'mediu',    label: 'Normal',    desc: 'Confort bun, spații generoase',      color: 'border-blue-300 bg-blue-50 text-blue-800'         },
+  { value: 'economic', label: 'Economic', desc: 'Camere esențiale, suprafețe minime', color: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
+  { value: 'mediu', label: 'Normal', desc: 'Confort bun, spații generoase', color: 'border-blue-300 bg-blue-50 text-blue-800' },
 ];
 
 const ZONE_COLORS: Record<string, string> = {
   distributie: 'bg-slate-100 text-slate-700 border-slate-200',
-  zi:          'bg-orange-50 text-orange-800 border-orange-200',
-  noapte:      'bg-indigo-50 text-indigo-800 border-indigo-200',
-  tehnic:      'bg-gray-50 text-gray-700 border-gray-200',
+  zi: 'bg-orange-50 text-orange-800 border-orange-200',
+  noapte: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+  tehnic: 'bg-gray-50 text-gray-700 border-gray-200',
 };
 
 const ZONE_LABELS: Record<string, string> = {
   distributie: 'Distribuție',
-  zi:          'Zona Zi',
-  noapte:      'Zona Noapte',
-  tehnic:      'Tehnic',
+  zi: 'Zona Zi',
+  noapte: 'Zona Noapte',
+  tehnic: 'Tehnic',
 };
 
 // Step 1 — colectare date
@@ -48,26 +48,28 @@ const ZONE_LABELS: Record<string, string> = {
 type Step = 'input' | 'loading' | 'result';
 
 export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose, projectData }) => {
-  const [step, setStep]               = useState<Step>('input');
+  const [step, setStep] = useState<Step>('input');
 
   // Dynamic slider: POT legal 40% per etaj din teren (dacă avem date)
-  const plotArea    = Number(projectData?.plotAreaSqm ?? 500);
+  const plotArea = Number(projectData?.plotAreaSqm ?? 500);
   const totalFloors = Number(projectData?.totalFloors ?? 1);
   const maxHouseArea = Math.min(Math.round(plotArea * 0.40 * totalFloors), 1200);
   const defaultHouseArea = Math.min(120, maxHouseArea);
 
   const [houseAreaSqm, setHouseAreaSqm] = useState(defaultHouseArea);
-  const [familySize, setFamilySize]   = useState(3);
-  const [budget, setBudget]           = useState<BudgetCategory>('mediu');
-  const [suggestion, setSuggestion]   = useState<RoomSuggestion | null>(null);
-  const [error, setError]             = useState<string | null>(null);
+  const [familySize, setFamilySize] = useState(3);
+  const [budget, setBudget] = useState<BudgetCategory>('mediu');
+  const [suggestion, setSuggestion] = useState<RoomSuggestion | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isSavingFloors, setIsSavingFloors] = useState(false);
+  const [refinementText, setRefinementText] = useState('');
 
   const { setActiveRooms, houseShape, setHouseShape, dimensions, setDimensions, switchFloor, streetOrientation } = useEditorState();
 
   const handleGenerate = async () => {
     setStep('loading');
     setError(null);
+    setRefinementText('');
     try {
       const result = await aiApi.suggestRooms(projectId, familySize, budget, houseAreaSqm, totalFloors);
       setSuggestion(result);
@@ -75,6 +77,21 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
     } catch (e: any) {
       setError(e?.response?.data?.error ?? e.message ?? 'Eroare necunoscută.');
       setStep('input');
+    }
+  };
+
+  const handleRefine = async () => {
+    if (!refinementText.trim() || !suggestion) return;
+    setStep('loading');
+    setError(null);
+    try {
+      const result = await aiApi.suggestRooms(projectId, familySize, budget, houseAreaSqm, totalFloors, refinementText, suggestion.rooms);
+      setSuggestion(result);
+      setStep('result');
+      setRefinementText('');
+    } catch (e: any) {
+      setError(e?.response?.data?.error ?? e.message ?? 'Eroare necunoscută.');
+      setStep('result'); // back to result to see previous rooms
     }
   };
 
@@ -96,28 +113,27 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
     // FIX — Problema 1 & 2: Calculăm dimensiunile corecte ale amprentei per etaj.
     // Ne bazăm strict pe suprafața estimată de AI împărțită la numărul de etaje distincte.
     const floorsCount = Object.keys(byFloor).length || 1;
-    const sqmPerFloor = suggestion.totalEstimatedSqm / floorsCount;
-    
+    const sqmPerFloor = houseAreaSqm / floorsCount;
+
     const shapeMultiplier = LAYOUT_CONSTANTS.shape_multipliers[houseShape as keyof typeof LAYOUT_CONSTANTS.shape_multipliers] || 1;
-    
-    const autoWidthM = Math.sqrt(sqmPerFloor * (4/3) * shapeMultiplier);
+
+    const autoWidthM = Math.sqrt(sqmPerFloor * (4 / 3) * shapeMultiplier);
     const autoHeightM = (sqmPerFloor * shapeMultiplier) / autoWidthM;
 
-    const finalWidthM  = Math.round(autoWidthM * 10) / 10;
+    const finalWidthM = Math.round(autoWidthM * 10) / 10;
     const finalHeightM = Math.round(autoHeightM * 10) / 10;
 
     const dims = {
-      widthM:     finalWidthM,
-      heightM:    finalHeightM,
-      wingWidthM:  Math.round(finalWidthM / 2.5),
+      widthM: finalWidthM,
+      heightM: finalHeightM,
+      wingWidthM: Math.round(finalWidthM / 2.5),
       wingLengthM: Math.round(finalHeightM / 2),
     };
 
-    // Actualizăm store-ul (și implicit canvas-ul) cu noile dimensiuni
-    setDimensions(dims);
-
-
-
+    // Salvăm noile dimensiuni pentru calcul, dar NU apelăm setDimensions încă.
+    // Dacă am apela setDimensions aici, am scala inutil elementele vechi de pe canvas,
+    // înainte ca backend-ul să genereze noile elemente.
+    // setDimensions(dims); // ELIMINAT pentru a preveni scalarea eronată a vechiului plan
     try {
       // Folosește cache-ul în loc să regenerezi
       let parterElementsCache: any[] | null = null;
@@ -147,29 +163,14 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
         // FIX: Calculăm suprafața corectă PER ETAJ, nu împărțim totalul la numărul de etaje.
         // Fiecare etaj are propria sa amprentă la sol, nu partajează aceeași suprafață.
 
-        const floorSqm = floorRooms.reduce((sum, r) => {
-          const avg = r.minSqm && r.maxSqm
-            ? (r.minSqm + r.maxSqm) / 2
-            : r.minSqm ?? r.maxSqm ?? 15;
-          return sum + avg;
-        }, 0);
+        // Folosim dimensiunile globale unificate pentru toate etajele.
+        // Asta garantează că amprenta casei este uniformă (aceeași și la parter și la etaj)
+        // și că se respectă suprafața totală estimată de AI.
+        const floorDims = { ...dims };
 
-        const shapeMultiplier = LAYOUT_CONSTANTS.shape_multipliers[houseShape as keyof typeof LAYOUT_CONSTANTS.shape_multipliers] || 1;
-        const adjustedSqm = floorSqm / shapeMultiplier; // invert multiplier to get net floor area
-        const autoWidthM = Math.sqrt(adjustedSqm * (4/3));
-        const autoHeightM = adjustedSqm / autoWidthM;
-
-        const floorDims = {
-          widthM:     Math.round(autoWidthM * 10) / 10,
-          heightM:    Math.round(autoHeightM * 10) / 10,
-          wingWidthM:  Math.round(autoWidthM / 2.5),
-          wingLengthM: Math.round(autoHeightM / 2),
-        };
-
-        // Actualizăm store-ul cu dimensiunile parterului (etajul principal vizibil)
-        if (floorKey === 'parter') {
-          setDimensions(floorDims);
-        }
+        // Nu mai apelăm setDimensions aici! 
+        // Vom aplica dimensiunile direct în switchFloor la final, împreună cu elementele generate,
+        // pentru a păstra reactivitatea Zustand o singură dată pe tot arborele.
 
         const configRooms = floorRooms.map((r, i) => ({
           id: `ai-${floorKey}-${i}`,
@@ -178,18 +179,18 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
           zone: r.zone ?? 'zi',
           ratioValue: r.weightRatio,
           // ── Proprietăți critice pentru generarea ferestrelor și ușilor ──
-          naturalLight:    r.naturalLight    ?? false,
-          hasDoorTo:       r.hasDoorTo       ?? [],
-          isCirculation:   r.isCirculation   ?? false,
-          hasStaircase:    r.hasStaircase    ?? false,
-          orientation:     r.orientation     ?? [],
-          minSqm:          r.minSqm          ?? undefined,
-          maxSqm:          r.maxSqm          ?? undefined,
-          mustAdjacentTo:  r.mustAdjacentTo  ?? [],
+          naturalLight: r.naturalLight ?? false,
+          hasDoorTo: r.hasDoorTo ?? [],
+          isCirculation: r.isCirculation ?? false,
+          hasStaircase: r.hasStaircase ?? false,
+          orientation: r.orientation ?? [],
+          minSqm: r.minSqm ?? undefined,
+          maxSqm: r.maxSqm ?? undefined,
+          mustAdjacentTo: r.mustAdjacentTo ?? [],
         }));
 
         const floorElements = await editorApi.generateConfiguratorLayout(projectId, houseShape, floorDims, configRooms, streetOrientation);
-        
+
         const fullState = {
           elements: floorElements,
           activeRooms: configRooms,
@@ -207,22 +208,9 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
       }
 
       if (parterElementsCache && parterConfigRoomsCache) {
-        // Trimite obiectul complet cu dimensiunile corecte ale parterului
-        // altfel canvas-ul rămâne cu dimensiunile vechi și nu afișează nimic
-        const parterFloorRooms = byFloor['parter'] ?? [];
-        const parterSqm = parterFloorRooms.reduce((sum: number, r: any) => {
-          const avg = r.minSqm && r.maxSqm ? (r.minSqm + r.maxSqm) / 2 : r.minSqm ?? r.maxSqm ?? 15;
-          return sum + avg;
-        }, 0);
-        const sm = LAYOUT_CONSTANTS.shape_multipliers[houseShape as keyof typeof LAYOUT_CONSTANTS.shape_multipliers] || 1;
-        const aw = Math.sqrt((parterSqm / sm) * (4/3));
-        const ah = (parterSqm / sm) / aw;
-        const parterDims = {
-          widthM: Math.round(aw * 10) / 10,
-          heightM: Math.round(ah * 10) / 10,
-          wingWidthM: Math.round(aw / 2.5),
-          wingLengthM: Math.round(ah / 2),
-        };
+        // Folosim direct dimensiunile globale 'dims' calculate corect din total
+        // pentru a preveni deviațiile (când suma minimelor camerelor nu dă exact suprafața target).
+        const parterDims = { ...dims };
         switchFloor('parter', {
           elements: parterElementsCache,
           activeRooms: parterConfigRoomsCache,
@@ -383,15 +371,13 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
                           <button
                             key={opt.value}
                             onClick={() => setBudget(opt.value)}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl border-2 transition-all text-left ${
-                              budget === opt.value
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl border-2 transition-all text-left ${budget === opt.value
                                 ? opt.color + ' border-2'
                                 : 'border-slate-100 bg-white hover:bg-slate-50 text-slate-600'
-                            }`}
+                              }`}
                           >
-                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                              budget === opt.value ? 'border-current' : 'border-slate-300'
-                            }`}>
+                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${budget === opt.value ? 'border-current' : 'border-slate-300'
+                              }`}>
                               {budget === opt.value && (
                                 <div className="w-2 h-2 rounded-full bg-current" />
                               )}
@@ -475,6 +461,30 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
                       </div>
                     </div>
 
+                    {/* Insufficient Area Warning */}
+                    {(() => {
+                      const totalMinSqm = suggestion.rooms.reduce((s, r) => s + (r.minSqm ?? 0), 0);
+                      // Daca minimele absolute depasesc suprafata dorita
+                      if (totalMinSqm > houseAreaSqm) {
+                        return (
+                          <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+                            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-red-800">
+                                Suprafață insuficientă (sub minimul legal)
+                              </p>
+                              <p className="text-xs text-red-600 mt-1 leading-relaxed">
+                                Suprafața cerută de {houseAreaSqm} m² este prea mică pentru acest program funcțional. 
+                                Suma suprafețelor minime legale impuse de Legea 114/1996 este de minim <strong>{Math.round(totalMinSqm)} m²</strong>. 
+                                Dacă continui, algoritmul va încălca normativul și va scala forțat camerele sub pragul legal pentru a le face să încapă.
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
                     {/* Layout advice */}
                     {suggestion.layoutAdvice && (
                       <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
@@ -494,7 +504,7 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
                             <Home className="w-3.5 h-3.5 text-slate-500" />
                           </div>
                           <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-xs font-bold text-slate-800">{room.label}</span>
                               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${ZONE_COLORS[room.zone] ?? ZONE_COLORS.tehnic}`}>
                                 {ZONE_LABELS[room.zone] ?? room.zone}
@@ -522,14 +532,27 @@ export const AiRoomSuggestModal: React.FC<Props> = ({ projectId, isOpen, onClose
                       </div>
                     )}
 
+                    {/* Refinement Area */}
+                    <div className="pt-2 border-t border-slate-100">
+                      <p className="text-xs font-bold text-slate-800 mb-2">
+                        Vrei să schimbi ceva? Spune-i lui Zidario:
+                      </p>
+                      <textarea
+                        value={refinementText}
+                        onChange={(e) => setRefinementText(e.target.value)}
+                        placeholder="ex: 'Vreau bucătăria închisă, nu open-space' sau 'Biroul să fie mai mic, de doar 9 mp'"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all resize-none h-20"
+                      />
+                    </div>
+
                     {/* Actions */}
                     <div className="flex gap-3 pt-1">
                       <button
-                        onClick={handleReset}
+                        onClick={refinementText.trim() ? handleRefine : handleReset}
                         disabled={isSavingFloors}
                         className="flex-1 py-3 px-4 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors disabled:opacity-40"
                       >
-                        ← Regenerează
+                        {refinementText.trim() ? '← Ajustează' : '← Regenerează'}
                       </button>
                       <button
                         onClick={handleApply}

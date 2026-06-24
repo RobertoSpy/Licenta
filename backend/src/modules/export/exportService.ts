@@ -85,14 +85,16 @@ function escapeHtml(unsafe: string | null | undefined): string {
 function buildHtmlTemplate(
   project: ExportProjectData,
   planPngBase64: string | null,
-  rooms: RoomRow[],
+  floorsData: Array<{ floorLabel: string; rooms: RoomRow[]; snapshotVersion: number }>,
+  activeFloorLabel: string,
   generatedAt: string,
   snapshotVersion: number,
 ): string {
-  const totalSqmFloat = rooms.reduce((acc, r) => acc + r.usableSqm, 0);
+  const totalSqmFloat = floorsData.reduce((acc, f) => acc + f.rooms.reduce((sum, r) => sum + r.usableSqm, 0), 0);
   const totalSqm = totalSqmFloat.toFixed(1);
   const totalBuiltSqm = project.totalFloorAreaSqm ? project.totalFloorAreaSqm.toFixed(1) : (totalSqmFloat * 1.25).toFixed(1);
-  const violationsCount = rooms.filter((r) => r.status === 'error').length;
+  const violationsCount = floorsData.reduce((acc, f) => acc + f.rooms.filter((r) => r.status === 'error').length, 0);
+  const totalRoomsCount = floorsData.reduce((acc, f) => acc + f.rooms.length, 0);
   const safeTitle = escapeHtml(project.title);
 
   const getNorthRotation = (orientation: string | null): number => {
@@ -111,8 +113,9 @@ function buildHtmlTemplate(
   if (project.hasMansard) configParts.push('Mansardă');
   const configString = configParts.length > 0 ? configParts.join(' / ') : 'Parter';
 
-  const roomRows = rooms
-    .map((r) => {
+  // Generate HTML for each floor's room table
+  const floorsHtml = floorsData.map((floor) => {
+    const roomRows = floor.rooms.map((r) => {
       const statusBadge =
         r.status === 'ok'
           ? '<span style="color:#16a34a">✓ Conform</span>'
@@ -125,8 +128,27 @@ function buildHtmlTemplate(
         <td style="text-align:center">${r.minRequiredSqm ? r.minRequiredSqm.toFixed(1) + ' mp' : '-'}</td>
         <td style="text-align:center">${statusBadge}</td>
       </tr>`;
-    })
-    .join('');
+    }).join('');
+
+    return `
+      <div style="margin-top: 32px; margin-bottom: 16px;">
+        <h2 style="font-size: 18px; font-weight: 800; color: #1e293b; margin-bottom: 12px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">Plan ${floor.floorLabel}</h2>
+        <table class="rooms-table">
+          <thead>
+            <tr>
+              <th>Cameră</th>
+              <th style="text-align:center">Suprafață utilă</th>
+              <th style="text-align:center">Minim legal</th>
+              <th style="text-align:center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${roomRows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8">Nicio cameră desenată pe acest nivel</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }).join('');
 
   return `<!DOCTYPE html>
 <html lang="ro">
@@ -203,7 +225,7 @@ function buildHtmlTemplate(
         <li><strong>Regim de înălțime:</strong> ${project.floors !== null ? `P+${project.floors - 1}` : 'Parter'}</li>
         <li><strong>Stil arhitectural ales:</strong> ${escapeHtml(project.houseType) || 'Nespecificat'}</li>
         <li><strong>Status conformitate:</strong> <span style="color:${violationsCount > 0 ? '#dc2626' : '#16a34a'}">${violationsCount === 0 ? 'Conform' : 'Neconform'}</span></li>
-        <li><strong>Număr camere:</strong> ${rooms.length}</li>
+        <li><strong>Număr camere total:</strong> ${totalRoomsCount}</li>
       </ul>
     </div>
   </div>
@@ -260,8 +282,8 @@ function buildHtmlTemplate(
   <!-- P3: Planul Fiecărui Etaj -->
   <div class="plan-page">
     <div class="plan-header">
-      <div class="plan-title">Plan Parter</div>
-      <div style="font-size:12px;color:#64748b;margin-top:4px">Scara: 1:100 (la tipărire A4) · Orientare: Landscape</div>
+      <div class="plan-title">Plan ${activeFloorLabel} (Previzualizare)</div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px">Imagine capturată pentru etajul activ. Scara: 1:100 (la tipărire A4) · Orientare: Landscape</div>
     </div>
     
     <div class="plan-container">
@@ -283,21 +305,11 @@ function buildHtmlTemplate(
   </div>
 
   <!-- P4: Tabel Încăperi -->
-  <div class="page">
-    <h1 style="font-size: 24px; font-weight: 900; margin-bottom: 20px;">Tabel Încăperi</h1>
-    <table class="rooms-table">
-      <thead>
-        <tr>
-          <th>Cameră</th>
-          <th style="text-align:center">Suprafață utilă</th>
-          <th style="text-align:center">Minim legal</th>
-          <th style="text-align:center">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${roomRows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8">Nicio cameră desenată</td></tr>'}
-      </tbody>
-    </table>
+  <div class="page" style="page-break-after: auto;">
+    <h1 style="font-size: 24px; font-weight: 900; margin-bottom: 20px;">Tabele Încăperi per Nivel</h1>
+    
+    ${floorsHtml}
+    
     
     <div style="margin-top: 32px; background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0;">
       <div style="display:flex; justify-content:space-between; margin-bottom: 12px; font-size: 16px;">
@@ -406,7 +418,8 @@ function buildContractorHtmlTemplate(project: any, bom: any[], snapshot: any, pl
 export const exportService = {
   async generatePlanPdf(
     projectId: number,
-    planPngBase64: string | null
+    planPngBase64: string | null,
+    activeFloor: string = 'parter'
   ): Promise<{ buffer: Buffer; filename: string } | null> {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
@@ -414,48 +427,69 @@ export const exportService = {
     });
 
     if (!project) return null;
-    const snapshot = await prisma.planSnapshot.findFirst({
+    
+    const snapshots = await prisma.planSnapshot.findMany({
       where: { projectId },
       orderBy: [{ isPublished: 'desc' }, { version: 'desc' }],
     });
 
-    if (!snapshot) return null;
+    if (snapshots.length === 0) return null;
 
-    const planJSON = snapshot.planJSON as {
-      elements?: Array<{
-        id: string;
-        type: string;
-        label?: string;
-        width?: number;
-        height?: number;
-        wallThicknessCm?: number;
-      }>;
-    };
+    // Obține ultimul snapshot pentru fiecare etaj
+    const latestPerFloor = new Map<string, any>();
+    for (const snap of snapshots) {
+      if (!latestPerFloor.has(snap.floor)) {
+        latestPerFloor.set(snap.floor, snap);
+      }
+    }
 
-    const rawRooms = (planJSON.elements ?? [])
-      .filter((el) => el.type === 'room')
-      .map((el) => ({
-        id: el.id,
-        label: el.label ?? 'Cameră',
-        usableSqm: computeUsableSqm(el.width ?? 0, el.height ?? 0, el.wallThicknessCm ?? 25),
-      }));
+    const floorNames: Record<string, string> = { parter: 'Parter', etaj1: 'Etaj 1', subsol: 'Subsol' };
+    const floorsData: Array<{ floorLabel: string; rooms: RoomRow[]; snapshotVersion: number }> = [];
 
-    const results = await conformityService.evaluateRooms(rawRooms);
-    const resultsById = new Map(results.rooms.map((r) => [r.id, r]));
+    for (const [floor, snap] of latestPerFloor.entries()) {
+      const planJSON = snap.planJSON as any;
+      const rawRooms = (planJSON.elements ?? [])
+        .filter((el: any) => el.type === 'room')
+        .map((el: any) => ({
+          id: el.id,
+          label: el.label ?? 'Cameră',
+          usableSqm: computeUsableSqm(el.width ?? 0, el.height ?? 0, el.wallThicknessCm ?? 25),
+        }));
 
-    const rooms: RoomRow[] = rawRooms.map((room) => {
-      const roomResult = resultsById.get(room.id);
-      return {
-        label: room.label,
-        usableSqm: room.usableSqm,
-        status: roomResult?.status ?? 'ok',
-        minRequiredSqm: roomResult?.minRequiredSqm,
-      };
+      const results = await conformityService.evaluateRooms(rawRooms);
+      const resultsById = new Map(results.rooms.map((r) => [r.id, r]));
+
+      const rooms: RoomRow[] = rawRooms.map((room: any) => {
+        const roomResult = resultsById.get(room.id);
+        return {
+          label: room.label,
+          usableSqm: room.usableSqm,
+          status: roomResult?.status ?? 'ok',
+          minRequiredSqm: roomResult?.minRequiredSqm,
+        };
+      });
+
+      floorsData.push({
+        floorLabel: floorNames[floor] || floor,
+        rooms,
+        snapshotVersion: snap.version
+      });
+    }
+
+    // Sortăm etajele logic
+    const order = ['Subsol', 'Parter', 'Etaj 1'];
+    floorsData.sort((a, b) => {
+      const idxA = order.indexOf(a.floorLabel);
+      const idxB = order.indexOf(b.floorLabel);
+      return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
     });
 
     const generatedAt = new Date().toLocaleDateString('ro-RO', {
       day: '2-digit', month: 'long', year: 'numeric',
     });
+
+    const activeSnapshot = latestPerFloor.get(activeFloor) || snapshots[0];
+    const activeFloorLabel = floorNames[activeFloor] || activeFloor;
 
     const html = buildHtmlTemplate(
       {
@@ -490,9 +524,10 @@ export const exportService = {
         hasMansard: project.hasMansard,
       },
       planPngBase64,
-      rooms,
+      floorsData,
+      activeFloorLabel,
       generatedAt,
-      snapshot.version,
+      activeSnapshot.version,
     );
 
     const browser = await puppeteer.launch({
@@ -513,7 +548,7 @@ export const exportService = {
         .toLowerCase()
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9-]/g, '');
-      const filename = `plan-parter-${slug}-v${snapshot.version}.pdf`;
+      const filename = `plan-${activeFloor}-${slug}-v${activeSnapshot.version}.pdf`;
 
       return { buffer: Buffer.from(pdfBuffer), filename };
     } finally {

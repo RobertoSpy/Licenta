@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { ShieldAlert, Users, Database, Settings, RefreshCw, LogOut } from 'lucide-react';
+import { ShieldAlert, Users, Database, Settings, RefreshCw, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 
 export default function AdminDashboardLayout() {
   const { logout, user } = useAuth();
   const location = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const menuItems = [
     { label: 'Utilizatori', icon: <Users size={20} />, path: '/admin/users' },
@@ -67,15 +68,75 @@ export default function AdminDashboardLayout() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Mobile Header */}
-        <header className="md:hidden bg-slate-950 border-b border-red-900/30 p-4 flex items-center justify-between">
-          <Link to="/admin" className="flex items-center gap-2 text-xl font-black text-red-500 tracking-tight">
-            <ShieldAlert className="w-6 h-6" />
-            Admin
-          </Link>
+        <header className="md:hidden bg-slate-950 border-b border-red-900/30 p-4 flex items-center justify-between sticky top-0 z-40">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-400 hover:text-white">
+              <Menu size={24} />
+            </button>
+            <Link to="/admin" className="flex items-center gap-2 text-xl font-black text-red-500 tracking-tight">
+              <ShieldAlert className="w-6 h-6" />
+              Admin
+            </Link>
+          </div>
           <button onClick={logout} className="p-2 text-slate-400 hover:text-red-400">
             <LogOut size={20} />
           </button>
         </header>
+
+        {/* Mobile Sidebar Overlay */}
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-[60] md:hidden flex">
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+            
+            {/* Sidebar content */}
+            <div className="relative w-64 max-w-sm bg-slate-950 h-full flex flex-col shadow-2xl animate-in slide-in-from-left">
+              <div className="p-4 flex items-center justify-between border-b border-red-900/30">
+                <div className="flex items-center gap-2 text-xl font-black text-red-500 tracking-tight">
+                  <ShieldAlert className="w-6 h-6" />
+                  Admin
+                </div>
+                <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 text-slate-400 hover:text-white">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+                {menuItems.map((item) => {
+                  const isActive = location.pathname.includes(item.path);
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                        isActive 
+                          ? 'bg-red-950/40 text-red-400 font-bold border border-red-900/50' 
+                          : 'text-slate-400 hover:bg-slate-900 hover:text-white'
+                      }`}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              <div className="p-4 border-t border-red-900/30">
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-red-400 hover:bg-red-950/40 rounded-xl transition-colors font-medium"
+                >
+                  <LogOut size={20} />
+                  Deconectare
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-900 text-slate-200">

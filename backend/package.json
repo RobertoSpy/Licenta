@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "npx prisma generate && npx prisma migrate deploy",
     "build": "tsc",
-    "dev": "nodemon -L src/index.ts",
+    "dev": "nodemon",
     "test": "jest --runInBand",
     "seed:normatives": "ts-node -T src/scripts/seedNormatives.ts",
     "seed:materials": "ts-node -T src/scripts/seedBaselineMaterials.ts",

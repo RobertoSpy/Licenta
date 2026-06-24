@@ -1,0 +1,14 @@
+{
+  "_note": "Mapare coduri normative → internalCode materiale DB. Modifică aici când schimbi furnizorul, fără redeployment.",
+  "concrete": {
+    "C20_25": "STANDARD_BETON_C20_25",
+    "C25_30": "STANDARD_BETON_C25_30",
+    "C30_37": "STANDARD_BETON_C30_37",
+    "leveling": "STANDARD_BETON_C8_10"
+  },
+  "rebar": {
+    "standard": "STANDARD_FIER_12",
+    "high_seismic": "STANDARD_FIER_14",
+    "light": "STANDARD_FIER_10"
+  }
+}

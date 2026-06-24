@@ -57,7 +57,7 @@ export const Login = () => {
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
             <Building2 className="w-16 h-16 text-buildorange mb-8" />
             <h1 className="text-5xl font-bold tracking-tight mb-6 leading-tight">
-              Construiește viitorul cu <span className="text-buildorange">BuildWise AI</span>
+              Construiește viitorul cu <span className="text-buildorange">Zidario AI</span>
             </h1>
             <p className="text-lg text-slate-300 max-w-lg leading-relaxed">
               Platforma inteligentă pentru generarea planurilor 3D și preluarea devizelor în timp real din marile magazine de bricolaj.

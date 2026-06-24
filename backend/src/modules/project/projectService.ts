@@ -13,8 +13,8 @@ export const projectService = {
     return projectRepository.create({ title, userId });
   },
 
-  async getUserProjects(userId: number) {
-    return projectRepository.findManyByUserId(userId);
+  async getUserProjects(userId: number, page: number = 1, limit: number = 10) {
+    return projectRepository.findManyByUserId(userId, page, limit);
   },
 
 

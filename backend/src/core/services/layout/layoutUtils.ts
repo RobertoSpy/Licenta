@@ -1,4 +1,6 @@
 import { ConfiguratorDimensions, ConfiguratorRoom, LAYOUT_CONSTANTS } from './layoutTypes';
+import { normalizeLabel } from '../conformityLookup';
+import conformityRules from '../../../data/conformity-rules.json';
 
 export function uuidv4(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -8,36 +10,22 @@ export function uuidv4(): string {
   });
 }
 
-/**
- * Normalizes Romanian characters and trims whitespace
- */
-export function normalizeLabel(label: string): string {
-  return label
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '')
-    .replace(/[^a-z0-9]/g, '');
+export { normalizeLabel };
+
+const corridorRule = (conformityRules as any).clearance_rules.find(
+  (r: any) => r.code === 'L114_CORRIDOR_WIDTH'
+);
+const CIRCULATION_TYPES = new Set(
+  (corridorRule?.targets ?? ['hol', 'coridor', 'vestibul']).map((t: string) => normalizeLabel(t))
+);
+
+export function isCirculationRoom(room: { type?: string; label?: string; isCirculation?: boolean }): boolean {
+  if (room.isCirculation === true) return true;
+  const typeKey = room.type ? normalizeLabel(room.type) : '';
+  const labelKey = room.label ? normalizeLabel(room.label) : '';
+  return CIRCULATION_TYPES.has(typeKey) || CIRCULATION_TYPES.has(labelKey);
 }
 
-export function isDayRoom(r: ConfiguratorRoom): boolean {
-  const z = (r.zone || '').toLowerCase();
-  if (z.includes('zi') || z.includes('distributie')) return true;
-  if (z.includes('noapte') || z.includes('tehnic')) return false;
-  // fallback
-  const norm = normalizeLabel(r.label);
-  return (
-    norm.includes('living') ||
-    norm.includes('sufragerie') ||
-    norm.includes('bucatarie') ||
-    norm.includes('hol') ||
-    norm.includes('antreu') ||
-    norm.includes('vestibul') ||
-    norm.includes('debara') ||
-    norm.includes('camara') ||
-    norm.includes('dining')
-  );
-}
 
 export function calculateShapeArea(shape: string, dims: ConfiguratorDimensions): number {
   const w = dims.widthM;

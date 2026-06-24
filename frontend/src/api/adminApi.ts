@@ -26,9 +26,9 @@ export interface MaterialDTO {
 
 export const adminApi = {
   // Users
-  getUsers: async (): Promise<UserDTO[]> => {
-    const res = await apiPrivate.get('/admin/users');
-    return res.data.users;
+  getUsers: async (page: number = 1, limit: number = 20): Promise<any> => {
+    const res = await apiPrivate.get('/admin/users', { params: { page, limit } });
+    return res.data;
   },
 
   toggleContractorVerification: async (id: number): Promise<boolean> => {
@@ -37,9 +37,9 @@ export const adminApi = {
   },
 
   // Materials
-  getMaterials: async (): Promise<MaterialDTO[]> => {
-    const res = await apiPrivate.get('/admin/materials');
-    return res.data.materials;
+  getMaterials: async (params?: { page?: number; limit?: number; search?: string; category?: string; subcategory?: string }): Promise<any> => {
+    const res = await apiPrivate.get('/admin/materials', { params });
+    return res.data;
   },
 
   updateMaterial: async (id: number, data: Partial<MaterialDTO>): Promise<MaterialDTO> => {
@@ -54,6 +54,16 @@ export const adminApi = {
   // Scraper Actions
   syncMaterials: async (): Promise<any> => {
     const res = await apiPrivate.post('/admin/scrape/sync');
+    return res.data;
+  },
+
+  syncMaterial: async (id: number): Promise<MaterialDTO> => {
+    const res = await apiPrivate.post(`/admin/materials/${id}/sync`);
+    return res.data.material;
+  },
+
+  getTaxonomy: async (): Promise<any> => {
+    const res = await apiPrivate.get('/admin/taxonomy');
     return res.data;
   },
 

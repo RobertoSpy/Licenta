@@ -5,7 +5,7 @@ import { detectRequiredAgents } from './agentRouter';
 
 export function rewriteShortQuery(question: string, screen: string): string {
   const q = question.toLowerCase().trim();
-  if (question.length < 15 || ['gata', 'ok', 'am terminat', 'next', 'da', 'nu'].includes(q)) {
+  if (['gata', 'ok', 'am terminat', 'next', 'da', 'nu'].includes(q)) {
     if (screen === 'screen1') return 'reglementari urbanism legea 50 certificat urbanism POT CUT maxim etaje';
     if (screen === 'screen2') return 'teren fundatie sol zona seismica adancime inghet panta';
     if (screen === 'screen3') return 'suprafete minime familie reglementari legea locuintei spatiu minim';
@@ -35,32 +35,33 @@ export async function buildRAGContext(
 
   console.log(`[buildRAGContext] Agenți activi: [${agents.join(', ')}] pentru screen="${screen}"`);
 
-  const contextParts = await Promise.all(
-    agents.map(async agent => {
-      if (agent === 'materiale') {
-        const { ragService } = await import('./ragService');
-        const materialChunks = await ragService.searchRelevantMaterialChunks(question, limitPerAgent);
-        if (materialChunks.includes('Nu am găsit')) return null;
-        return `[AGENT MATERIALE]\n${materialChunks}`;
-      }
+  const augmentedQuery = rewriteShortQuery(question, screen);
+  const purpose = (project.buildingPurpose as BuildingPurpose) ?? 'residential';
 
-      const purpose = (project.buildingPurpose as BuildingPurpose) ?? 'residential';
-      const agentSources = AGENT_SOURCES_BY_PURPOSE[purpose]?.[agent] || [];
+  let contextParts: string[] = [];
 
-      if (agentSources.length === 0) return null;
+  // Agentul materiale are tabela lui separată (MaterialChunk)
+  if (agents.includes('materiale')) {
+    const { ragService } = await import('./ragService');
+    const materialChunks = await ragService.searchRelevantMaterialChunks(question, 3);
+    if (!materialChunks.includes('Nu am găsit')) {
+      contextParts.push(`[AGENT MATERIALE]\n${materialChunks}`);
+    }
+  }
 
-      const augmentedQuery = rewriteShortQuery(question, screen);
-
-      const chunks = await searchHybrid(augmentedQuery, agent, limitPerAgent, agentSources, purpose);
-      if (chunks.length === 0) return null;
-
+  // Ceilalți agenți îi rezolvăm dintr-un singur query Multi-Agent
+  const normativeAgents = agents.filter(a => a !== 'materiale');
+  if (normativeAgents.length > 0) {
+    const { searchHybridMultiAgent } = await import('./ragService');
+    const chunks = await searchHybridMultiAgent(augmentedQuery, normativeAgents, 8, purpose);
+    
+    if (chunks.length > 0) {
       const chunksText = chunks
         .map(c => `§ ${c.source} — ${c.chapter}:\n${c.content}`)
         .join('\n\n');
-
-      return `[AGENT ${agent.toUpperCase()}]\n${chunksText}`;
-    })
-  );
+      contextParts.push(`[MULTI-AGENT NORMATIVE]\n${chunksText}`);
+    }
+  }
 
   const foundationSpec = bomService.getFoundationSpec(project.frostDepthCm, project.soilType);
 

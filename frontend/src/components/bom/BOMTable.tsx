@@ -46,14 +46,14 @@ export const BOMTable = ({ items, onMaterialReplaced }: BOMTableProps) => {
                   {phaseItems.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-4">
-                        <div className="flex items-start justify-between">
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between">
                           <div>
                             <p className="font-bold text-slate-900">{item.material.name}</p>
                             <p className="text-xs text-slate-400 mt-1">{item.note}</p>
                           </div>
                           <button 
                             onClick={() => setSelectedItem(item)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 text-xs font-bold text-buildorange bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-100 hover:bg-orange-100 shrink-0 ml-4"
+                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center gap-1.5 text-xs font-bold text-buildorange bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-100 hover:bg-orange-100 shrink-0 mt-2 md:mt-0 md:ml-4"
                           >
                             <span>🔄</span> Schimbă
                           </button>

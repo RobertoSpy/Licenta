@@ -1,4 +1,4 @@
-// backend/src/types/roomSuggestion.ts
+// backend/src/core/types/roomSuggestion.ts
 //
 // Tipuri pentru răspunsul Gemini la suggestRoomProgram.
 // Sunt folosite atât în agentOrchestrator.ts cât și în aiController.ts.
@@ -29,13 +29,15 @@ export interface RoomSuggestion {
 
 export interface SuggestRoomsInput {
   houseAreaSqm: number;
-  plotAreaSqm: number;
-  houseStyle: string;
+  plotAreaSqm?: number | null;
+  houseStyle?: string | null;
   totalFloors: number;
-  hasBasement: boolean;
-  streetOrientation: string;
+  hasBasement?: boolean | null;
+  streetOrientation?: string | null;
   familySize: number;
   budgetCategory: 'economic' | 'mediu';
   /** (Opțional) Destinația finală (ex: "residential") */
   buildingPurpose?: string;
+  userRefinementText?: string;
+  previousRooms?: SuggestedRoom[];
 }

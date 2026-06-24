@@ -80,7 +80,7 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<ProjectFormData>(initialData);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const { projectId, isLoading, restoredData, restoredStep, clearProject } = useProjectGuard();
 
   const contextForAi = useMemo(() => {
@@ -139,9 +139,9 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
         break;
       }
     }
-    
+
     const hasUserReplyAfter = lastSystemIndex === -1 || messages.findIndex((m, idx) => idx > lastSystemIndex && m.role === 'user') !== -1;
-    
+
     if (!hasUserReplyAfter) return false;
 
     if (currentStep === 1) {
@@ -151,10 +151,34 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
     return true;
   }, [messages, currentStep, formData.lat, formData.lng, formData.seismicZone, formData.zoningRestrictions]);
 
+  // Auto-save în localStorage
+  useEffect(() => {
+    if (projectId) {
+      const savedState = localStorage.getItem(`wizard_draft_${projectId}`);
+      if (savedState) {
+        try {
+          const parsed = JSON.parse(savedState);
+          // Restaurăm doar dacă nu a venit ceva oficial de la API (restoredData suprascrie)
+          if (!restoredData) setFormData(prev => ({ ...prev, ...parsed.formData }));
+          if (!restoredStep) setCurrentStep(parsed.currentStep || 1);
+        } catch (e) {
+          console.error('Eroare la parsarea autosave-ului din localStorage', e);
+        }
+      }
+    }
+  }, [projectId]); // Rulează o singură dată la încărcarea projectId-ului
+
   useEffect(() => {
     if (restoredData) setFormData(prev => ({ ...prev, ...restoredData }));
     if (restoredStep) setCurrentStep(restoredStep);
   }, [restoredData, restoredStep]);
+
+  useEffect(() => {
+    // Salvăm mereu la schimbări în browser, ca măsură de siguranță
+    if (projectId) {
+      localStorage.setItem(`wizard_draft_${projectId}`, JSON.stringify({ formData, currentStep }));
+    }
+  }, [formData, currentStep, projectId]);
 
   const updateFormData = (fields: Partial<ProjectFormData>) => {
     setFormData((prev) => ({ ...prev, ...fields }));
@@ -190,6 +214,7 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
         wizardStep: 4,
         isCompleted: true,
       });
+      localStorage.removeItem(`wizard_draft_${projectId}`);
       clearProject();
       navigate(`/dashboard/projects/${projectId}`);
     } catch (err) {
@@ -206,11 +231,11 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
         <div className="bg-slate-50 border-b border-slate-200 p-6 md:px-10">
           <div className="h-8 w-48 bg-slate-200 animate-pulse rounded-lg mb-6" />
           <div className="flex justify-between">
-            {[1,2,3,4].map(i => <div key={i} className="h-12 w-12 rounded-full bg-slate-200 animate-pulse" />)}
+            {[1, 2, 3, 4].map(i => <div key={i} className="h-12 w-12 rounded-full bg-slate-200 animate-pulse" />)}
           </div>
         </div>
         <div className="flex-1 p-10 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-100 animate-pulse rounded-2xl" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-slate-100 animate-pulse rounded-2xl" />)}
         </div>
       </div>
     );
@@ -218,96 +243,96 @@ export const ProjectWizard = ({ onCancel }: ProjectWizardProps) => {
 
   return (
     <>
-    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[85vh] md:h-[800px] w-full max-w-5xl mx-auto">
-      {/* Header & Stepper */}
-      <div className="bg-slate-50 border-b border-slate-200 p-6 md:px-10">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-black text-slate-900">Configurator Casă</h2>
-          <Button variant="ghost" onClick={onCancel} className="text-slate-500 hover:text-slate-900">
-            Anulează
-          </Button>
-        </div>
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[85vh] md:h-[800px] w-full max-w-5xl mx-auto">
+        {/* Header & Stepper */}
+        <div className="bg-slate-50 border-b border-slate-200 p-6 md:px-10">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-black text-slate-900">Configurator Casă</h2>
+            <Button variant="ghost" onClick={onCancel} className="text-slate-500 hover:text-slate-900">
+              Anulează
+            </Button>
+          </div>
 
-        {/* Progress Dots / Steps */}
-        <div className="flex items-center justify-between relative">
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 rounded-full z-0"></div>
-          <div
-            className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-buildorange rounded-full z-0 transition-all duration-500"
-            style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
-          ></div>
+          {/* Progress Dots / Steps */}
+          <div className="flex items-center justify-between relative">
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 rounded-full z-0"></div>
+            <div
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-buildorange rounded-full z-0 transition-all duration-500"
+              style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+            ></div>
 
-          {steps.map((step) => {
-            const isActive = step.id === currentStep;
-            const isCompleted = step.id < currentStep;
+            {steps.map((step) => {
+              const isActive = step.id === currentStep;
+              const isCompleted = step.id < currentStep;
 
-            return (
-              <div key={step.id} className="relative z-10 flex flex-col items-center gap-2">
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all duration-300 shadow-sm
+              return (
+                <div key={step.id} className="relative z-10 flex flex-col items-center gap-2">
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all duration-300 shadow-sm
                     ${isActive ? 'bg-buildorange text-white ring-4 ring-buildorange/20 scale-110' :
-                      isCompleted ? 'bg-buildnavy text-white' : 'bg-white text-slate-400 border-2 border-slate-200'}`}
-                >
-                  {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : step.icon}
+                        isCompleted ? 'bg-buildnavy text-white' : 'bg-white text-slate-400 border-2 border-slate-200'}`}
+                  >
+                    {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : step.icon}
+                  </div>
+                  <span className={`text-sm font-bold ${isActive ? 'text-slate-900' : 'text-slate-500'} hidden md:block`}>
+                    {step.title}
+                  </span>
                 </div>
-                <span className={`text-sm font-bold ${isActive ? 'text-slate-900' : 'text-slate-500'} hidden md:block`}>
-                  {step.title}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Form Content Area */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-10 relative bg-slate-50/50">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="h-full"
+            >
+              {currentStep === 1 && <Step1Location data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
+              {currentStep === 2 && <Step2Terrain data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
+              {currentStep === 3 && <Step4HouseType data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
+              {currentStep === 4 && <Step3Regulations data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Footer Navigation */}
+        <div className="bg-white border-t border-slate-200 p-6 flex items-center justify-between">
+          <Button
+            variant="outline"
+            onClick={handlePrev}
+            disabled={currentStep === 1}
+            className="gap-2"
+          >
+            <ChevronLeft className="w-5 h-5" /> Înapoi
+          </Button>
+
+          {currentStep < 4 ? (
+            <Button onClick={handleNext} disabled={!canGoNext} className="gap-2 px-8">
+              Următorul Pas <ChevronRight className="w-5 h-5" />
+            </Button>
+          ) : (
+            <Button onClick={handleFinish} disabled={isSaving || !canGoNext} className="gap-2 px-8 bg-buildnavy hover:bg-slate-800 text-white">
+              {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+              {isSaving ? 'Se salvează...' : 'Finalizează și Creează Proiect'}
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Form Content Area */}
-      <div className="flex-1 overflow-y-auto p-6 md:p-10 relative bg-slate-50/50">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="h-full"
-          >
-            {currentStep === 1 && <Step1Location data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
-            {currentStep === 2 && <Step2Terrain data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
-            {currentStep === 3 && <Step4HouseType data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
-            {currentStep === 4 && <Step3Regulations data={formData} updateData={updateFormData} addSystemMessage={addSystemMessage} />}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Footer Navigation */}
-      <div className="bg-white border-t border-slate-200 p-6 flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={handlePrev}
-          disabled={currentStep === 1}
-          className="gap-2"
-        >
-          <ChevronLeft className="w-5 h-5" /> Înapoi
-        </Button>
-
-        {currentStep < 4 ? (
-          <Button onClick={handleNext} disabled={!canGoNext} className="gap-2 px-8">
-            Următorul Pas <ChevronRight className="w-5 h-5" />
-          </Button>
-        ) : (
-          <Button onClick={handleFinish} disabled={isSaving || !canGoNext} className="gap-2 px-8 bg-buildnavy hover:bg-slate-800 text-white">
-            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-            {isSaving ? 'Se salvează...' : 'Finalizează și Creează Proiect'}
-          </Button>
-        )}
-      </div>
-    </div>
-    
-    <AIChatBubble 
-      messages={messages}
-      isStreaming={isStreaming}
-      onSendMessage={sendMessage}
-      unreadCount={unreadCount}
-      onMarkAsRead={markAsRead}
-    />
+      <AIChatBubble
+        messages={messages}
+        isStreaming={isStreaming}
+        onSendMessage={sendMessage}
+        unreadCount={unreadCount}
+        onMarkAsRead={markAsRead}
+      />
     </>
   );
 };

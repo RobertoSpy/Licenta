@@ -33,15 +33,20 @@ export function generateEntranceDoor(
     const touchesLeft = Math.abs(mainHall.bbox.x - offsetM) < TOUCHES_THRESHOLD;
     const touchesRight = Math.abs(mainHall.bbox.x + mainHall.bbox.w - (offsetM + dimensions.widthM)) < TOUCHES_THRESHOLD;
 
-    const street = streetOrientation.toUpperCase();
+    const s = streetOrientation.toUpperCase();
+    let primary = '';
+    if (s.includes('N') || s.includes('NORD')) primary = 'N';
+    else if (s.includes('S') || s.includes('SUD')) primary = 'S';
+    else if (s.includes('E') || s.includes('EST')) primary = 'E';
+    else if (s.includes('V') || s.includes('W') || s.includes('VEST')) primary = 'V';
 
-    if ((street.includes('N') || street.includes('NE') || street.includes('NW') || street.includes('NORD')) && touchesTop) {
+    if (primary === 'N' && touchesTop) {
       elements.push({ id: uuidv4(), type: 'door', x: hx + hw / 2 - extDoorSizePx / 2, y: hy - thickPx / 2, width: extDoorSizePx, height: thickPx, rotation: 0 });
-    } else if ((street.includes('V') || street.includes('W') || street.includes('SV') || street.includes('NV') || street.includes('SW') || street.includes('NW') || street.includes('VEST')) && touchesLeft) {
+    } else if (primary === 'V' && touchesLeft) {
       elements.push({ id: uuidv4(), type: 'door', x: hx - thickPx / 2, y: hy + hh / 2 - extDoorSizePx / 2, width: thickPx, height: extDoorSizePx, rotation: 0 });
-    } else if ((street.includes('E') || street.includes('SE') || street.includes('NE') || street.includes('EST')) && touchesRight) {
+    } else if (primary === 'E' && touchesRight) {
       elements.push({ id: uuidv4(), type: 'door', x: hx + hw - thickPx / 2, y: hy + hh / 2 - extDoorSizePx / 2, width: thickPx, height: extDoorSizePx, rotation: 0 });
-    } else if ((street.includes('S') || street.includes('SUD')) && touchesBottom) {
+    } else if (primary === 'S' && touchesBottom) {
       elements.push({ id: uuidv4(), type: 'door', x: hx + hw / 2 - extDoorSizePx / 2, y: hy + hh - thickPx / 2, width: extDoorSizePx, height: thickPx, rotation: 0 });
     } else {
       // Fallback: pune ușa pe orice perete atinge holul

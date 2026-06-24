@@ -38,8 +38,10 @@ export const getClientQuotes = async (req: AuthRequest, res: Response) => {
 
 export const getContractorQuotes = async (req: AuthRequest, res: Response) => {
   try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
     const userId = req.user!.id;
-    const quotes = await quoteService.getQuotesForContractor(userId);
+    const quotes = await quoteService.getQuotesForContractor(userId, page, limit);
     res.json(quotes);
   } catch (error: any) {
     console.error('getContractorQuotes error:', error);

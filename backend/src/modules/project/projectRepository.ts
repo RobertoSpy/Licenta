@@ -14,15 +14,30 @@ export const projectRepository = {
       } 
     });
   },
-  async findManyByUserId(userId: number): Promise<Project[]> {
-    return prisma.project.findMany({
+  async findManyByUserId(userId: number, page: number = 1, limit: number = 10) {
+    const total = await prisma.project.count({ where: { userId } });
+    const skip = (page - 1) * limit;
+
+    const data = await prisma.project.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       include: {
         bomItems: true,
         constructionPhases: true
-      }
+      },
+      skip,
+      take: limit
     });
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   },
   async create(data: Partial<Project>): Promise<Project> {
     const DEFAULT_PHASES = [

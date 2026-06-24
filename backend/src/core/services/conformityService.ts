@@ -1,43 +1,9 @@
 import { ConformityRuleSource, getSupplementalRules } from '../../lib/conformityRulesCache';
-import rawRules from '../../data/conformity-rules.json';
-
-// Tipaj explicit pentru datele importate din JSON
-const conformityRules = rawRules as {
-  room_min_sqm: Array<{
-    code: string;
-    targets: string[];
-    min_sqm: number;
-    severity: string;
-    _source: string;
-    applies_to?: string[];
-  }>;
-  clearance_rules: Array<{
-    code: string;
-    targets: string[];
-    property: string;
-    value: number;
-    severity: string;
-    _source: string;
-    applies_to?: string[];
-  }>;
-  environmental_rules: Array<{
-    code: string;
-    targets: string[];
-    property: string;
-    value: number;
-    severity: string;
-    _source: string;
-    applies_to?: string[];
-  }>;
-};
-
-// ─────────────────────────────────────────────────────────────────
-// Single Source of Truth — regulile sunt citite din conformity-rules.json.
-// NU mai există valori hardcodate în cod.
-// ─────────────────────────────────────────────────────────────────
+import { normalizeLabel, findRoomMinRule, findEnvironmentalRule, findClearanceRule, ARCH_RULES } from './conformityLookup';
 
 export interface ConformityRoomInput {
   id: string;
+  type?: string;
   label?: string;
   usableSqm: number;
   widthM?: number;
@@ -82,69 +48,21 @@ export interface ConformityEvaluation {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Construim lookup-ul din JSON la startup (O(1) la runtime)
-// { "living": { min: 18, _source: "...", code: "...", severity: "error" }, ... }
+// Evaluare cameră — folosind conformityLookup
 // ─────────────────────────────────────────────────────────────────
-
-interface RoomMinRule {
-  min: number;
-  code: string;
-  severity: ConformitySeverity;
-  _source: string;
-  applies_to?: string[];
-}
-
-const ROOM_MIN_LOOKUP = new Map<string, RoomMinRule>();
-
-for (const rule of conformityRules.room_min_sqm) {
-  for (const target of rule.targets) {
-    ROOM_MIN_LOOKUP.set(
-      target.toLowerCase().replace(/\s+/g, ''),
-      {
-        min: rule.min_sqm,
-        code: rule.code,
-        severity: rule.severity as ConformitySeverity,
-        _source: rule._source,
-        applies_to: rule.applies_to,
-      }
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Normalizare label: "Sufragerie " → "sufragerie", "Cameră de Zi" → "cameradezi"
-// ─────────────────────────────────────────────────────────────────
-
-function normalizeLabel(label?: string): string {
-  if (!label) return '';
-  return label
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z]/g, '');
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Evaluare cameră — citit exclusiv din ROOM_MIN_LOOKUP (JSON)
-// ─────────────────────────────────────────────────────────────────
-
-function getEnvironmentalRule(code: string, buildingPurpose: string) {
-  return conformityRules.environmental_rules?.find((r) => r.code === code && (!r.applies_to || r.applies_to.includes(buildingPurpose)));
-}
 
 function evaluateRoom(room: ConformityRoomInput, buildingPurpose: string): ConformityRoomResult {
-  const key = normalizeLabel(room.label);
-  const rule = ROOM_MIN_LOOKUP.get(key);
+  const rule = findRoomMinRule(room.type, room.label, buildingPurpose);
   const issues: ConformityRuleIssue[] = [];
 
   // Validare Suprafață (Existent)
-  if (rule && (!rule.applies_to || rule.applies_to.includes(buildingPurpose))) {
-    const isWarning = room.usableSqm < rule.min && room.usableSqm >= rule.min * 0.9;
-    const isError = room.usableSqm < rule.min * 0.9;
+  if (rule) {
+    const isWarning = room.usableSqm < rule.min_sqm && room.usableSqm >= rule.min_sqm * 0.9;
+    const isError = room.usableSqm < rule.min_sqm * 0.9;
 
     if (isWarning || isError) {
       const severity: ConformitySeverity = isError ? 'error' : 'warning';
-      const delta = parseFloat((rule.min - room.usableSqm).toFixed(2));
+      const delta = parseFloat((rule.min_sqm - room.usableSqm).toFixed(2));
 
       issues.push({
         targetType: 'room',
@@ -154,7 +72,7 @@ function evaluateRoom(room: ConformityRoomInput, buildingPurpose: string): Confo
         article: rule._source,
         message: `Suprafața utilă este sub minimul legal pentru "${room.label ?? 'Cameră'}" (${rule._source}).`,
         currentValue: room.usableSqm,
-        requiredValue: rule.min,
+        requiredValue: rule.min_sqm,
         deltaValue: delta,
         suggestion: `Mărește camera cu cel puțin ${delta} m² util.`,
       });
@@ -162,7 +80,8 @@ function evaluateRoom(room: ConformityRoomInput, buildingPurpose: string): Confo
   }
 
   // Regula: Garajul trebuie să aibă acces exterior (să atingă perimetrul casei / să aibă o ușă de exterior)
-  if (key.includes('garaj') && room.hasExteriorAccess === false) {
+  const isGarage = ARCH_RULES.isGarage(room.type, room.label);
+  if (isGarage && room.hasExteriorAccess === false) {
     issues.push({
       targetType: 'room',
       targetId: room.id,
@@ -179,9 +98,7 @@ function evaluateRoom(room: ConformityRoomInput, buildingPurpose: string): Confo
 
   // Validare Fereastră (Ratios)
   if (room.windowAreaSqm !== undefined) {
-    const isDayRoom = ['living', 'sufragerie', 'cameradezi', 'dormitor', 'camera', 'cameraparintilor'].some(k => key.includes(k));
-    const code = isDayRoom ? 'NP057_WINDOW_FLOOR_RATIO_LIVING' : 'NP057_WINDOW_FLOOR_RATIO_OTHER';
-    const envRule = getEnvironmentalRule(code, buildingPurpose);
+    const envRule = findEnvironmentalRule('windowFloorRatio', room.type, room.label, buildingPurpose);
 
     if (envRule) {
       const ratio = room.windowAreaSqm / room.usableSqm;
@@ -206,15 +123,7 @@ function evaluateRoom(room: ConformityRoomInput, buildingPurpose: string): Confo
   const hasWarning = issues.some(i => i.severity === 'warning');
   const status: ConformityRoomResult['status'] = hasError ? 'error' : hasWarning ? 'warning' : 'ok';
 
-  return { id: room.id, status, minRequiredSqm: rule?.min, issues };
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Lookup pentru clearance_rules (din JSON)
-// ─────────────────────────────────────────────────────────────────
-
-function getClearanceRule(code: string, buildingPurpose: string) {
-  return conformityRules.clearance_rules.find((r) => r.code === code && (!r.applies_to || r.applies_to.includes(buildingPurpose)));
+  return { id: room.id, status, minRequiredSqm: rule?.min_sqm, issues };
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -224,7 +133,7 @@ function getClearanceRule(code: string, buildingPurpose: string) {
 export const conformityService = {
   async evaluateRooms(
     rooms: ConformityRoomInput[],
-    options?: { doors?: ConformityDoorInput[]; buildingPurpose?: string }
+    options?: { doors?: ConformityDoorInput[]; virtualBoundaries?: Array<{ roomIdA: string; roomIdB: string }>; buildingPurpose?: string }
   ): Promise<ConformityEvaluation> {
     const purpose = options?.buildingPurpose ?? 'residential';
     const roomResults = rooms.map(r => evaluateRoom(r, purpose));
@@ -249,8 +158,8 @@ export const conformityService = {
     const doorRuleRAG = supplementalRules.find((rule) => rule.code === 'DOOR_MIN_WIDTH');
 
     // Fallback static din JSON dacă RAG nu a returnat valori
-    const corridorRuleJSON = getClearanceRule('L114_CORRIDOR_WIDTH', purpose);
-    const doorRuleJSON = getClearanceRule('P118_DOOR_WIDTH', purpose);
+    const corridorRuleJSON = findClearanceRule('L114_CORRIDOR_WIDTH', purpose);
+    const doorRuleJSON = findClearanceRule('P118_DOOR_WIDTH', purpose);
 
     let corridorMinM = corridorRuleRAG?.minValueM ?? corridorRuleJSON?.value ?? 1.2;
     // Limitator pentru clădiri rezidențiale: evităm regula de 2.1m din normativul de dizabilități (NP051)
@@ -259,10 +168,11 @@ export const conformityService = {
     }
     const doorMinM = doorRuleRAG?.minValueM ?? doorRuleJSON?.value ?? 0.8;
 
-    // Verificare lățime coridor
+        // Verificare lățime coridor
     for (const room of rooms) {
-      const key = normalizeLabel(room.label);
-      if (!corridorLabels.has(key)) continue;
+      const typeKey = room.type ? normalizeLabel(room.type) : '';
+      const labelKey = normalizeLabel(room.label);
+      if (!corridorLabels.has(typeKey) && !corridorLabels.has(labelKey)) continue;
       if (!room.widthM || !room.heightM) continue;
 
       const corridorWidth = Math.min(room.widthM, room.heightM);
@@ -290,8 +200,8 @@ export const conformityService = {
       }
     }
 
-    const mainDoorRuleJSON = getClearanceRule('NP057_DOOR_ENTRANCE_MAIN', purpose);
-    const intDoorRuleJSON = getClearanceRule('NP057_DOOR_INTERIOR_WIDTH', purpose);
+    const mainDoorRuleJSON = findClearanceRule('NP057_DOOR_ENTRANCE_MAIN', purpose);
+    const intDoorRuleJSON = findClearanceRule('NP057_DOOR_INTERIOR_WIDTH', purpose);
     const mainDoorMinM = mainDoorRuleJSON?.value ?? 0.9;
     const intDoorMinM = intDoorRuleJSON?.value ?? 0.8;
 
@@ -321,7 +231,7 @@ export const conformityService = {
     }
 
     // Validare implicită pentru înălțimea tavanului (trece automat de 2.0m pe etaje curente cu 2.7m)
-    const ceilingRule = getClearanceRule('NP057_INTERIOR_HEIGHT', purpose);
+    const ceilingRule = findClearanceRule('NP057_INTERIOR_HEIGHT', purpose);
     if (ceilingRule) {
        // În plan 2D nu avem control pe Z, asumăm standardul de 2.7m.
        // Nu ridicăm eroare, doar dacă ar fi necesar un raport info.

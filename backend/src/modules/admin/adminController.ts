@@ -18,12 +18,58 @@ export const syncDedemanMaterials = async (req: Request, res: Response): Promise
   }
 };
 
+export const syncSingleMaterial = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const material = await prisma.material.findUnique({ where: { id: Number(id) } });
+
+    if (!material) {
+      res.status(404).json({ success: false, error: 'Material negăsit' });
+      return;
+    }
+
+    if (!material.storeUrl) {
+      res.status(400).json({ success: false, error: 'Materialul nu are un URL configurat pentru scraping' });
+      return;
+    }
+
+    const scraped = await scraperService.scrapeOne(material.storeUrl);
+    if (!scraped || scraped.price === 0) {
+      res.status(400).json({ success: false, error: 'Eșec la scraping sau preț 0. Poate fi un blocaj (ex: Cloudflare) sau o eroare de rețea.' });
+      return;
+    }
+
+    const updated = await prisma.material.update({
+      where: { id: material.id },
+      data: {
+        pricePerUnit: scraped.price,
+        inStock: scraped.inStock,
+        stockQuantity: scraped.stockQuantity,
+      }
+    });
+
+    // Salvăm istoric
+    await prisma.priceHistory.create({
+      data: {
+        materialId: material.id,
+        price: scraped.price,
+        source: 'Sincronizare Individuala',
+      }
+    });
+
+    res.json({ success: true, material: updated });
+  } catch (error: any) {
+    console.error('[AdminController.syncSingleMaterial] Eroare:', error);
+    res.status(500).json({ success: false, error: 'Eroare internă la sincronizarea materialului' });
+  }
+};
+
 export const addMaterialFromUrl = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { url, category, subcategory, unit, internalCode, name, uValue, compressiveStrength, minSeismicZone, maxFloors } = req.body;
+    const { url } = req.body;
     
-    if (!url || !internalCode || !name || !category || !unit) {
-      res.status(400).json({ success: false, error: 'Câmpuri obligatorii lipsă (url, internalCode, name, category, unit)' });
+    if (!url) {
+      res.status(400).json({ success: false, error: 'URL obligatoriu' });
       return;
     }
 
@@ -39,23 +85,59 @@ export const addMaterialFromUrl = async (req: Request, res: Response): Promise<v
       return;
     }
 
+    // Agentic Analysis
+    const materialAnalyzerModule = await import('../ai/services/materialAnalyzer');
+    const analyzer = materialAnalyzerModule.materialAnalyzer;
+    const analysis = await analyzer.analyzeMaterial(scraped.title, scraped.price, url, scraped.specifications);
+
+    if (!analysis) {
+      res.status(500).json({ success: false, error: 'Analiza AI a eșuat. Încercați manual.' });
+      return;
+    }
+
+    // Generăm un internal code din title și brand
+    const brandPrefix = analysis.brand ? analysis.brand.toUpperCase().substring(0, 5) : 'GEN';
+    const internalCode = `AGENTIC_${brandPrefix}_${Date.now()}`;
+
+    let storeName = 'Generic';
+    try {
+      const hostname = new URL(url).hostname.replace(/^www\./, '');
+      const nameParts = hostname.split('.');
+      if (nameParts.length > 1) nameParts.pop(); // remove TLD
+      const rawName = nameParts.join(' ');
+      if (rawName) {
+        storeName = rawName.split(/[-_ ]+/)
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(' ');
+      }
+    } catch (e) {
+      console.warn('[AdminController] Eroare parsare storeName din URL:', e);
+    }
+
+    const safeInternalCode = analysis.internalCode 
+      ? `${analysis.internalCode}_${Date.now().toString().slice(-4)}`
+      : internalCode;
+
     const material = await prisma.material.create({
       data: {
-        internalCode,
-        name,
-        category,
-        subcategory,
-        unit,
+        internalCode: safeInternalCode,
+        name: scraped.title,
+        category: analysis.category,
+        subcategory: analysis.subcategory,
+        structuralType: analysis.structuralType,
+        unit: analysis.unit,
+        // packagingUnit: analysis.packagingUnit || undefined,
+        // packagingValue: analysis.packagingValue || undefined,
+        compressiveStrength: analysis.compressiveStrength || undefined,
         pricePerUnit: scraped.price,
+        storeName,
         storeUrl: url,
+        brand: analysis.brand || undefined,
         description: scraped.description,
         inStock: scraped.inStock,
         stockQuantity: scraped.stockQuantity,
-        uValue: uValue ? parseFloat(uValue) : undefined,
-        compressiveStrength: compressiveStrength ? parseFloat(compressiveStrength) : undefined,
-        minSeismicZone: minSeismicZone ? parseFloat(minSeismicZone) : undefined,
-        maxFloors: maxFloors ? parseInt(maxFloors, 10) : undefined,
-        isVerified: true, // Adaugat manual de admin -> pre-verificat
+        uValue: analysis.uValue || undefined,
+        isVerified: true, 
       }
     });
 
@@ -64,11 +146,21 @@ export const addMaterialFromUrl = async (req: Request, res: Response): Promise<v
       data: {
         materialId: material.id,
         price: scraped.price,
-        source: 'dedeman_scraper_manual'
+        source: 'agentic_scraper'
       }
     });
 
-    res.json({ success: true, material });
+    // Lansăm salvarea embedding-urilor pentru RAG asincron
+    const scraperSvc = await import('../../core/infrastructure/scraperService');
+    scraperSvc.saveMaterialEmbedding(
+      material.id,
+      material.name,
+      analysis.description || scraped.description || '',
+      scraped.specifications,
+      'agentic_ingestion'
+    ).catch(e => console.error('[Agentic RAG Error]', e));
+
+    res.json({ success: true, material, analysis });
   } catch (error: any) {
     console.error('[AdminController.addMaterial] Eroare:', error);
     res.status(500).json({ success: false, error: 'Eroare la adăugarea materialului.' });
@@ -79,8 +171,9 @@ export const addMaterialManual = async (req: Request, res: Response): Promise<vo
   try {
     const { 
       internalCode, name, category, subcategory, unit, pricePerUnit, 
-      brand, storeUrl, description, uValue, inStock, stockQuantity, 
-      compressiveStrength, minSeismicZone, maxFloors, normativeCode, performanceClass, isVerified
+      brand, storeUrl, storeName: reqStoreName, description, uValue, inStock, stockQuantity, 
+      compressiveStrength, minSeismicZone, maxFloors, normativeCode, performanceClass, isVerified,
+      packagingUnit, packagingValue
     } = req.body;
     
     if (!internalCode || !name || !category || !unit || pricePerUnit === undefined) {
@@ -88,11 +181,30 @@ export const addMaterialManual = async (req: Request, res: Response): Promise<vo
       return;
     }
 
+    let finalStoreName = reqStoreName || 'Generic';
+    if (!reqStoreName && storeUrl) {
+      try {
+        const hostname = new URL(storeUrl).hostname.replace(/^www\./, '');
+        const nameParts = hostname.split('.');
+        if (nameParts.length > 1) nameParts.pop();
+        const rawName = nameParts.join(' ');
+        if (rawName) {
+          finalStoreName = rawName.split(/[-_ ]+/)
+            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(' ');
+        }
+      } catch (e) {
+        // invalid url, default to Generic
+      }
+    }
+
     const material = await prisma.material.create({
       data: {
         internalCode, name, category, subcategory, unit,
         pricePerUnit: parseFloat(pricePerUnit),
-        brand, storeUrl, description,
+        brand, storeUrl, storeName: finalStoreName, description,
+        packagingUnit,
+        packagingValue: packagingValue ? parseFloat(packagingValue) : undefined,
         inStock: inStock !== undefined ? inStock : true,
         stockQuantity: stockQuantity ? parseFloat(stockQuantity) : undefined,
         uValue: uValue ? parseFloat(uValue) : undefined,
@@ -207,7 +319,12 @@ export const importMaterialsCsv = async (req: Request, res: Response): Promise<v
 };
 export const getUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const users = await prisma.user.findMany({
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const skip = (page - 1) * limit;
+
+    const total = await prisma.user.count();
+    const data = await prisma.user.findMany({
       select: {
         id: true,
         email: true,
@@ -221,9 +338,20 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
           }
         }
       },
+      skip,
+      take: limit,
       orderBy: { createdAt: 'desc' }
     });
-    res.json({ success: true, users });
+    res.json({
+      success: true,
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error: any) {
     console.error('[AdminController.getUsers] Eroare:', error);
     res.status(500).json({ success: false, error: 'Eroare la preluarea utilizatorilor.' });
@@ -253,13 +381,50 @@ export const toggleContractorVerification = async (req: Request, res: Response):
 
 export const getAllMaterials = async (req: Request, res: Response): Promise<void> => {
   try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const skip = (page - 1) * limit;
+
+    const search = req.query.search as string;
+    const category = req.query.category as string;
+    const subcategory = req.query.subcategory as string;
+
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { internalCode: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    if (category) {
+      where.category = category;
+    }
+    if (subcategory) {
+      where.subcategory = subcategory;
+    }
+
+    const total = await prisma.material.count({ where });
     const materials = await prisma.material.findMany({
-      orderBy: { category: 'asc' }
+      where,
+      skip,
+      take: limit,
+      orderBy: { updatedAt: 'desc' }
     });
-    res.json({ success: true, materials });
+
+    res.json({
+      success: true,
+      data: materials,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error: any) {
-    console.error('[AdminController.getAllMaterials] Eroare:', error);
-    res.status(500).json({ success: false, error: 'Eroare la preluarea materialelor.' });
+    console.error('[AdminController.getAllMaterials]', error);
+    res.status(500).json({ success: false, error: 'Eroare preluare materiale' });
   }
 };
 
@@ -306,5 +471,21 @@ export const reseedNormatives = async (req: Request, res: Response): Promise<voi
   } catch (error: any) {
     console.error('[AdminController.reseedNormatives] Eroare:', error);
     res.status(500).json({ success: false, error: 'Eroare la pornirea reindexării.' });
+  }
+};
+
+export const getTaxonomy = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { MATERIAL_CATEGORIES, MATERIAL_SUBCATEGORIES, ALL_SUBCATEGORIES } = await import('../../data/taxonomy');
+    
+    res.json({
+      success: true,
+      categories: MATERIAL_CATEGORIES,
+      subcategoriesMap: MATERIAL_SUBCATEGORIES,
+      allSubcategories: ALL_SUBCATEGORIES
+    });
+  } catch (error: any) {
+    console.error('[AdminController.getTaxonomy] Eroare:', error);
+    res.status(500).json({ success: false, error: 'Eroare preluare taxonomie' });
   }
 };

@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { scraperService } from '../core/infrastructure/scraperService';
+import { scraperService, saveMaterialEmbedding } from '../core/infrastructure/scraperService';
 
 const prisma = new PrismaClient();
 
@@ -12,8 +12,12 @@ interface BaselineMaterial {
   pricePerUnit: number; // RON, estimativ 2024
   description: string;
   isDefault: boolean;
+  storeName?: string;
   storeUrl?: string | null;
+  packagingUnit?: string | null;
+  packagingValue?: number | null;
   structuralType?: string | null; // "BCA" | "CARAMIDA" | null
+  compressiveStrength?: number;
 }
 
 const BASELINE_MATERIALS: BaselineMaterial[] = [
@@ -21,70 +25,104 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
   {
     internalCode: 'SAPATURA_MECANIZATA',
     name: 'Săpătură Mecanizată Fundație/Subsol',
-    category: 'Fundație', subcategory: 'Terasamente', unit: 'mc', pricePerUnit: 45,
+    category: 'Fundație', subcategory: 'Săpătură și Terasamente', unit: 'mc', pricePerUnit: 45,
     description: 'Săpătură mecanizată cu excavatorul pentru fundații continue sau groapă generală subsol.',
     isDefault: true, storeUrl: null
   },
   {
     internalCode: 'STANDARD_BETON_C20_25',
     name: 'Beton C20/25 (B250)',
-    category: 'Fundație', subcategory: 'Beton', unit: 'mc', pricePerUnit: 420,
+    category: 'Fundație', subcategory: 'Beton Fundație', unit: 'mc', pricePerUnit: 420,
     description: 'Standard pentru zone cu ag≤0.20g. Clasa XC2.',
     isDefault: true, storeUrl: null
   },
   {
     internalCode: 'STANDARD_BETON_C25_30',
     name: 'Beton C25/30 (B300)',
-    category: 'Fundație', subcategory: 'Beton', unit: 'mc', pricePerUnit: 465,
+    category: 'Fundație', subcategory: 'Beton Fundație', unit: 'mc', pricePerUnit: 465,
     description: 'Recomandat pentru zone seismice ag≥0.25g sau îngheț sever. Clasa XF2.',
     isDefault: false, storeUrl: null
   },
   {
     internalCode: 'STANDARD_BETON_C30_37',
     name: 'Beton C30/37 (B400)',
-    category: 'Fundație', subcategory: 'Beton', unit: 'mc', pricePerUnit: 510,
+    category: 'Fundație', subcategory: 'Beton Fundație', unit: 'mc', pricePerUnit: 510,
     description: 'Zone seismice severe + sol slab.',
     isDefault: false,
   },
+
+  {
+    internalCode: 'STANDARD_BETON_C8_10',
+    name: 'Beton de egalizare C8/10 (B150)',
+    category: 'Fundație', subcategory: 'Beton Fundație', unit: 'mc', pricePerUnit: 350,
+    description: 'Strat de regularizare și egalizare 10cm sub fundație, conform NE 012-1:2022 §4.3 și NP 112-2014 Tab.3.',
+    isDefault: true, storeUrl: null,
+    compressiveStrength: 8
+  },
+  {
+    internalCode: 'STANDARD_BETON_C20_25',
+    name: 'Beton Structural C20/25 (B250)',
+    category: 'Fundație', subcategory: 'Beton Fundație', unit: 'mc', pricePerUnit: 420,
+    description: 'Destinat fundațiilor standard pentru case P, P+1 fără cerințe seismice severe.',
+    isDefault: true, storeUrl: null,
+    compressiveStrength: 20
+  },
+  {
+    internalCode: 'STANDARD_BETON_C25_30',
+    name: 'Beton Structural C25/30 (B350)',
+    category: 'Fundație', subcategory: 'Beton Fundație', unit: 'mc', pricePerUnit: 460,
+    description: 'Beton pentru structură de rezistență, ag<0.30g.',
+    isDefault: false, storeUrl: null,
+    compressiveStrength: 25
+  },
+  {
+    internalCode: 'STANDARD_BETON_C30_37',
+    name: 'Beton Structural C30/37 (B400)',
+    category: 'Fundație', subcategory: 'Beton Fundație', unit: 'mc', pricePerUnit: 510,
+    description: 'Destinat zonelor seismice severe ag≥0.30g și clase de ductilitate înaltă (DCH). Clasa de expunere XF4.',
+    isDefault: false, storeUrl: null,
+    compressiveStrength: 30
+  },
+
   {
     internalCode: 'STANDARD_FIER_10',
     name: 'Fier beton PC52 Ø10mm',
-    category: 'Fundație', subcategory: 'Armătură', unit: 'kg', pricePerUnit: 4.10,
+    category: 'Fundație', subcategory: 'Oțel Beton Fundație', unit: 'kg', pricePerUnit: 4.10,
     description: 'Fundații ușoare, P fără etaj.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/otel-beton-pc-52-d10/p/6000699'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/otel-beton-pc-52-d10/p/6000699'
   },
   {
     internalCode: 'STANDARD_FIER_12',
     name: 'Fier beton PC52 Ø12mm',
-    category: 'Fundație', subcategory: 'Armătură', unit: 'kg', pricePerUnit: 4.20,
+    category: 'Fundație', subcategory: 'Oțel Beton Fundație', unit: 'kg', pricePerUnit: 4.20,
     description: 'Standard P+1. Bare longitudinale fundații, armătură centuri.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/otel-beton-pc-52-d12/p/6000667'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/otel-beton-pc-52-d12/p/6000667'
   },
   {
     internalCode: 'STANDARD_FIER_14',
     name: 'Fier beton PC60 Ø14mm',
-    category: 'Fundație', subcategory: 'Armătură', unit: 'kg', pricePerUnit: 4.30,
+    category: 'Fundație', subcategory: 'Oțel Beton Fundație', unit: 'kg', pricePerUnit: 4.30,
     description: 'P+2, zone seismice 0.30g+.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/otel-beton-pc-52-d14/p/6000616'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/otel-beton-pc-52-d14/p/6000616'
   },
   {
     internalCode: 'HIDROIZOLATIE_3MM',
     name: 'Membrană bituminoasă 3mm',
-    category: 'Fundație', subcategory: 'Hidroizolație', unit: 'mp', pricePerUnit: 15,
+    category: 'Fundație', subcategory: 'Hidroizolație Fundație', unit: 'mp', pricePerUnit: 15,
     description: 'Hidroizolație standard pentru fundații.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/membrane-bituminoase/c/390'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/membrane-bituminoase/c/390'
   },
   {
     internalCode: 'HIDROIZOLATIE_4MM_ARM',
     name: 'Membrană bituminoasă 4mm armată',
-    category: 'Fundație', subcategory: 'Hidroizolație', unit: 'mp', pricePerUnit: 25,
+    category: 'Fundație', subcategory: 'Hidroizolație Fundație', unit: 'mp', pricePerUnit: 25,
     description: 'Zone cu pânză freatică ridicată.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/membrane-bituminoase/c/390'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/membrane-bituminoase/c/390'
   },
   {
     internalCode: 'STANDARD_PLACAJ_COFRARE',
     name: 'Placaj cofraj 18mm',
-    category: 'Fundație', subcategory: 'Cofraj', unit: 'mp', pricePerUnit: 38,
+    category: 'Fundație', subcategory: 'Cofraj Fundație', unit: 'mp', pricePerUnit: 38,
     description: 'Placaj fenolic 18mm pentru cofrarea fețelor laterale.',
     isDefault: true,
   },
@@ -93,49 +131,59 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
   {
     internalCode: 'STANDARD_BCA_25',
     name: 'BCA Ytong 25cm D3',
-    category: 'Structură', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 65,
+    category: 'Structură', subcategory: 'Zidărie BCA', unit: 'mp', pricePerUnit: 65,
     description: 'Ușor, izolant termic, recomandat ag≤0.25g, sol stabil.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-thermo-nf-599-x-250-x-199-mm-lxgxh/p/6053253',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-thermo-nf-599-x-250-x-199-mm-lxgxh/p/6053253',
     structuralType: 'BCA',
   },
+
+  {
+    internalCode: 'EXTERIOR_WALL_BRICK_38CM',
+    name: 'Cărămidă Porotherm 38cm Robust',
+    category: 'Structură', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 95,
+    description: 'Bloc ceramic portant cu grosime de 38cm, elimină punțile termice și rezistă la eforturi structurale mari.',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295',
+    structuralType: 'CARAMIDA'
+  },
+
   {
     internalCode: 'BCA_YTONG_30',
     name: 'BCA Ytong 30cm D4',
-    category: 'Structură', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 75,
+    category: 'Structură', subcategory: 'Zidărie BCA', unit: 'mp', pricePerUnit: 75,
     description: 'Mai gros, clasă energetică mai bună, recomandat climă rece.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-thermo-nf-599-x-300-x-199-mm-lxgxh/p/6053254',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-thermo-nf-599-x-300-x-199-mm-lxgxh/p/6053254',
     structuralType: 'BCA',
   },
   {
     internalCode: 'CARAMIDA_POROTHERM_30',
     name: 'Cărămidă Porotherm 30cm',
-    category: 'Structură', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 80,
+    category: 'Structură', subcategory: 'Zidărie Cărămidă', unit: 'mp', pricePerUnit: 80,
     description: 'Tradițional, mai rezistent seismic pe sol slab.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295',
     structuralType: 'CARAMIDA',
   },
   {
     internalCode: 'CARAMIDA_POROTHERM_38',
     name: 'Cărămidă Porotherm 38cm',
-    category: 'Structură', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 95,
+    category: 'Structură', subcategory: 'Zidărie Cărămidă', unit: 'mp', pricePerUnit: 95,
     description: 'Pentru climă rece, izolație termică superioară din masă.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295',
     structuralType: 'CARAMIDA',
   },
   {
     internalCode: 'STANDARD_BCA_12',
-    name: 'BCA Ytong 12.5cm',
+    name: 'BCA Ytong 12.5cm Interior',
     category: 'Structură', subcategory: 'Pereți interiori', unit: 'mp', pricePerUnit: 38,
-    description: 'Standard despărțitor, greutate redusă pe planșeu.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-interio-nf-599-x-150-x-199-mm-lxgxh/p/6053251',
+    description: 'Standard compartimentare interioară, greutate optimizată pe planșee de beton armat.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-interio-nf-599-x-150-x-199-mm-lxgxh/p/6053251',
     structuralType: 'BCA',
   },
   {
     internalCode: 'CARAMIDA_12',
-    name: 'Cărămidă 12.5cm',
+    name: 'Cărămidă Porotherm 11.5 N+F',
     category: 'Structură', subcategory: 'Pereți interiori', unit: 'mp', pricePerUnit: 45,
-    description: 'Mai bună izolație fonică între camere.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295',
+    description: 'Cărămidă pentru compartimentări interioare, izolație acustică excelentă între camere.',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/caramida/c/295',
     structuralType: 'CARAMIDA',
   },
   {
@@ -143,104 +191,119 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
     name: 'Gips-carton dublu 12.5cm',
     category: 'Structură', subcategory: 'Pereți interiori', unit: 'mp', pricePerUnit: 35,
     description: 'Execuție rapidă, pereți complet nestructurali.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/placi-gips-carton/c/270'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/placi-gips-carton/c/270',
+    structuralType: 'GIPS_CARTON'
   },
 
   // ── TERMOIZOLAȚIE ────────────────────────────────────────────────────────────────
   {
     internalCode: 'polistiren-eps-10cm',
     name: 'Polistiren expandat EPS 10cm',
-    category: 'Termoizolație', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 25,
+    category: 'Termoizolație', subcategory: 'Polistiren (EPS/XPS)', unit: 'mp', pricePerUnit: 25,
     description: 'Ieftin, clasă C, conductivitate 0.040 W/mK.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/polistiren-expandat/c/319'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/polistiren-expandat/c/319'
   },
   {
     internalCode: 'POLISTIREN_GRAFITAT_10',
     name: 'Polistiren grafitat EPS 10cm',
-    category: 'Termoizolație', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 35,
+    category: 'Termoizolație', subcategory: 'Polistiren (EPS/XPS)', unit: 'mp', pricePerUnit: 35,
     description: 'Mai eficient, clasă B, conductivitate 0.032 W/mK.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/polistiren-expandat/c/319'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/polistiren-expandat/c/319'
   },
   {
     internalCode: 'VATA_MINERALA_EXT_10',
     name: 'Vată minerală bazaltică 10cm',
-    category: 'Termoizolație', subcategory: 'Pereți exteriori', unit: 'mp', pricePerUnit: 60,
+    category: 'Termoizolație', subcategory: 'Polistiren (EPS/XPS)', unit: 'mp', pricePerUnit: 60,
     description: 'Premium, clasa A, incombustibil (ignifug), izolație fonică superioară.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/vata-minerala/c/316'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/vata-minerala/c/316'
   },
   {
     internalCode: 'vata-minerala-15cm',
     name: 'Vată minerală 15cm',
-    category: 'Termoizolație', subcategory: 'Acoperiș', unit: 'mp', pricePerUnit: 55,
+    category: 'Termoizolație', subcategory: 'Vată Minerală', unit: 'mp', pricePerUnit: 55,
     description: 'Standard izolație pod/acoperiș.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/vata-minerala/c/316'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/vata-minerala/c/316'
   },
   {
     internalCode: 'VATA_MINERALA_20',
     name: 'Vată minerală 20cm',
-    category: 'Termoizolație', subcategory: 'Acoperiș', unit: 'mp', pricePerUnit: 75,
+    category: 'Termoizolație', subcategory: 'Vată Minerală', unit: 'mp', pricePerUnit: 75,
     description: 'Climă rece, nord, rezistență termică ridicată.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/vata-minerala/c/316'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/vata-minerala/c/316'
+  },
+  {
+    internalCode: 'PLASA_FIBRA_STICLA',
+    name: 'Plasă fibră sticlă 160g/mp',
+    category: 'Termoizolație', subcategory: 'ETICS - Armare', unit: 'mp', pricePerUnit: 4.5,
+    description: 'Plasă din fibră de sticlă pentru armarea sistemului termoizolant (ETICS).',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/plasa-fibra-de-sticla/c/321'
+  },
+  {
+    internalCode: 'TENCUIALA_DECORATIVA_SILOXANICA',
+    name: 'Tencuială decorativă siloxanică 1.5mm',
+    category: 'Termoizolație', subcategory: 'ETICS - Finisaje Exterioare', unit: 'kg', pricePerUnit: 11.5,
+    description: 'Tencuială decorativă structurată pentru exterior, strat final ETICS (consum ~2.5-3.5 kg/mp).',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tencuieli-decorative/c/308'
   },
 
   // ── ACOPERIȘ ─────────────────────────────────────────────────────────────────────
   {
     internalCode: 'STANDARD_TIGLA_CERAMICA',
     name: 'Țiglă ceramică Tondach',
-    category: 'Acoperiș', subcategory: 'Învelitoare', unit: 'mp', pricePerUnit: 75,
+    category: 'Acoperiș', subcategory: 'Învelitori', unit: 'mp', pricePerUnit: 75,
     description: 'Clasic, durabil >50 ani, greutate mare.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/tigla/c/335'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tigla/c/335'
   },
   {
     internalCode: 'TIGLA_BETON_BRAMAC',
     name: 'Țiglă beton Bramac',
-    category: 'Acoperiș', subcategory: 'Învelitoare', unit: 'mp', pricePerUnit: 60,
+    category: 'Acoperiș', subcategory: 'Învelitori', unit: 'mp', pricePerUnit: 60,
     description: 'Mai ieftină, durabil ~30 ani.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/tigla/c/335'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tigla/c/335'
   },
   {
     internalCode: 'TABLA_LINDAB',
     name: 'Tablă cutată Lindab',
-    category: 'Acoperiș', subcategory: 'Învelitoare', unit: 'mp', pricePerUnit: 45,
+    category: 'Acoperiș', subcategory: 'Învelitori', unit: 'mp', pricePerUnit: 45,
     description: 'Modern, greutate redusă, rapid de montat.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/tabla-acoperis/c/336'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tabla-acoperis/c/336'
   },
   {
     internalCode: 'STANDARD_LEMN_STRUCTURA',
     name: 'Lemn rășinos ecarisat 8×12cm',
-    category: 'Acoperiș', subcategory: 'Structură', unit: 'mc', pricePerUnit: 1450,
+    category: 'Acoperiș', subcategory: 'Șarpantă Lemn', unit: 'mc', pricePerUnit: 1450,
     description: 'Standard pentru șarpante și căpriori.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/cherestea/c/365'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/cherestea/c/365'
   },
 
   // ── TÂMPLĂRIE ────────────────────────────────────────────────────────────────────
   {
     internalCode: 'STANDARD_FEREASTRA_PVC',
     name: 'Ferestre PVC 2 geamuri Low-E',
-    category: 'Tâmplărie', subcategory: 'Ferestre', unit: 'buc', pricePerUnit: 850,
+    category: 'Tâmplărie', subcategory: 'Fereastră PVC', unit: 'buc', pricePerUnit: 850,
     description: 'Buget mediu, Uw=1.1, standard termopan.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/ferestre-pvc/c/258'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/ferestre-pvc/c/258'
   },
   {
     internalCode: 'FEREASTRA_PVC_3K',
     name: 'Ferestre PVC 3 geamuri (Tripan)',
-    category: 'Tâmplărie', subcategory: 'Ferestre', unit: 'buc', pricePerUnit: 1200,
+    category: 'Tâmplărie', subcategory: 'Fereastră PVC', unit: 'buc', pricePerUnit: 1200,
     description: 'Premium, Uw=0.7, clasă energetică A.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/ferestre-pvc/c/258'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/ferestre-pvc/c/258'
   },
   {
     internalCode: 'FEREASTRA_ALUMINIU',
     name: 'Ferestre Aluminiu 3 geamuri',
-    category: 'Tâmplărie', subcategory: 'Ferestre', unit: 'buc', pricePerUnit: 1800,
+    category: 'Tâmplărie', subcategory: 'Fereastră Aluminiu', unit: 'buc', pricePerUnit: 1800,
     description: 'Modern/industrial, profil rezistent, Uw=0.8.',
     isDefault: false,
   },
   {
     internalCode: 'STANDARD_USA_EXTERIOR',
     name: 'Ușă exterior PVC cu geam',
-    category: 'Tâmplărie', subcategory: 'Uși exterior', unit: 'buc', pricePerUnit: 1800,
+    category: 'Tâmplărie', subcategory: 'Ușă Exterior', unit: 'buc', pricePerUnit: 1800,
     description: 'Standard ușă de intrare rezidențială.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/usi-exterior/c/255'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/usi-exterior/c/255'
   },
 
   // ── FINISAJE BRUTE ───────────────────────────────────────────────────────────────
@@ -249,70 +312,70 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
     name: 'Șapă ciment M100 5cm',
     category: 'Finisaje Brute', subcategory: 'Șapă', unit: 'mp', pricePerUnit: 28,
     description: 'Standard pentru nivelare pardoseală.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/sape/c/309'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/sape/c/309'
   },
   {
     internalCode: 'SAPA_AUTONIVELANTA',
     name: 'Șapă autonivelantă',
     category: 'Finisaje Brute', subcategory: 'Șapă', unit: 'mp', pricePerUnit: 40,
     description: 'Rapid de aplicat, finisaj perfect pentru parchet laminat subțire.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/sape/c/309'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/sape/c/309'
   },
   {
     internalCode: 'STANDARD_TENCUIALA',
     name: 'Tencuială mecanizată',
     category: 'Finisaje Brute', subcategory: 'Tencuială', unit: 'mp', pricePerUnit: 22,
     description: 'Rapid, aplicare uniformă, necesită echipament.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/tencuieli/c/308'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tencuieli/c/308'
   },
 
   // ── FINISAJE FINE ────────────────────────────────────────────────────────────────
   {
     internalCode: 'PARCHET_8MM',
     name: 'Parchet laminat 8mm AC4',
-    category: 'Finisaje Fine', subcategory: 'Pardoseli calde', unit: 'mp', pricePerUnit: 35,
+    category: 'Finisaje Fine', subcategory: 'Parchet', unit: 'mp', pricePerUnit: 35,
     description: 'Buget redus, rezistență la trafic normal.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/parchet-laminat/c/153'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/parchet-laminat/c/153'
   },
   {
     internalCode: 'PARCHET_12MM',
     name: 'Parchet laminat 12mm AC5',
-    category: 'Finisaje Fine', subcategory: 'Pardoseli calde', unit: 'mp', pricePerUnit: 60,
+    category: 'Finisaje Fine', subcategory: 'Parchet', unit: 'mp', pricePerUnit: 60,
     description: 'Calitate medie spre premium, bun pentru încălzire în pardoseală.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/parchet-laminat/c/153'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/parchet-laminat/c/153'
   },
   {
     internalCode: 'PARCHET_MASIV',
     name: 'Parchet masiv stejar',
-    category: 'Finisaje Fine', subcategory: 'Pardoseli calde', unit: 'mp', pricePerUnit: 250,
+    category: 'Finisaje Fine', subcategory: 'Parchet', unit: 'mp', pricePerUnit: 250,
     description: 'Premium, aspect natural, durată lungă de viață.',
     isDefault: false,
   },
   {
     internalCode: 'GRESIE_60',
     name: 'Gresie porțelanată 60×60cm',
-    category: 'Finisaje Fine', subcategory: 'Pardoseli reci', unit: 'mp', pricePerUnit: 65,
+    category: 'Finisaje Fine', subcategory: 'Gresie', unit: 'mp', pricePerUnit: 65,
     description: 'Standard, format potrivit pentru băi și bucătării.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/gresie/c/138'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/gresie/c/138'
   },
   {
     internalCode: 'GRESIE_80',
     name: 'Gresie rectificată 80×80cm',
-    category: 'Finisaje Fine', subcategory: 'Pardoseli reci', unit: 'mp', pricePerUnit: 120,
+    category: 'Finisaje Fine', subcategory: 'Gresie', unit: 'mp', pricePerUnit: 120,
     description: 'Premium, rosturi minime, aspect modern și elegant.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/gresie/c/138'
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/gresie/c/138'
   },
   {
     internalCode: 'STANDARD_USA_INTERIOR',
     name: 'Porta Doors furniruit',
-    category: 'Finisaje Fine', subcategory: 'Uși interior', unit: 'buc', pricePerUnit: 550,
+    category: 'Finisaje Fine', subcategory: 'Uși Interior', unit: 'buc', pricePerUnit: 550,
     description: 'Standard, ușor de asortat, rezistență medie.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/usi-interior/c/256'
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/usi-interior/c/256'
   },
   {
     internalCode: 'USA_INTERIOR_MASIV',
     name: 'Porta Doors stejar masiv',
-    category: 'Finisaje Fine', subcategory: 'Uși interior', unit: 'buc', pricePerUnit: 1400,
+    category: 'Finisaje Fine', subcategory: 'Uși Interior', unit: 'buc', pricePerUnit: 1400,
     description: 'Premium, fonoizolație bună, durabilitate mare.',
     isDefault: false,
   },
@@ -324,30 +387,30 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
   {
     internalCode: 'BALAST_COMPACTAT',
     name: 'Balast 16-32mm compactat',
-    category: 'Fundație', subcategory: 'Terasamente', unit: 'mc', pricePerUnit: 65,
+    category: 'Fundație', subcategory: 'Săpătură și Terasamente', unit: 'mc', pricePerUnit: 65,
     description: 'Pat de balast compactat 20cm sub fundație, obligatoriu conform NP 112-2014 Art.6.3 — asigură drenajul și distribuția uniformă a presiunii.',
     isDefault: true,
   },
   {
     internalCode: 'BETON_EGALIZARE_C8_10',
     name: 'Beton de egalizare C8/10',
-    category: 'Fundație', subcategory: 'Beton', unit: 'mc', pricePerUnit: 280,
+    category: 'Fundație', subcategory: 'Beton Fundație', unit: 'mc', pricePerUnit: 280,
     description: 'Strat de regularizare 10cm sub fundație, obligatoriu conform NE 012-1:2022 §4.3 și NP 112-2014 Tab.3 — asigură suprafața plană pentru cofraje și hidroizolație.',
     isDefault: true,
   },
   {
     internalCode: 'FOLIE_PE_200_MICRONI',
     name: 'Folie polietilenă 200 microni',
-    category: 'Fundație', subcategory: 'Hidroizolație', unit: 'mp', pricePerUnit: 3,
+    category: 'Fundație', subcategory: 'Hidroizolație Fundație', unit: 'mp', pricePerUnit: 3,
     description: 'Barieră de umiditate între teren și structura de beton, obligatorie conform NP 112-2014 Art.9.1 — protejează betonul de proasta umiditate a terenului înainte de hidroizolația propriu-zisă.',
     isDefault: true,
   },
   {
     internalCode: 'PRIMER_BITUMINOS',
     name: 'Primer bituminos (amorsă) Penetral MC',
-    category: 'Fundație', subcategory: 'Hidroizolație', unit: 'mp', pricePerUnit: 4,
+    category: 'Fundație', subcategory: 'Hidroizolație Fundație', unit: 'mp', pricePerUnit: 4,
     description: 'Amorsă bituminoasă pe bază de solvent, aplicată obligatoriu înaintea membranei bituminoase conform NP 112-2014 Art.9.2 și instrucțiunilor tehnice C 112-86. Consum: 0.3 L/mp.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/hidroizolatii-pentru-fundatii/c/393',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/hidroizolatii-pentru-fundatii/c/393',
   },
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -357,29 +420,29 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
   {
     internalCode: 'MORTAR_ZIDARIE_M10_SAC',
     name: 'Mortar zidărie M10 sac 25kg',
-    category: 'Structură', subcategory: 'Mortar', unit: 'sac', pricePerUnit: 18,
+    category: 'Structură', subcategory: 'Mortar Zidărie', unit: 'sac', pricePerUnit: 18,
     description: 'Mortar pentru utilizare generală (G) clasa M10 — prescripție CR 6-2013 Tab.3.1 (compoziție 1:2.5 ciment:nisip). Rost de 12mm conform CR 6-2013 §3.2.2(4). Standard pentru zidărie din cărămidă. 1 sac = ~12L mortar proaspăt.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/mortare-zidarie/c/296',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/mortare-zidarie/c/296',
     structuralType: 'CARAMIDA',
   },
   {
     internalCode: 'MORTAR_ZIDARIE_M5_SAC',
     name: 'Mortar zidărie M5 sac 25kg',
-    category: 'Structură', subcategory: 'Mortar', unit: 'sac', pricePerUnit: 15,
+    category: 'Structură', subcategory: 'Mortar Zidărie', unit: 'sac', pricePerUnit: 15,
     description: 'Mortar pentru utilizare generală (G) clasa M5 — CR 6-2013 Tab.3.1 (1:3 ciment:nisip). Utilizat la pereți interiori nestructurali sau zone cu cerințe seismice reduse (ag≤0.15g).',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/mortare-zidarie/c/296',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/mortare-zidarie/c/296',
   },
   {
     internalCode: 'ADEZIV_BCA_YTONG_SAC',
     name: 'Adeziv rost subțire BCA Ytong 25kg',
-    category: 'Structură', subcategory: 'Mortar', unit: 'sac', pricePerUnit: 22,
+    category: 'Structură', subcategory: 'Mortar Zidărie', unit: 'sac', pricePerUnit: 22,
     description: 'Mortar adeziv (T — thin layer) pentru rost subțire 1-3mm, conform CR 6-2013 §3.2.2(3) și specificațiilor tehnice Ytong/Xella. Nisip fin <1mm, întărire rapidă. Consum: ~1.4 kg/mp zidărie față (vs 88 kg/mp la mortar G 25cm). AI sugerează override din mortar M10 când wall_exterior=BCA.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/adeziv-bca-ytong-fix-n220-sac-25-kg/p/6012314',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/adeziv-bca-ytong-fix-n220-sac-25-kg/p/6012314',
   },
   {
     internalCode: 'MORTAR_BETON_CELULAR_BAUMIT',
     name: 'Mortar beton celular Baumit PowerContact 25kg',
-    category: 'Structură', subcategory: 'Mortar', unit: 'sac', pricePerUnit: 25,
+    category: 'Structură', subcategory: 'Mortar Zidărie', unit: 'sac', pricePerUnit: 25,
     description: 'Adeziv performant pentru BCA și blocuri de beton celular, alternativă premium la ADEZIV_BCA_YTONG_SAC. Rost subțire 2-3mm. SR EN 998-2:2016 tip T. Rezistență la forfecare declarată ≥0.15 N/mm² (CR 6-2013 Tab.3.2).',
     isDefault: false,
   },
@@ -391,44 +454,44 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
   {
     internalCode: 'SIPCA_25X50MM',
     name: 'Șipcă rășinoasă 2.5×5cm',
-    category: 'Acoperiș', subcategory: 'Structură', unit: 'ml', pricePerUnit: 2.5,
+    category: 'Acoperiș', subcategory: 'Șipci Acoperiș', unit: 'ml', pricePerUnit: 2.5,
     description: 'Șipci suport învelitoare, distanță între ele 33cm (standard pentru țiglă ceramică Tondach — 13 cursuri/ml conform fișei tehnice). CR 1-1-4-2012 — structura de suport a învelitorii.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/cherestea/c/365',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/cherestea/c/365',
   },
   {
     internalCode: 'FOLIE_ANTICONDENS_ACOPERIS',
     name: 'Folie difuzie vapori acoperiș (anticondens)',
-    category: 'Acoperiș', subcategory: 'Hidroizolație', unit: 'mp', pricePerUnit: 8,
+    category: 'Acoperiș', subcategory: 'Hidroizolație Acoperiș', unit: 'mp', pricePerUnit: 8,
     description: 'Strat difuzie vapori sub învelitoare, obligatoriu pentru prevenirea condensului interstițial conform Mc-001-2022 §7.3 (performanță energetică) și SR EN 13859-1. Suprapunere minimă 10% la montat.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/folii-acoperis/c/4984',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/folii-acoperis/c/4984',
   },
   {
     internalCode: 'JGHEAB_PVC_100MM',
     name: 'Jgheab PVC Ø100mm (semicerc)',
-    category: 'Acoperiș', subcategory: 'Sistem pluvial', unit: 'ml', pricePerUnit: 35,
+    category: 'Acoperiș', subcategory: 'Sisteme Pluviale - Jgheaburi', unit: 'ml', pricePerUnit: 35,
     description: 'Jgheab colectare apă pluvială. Dimensionat conform CR 1-1-4-2012 Art.6.3 — suprafața max captată per jgheab Ø100mm: ~60mp acoperiș. Perimetrul casei = lungimea totală jgheab.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/jgheaburi-burlane/c/338',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/jgheaburi-burlane/c/338',
   },
   {
     internalCode: 'BURLAN_PVC_80MM',
     name: 'Burlan PVC Ø80mm',
-    category: 'Acoperiș', subcategory: 'Sistem pluvial', unit: 'ml', pricePerUnit: 28,
+    category: 'Acoperiș', subcategory: 'Sisteme Pluviale - Burlane', unit: 'ml', pricePerUnit: 28,
     description: 'Burlan evacuare apă pluvială. Conform CR 1-1-4-2012 Art.6.3 — 1 burlan Ø80mm la max 50mp suprafață de captare acoperiș. Înălțimea = etaje ale casei + 0.5m până la sol.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/jgheaburi-burlane/c/338',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/jgheaburi-burlane/c/338',
   },
   {
     internalCode: 'COAMA_CERAMICA',
     name: 'Coamă ceramică tip T sau rotundă',
-    category: 'Acoperiș', subcategory: 'Învelitoare', unit: 'ml', pricePerUnit: 55,
+    category: 'Acoperiș', subcategory: 'Învelitori', unit: 'ml', pricePerUnit: 55,
     description: 'Coamă ceramică pentru etanșarea culmii acoperișului. Specifică producătorului de țiglă (Tondach, Creaton). Montare cu mortar de fixare rezistent la îngheț (XF2).',
     isDefault: true,
   },
   {
     internalCode: 'TABLA_TIGLA_METALICA',
     name: 'Tablă tip țiglă metalică (Modern/Roman)',
-    category: 'Acoperiș', subcategory: 'Învelitoare', unit: 'mp', pricePerUnit: 55,
+    category: 'Acoperiș', subcategory: 'Învelitori', unit: 'mp', pricePerUnit: 55,
     description: 'Învelitoare tablă profilată tip țiglă, oțel zincat 0.5mm. Ușoară (5 kg/mp), rapidă. Alternativă modernă la țigla ceramică. CR 1-1-4-2012 — factor zonă vânt aplicat în calcul.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/tabla-acoperis/c/336',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tabla-acoperis/c/336',
   },
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -481,7 +544,7 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
     name: 'Glet de ipsos Knauf Multifinish (per kg)',
     category: 'Finisaje Brute', subcategory: 'Glet', unit: 'kg', pricePerUnit: 1.80,
     description: 'Glet de ipsos interior pentru netezire pereți și tavan. SR EN 13279-1 clasa C5. Consum: 1.2-1.8 kg/mp/strat (specificație producător Knauf). 2 straturi standard = 1.5 kg/mp medie. Prețul per kg = sac 25kg (45 RON) / 25.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/gleturi/c/310',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/gleturi/c/310',
   },
   {
     internalCode: 'GLET_FINISAJ_DANOGIPS',
@@ -493,21 +556,21 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
   {
     internalCode: 'VOPSEA_LAVABILA_INTERIOR_L',
     name: 'Vopsea lavabilă interior Kober Spor (per L)',
-    category: 'Finisaje Brute', subcategory: 'Vopsea', unit: 'L', pricePerUnit: 8,
+    category: 'Finisaje Fine', subcategory: 'Vopsea Lavabilă', unit: 'L', pricePerUnit: 8,
     description: 'Vopsea lavabilă acrilică interior, clasa A de lavabilitate (SR EN 13300). Consum: 0.11-0.13 L/mp/strat (specificație producător). 2 straturi + grund = 0.34 L/mp total. Preț/L calculat din bidon 15L (120 RON).',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/vopsele-lavabile/c/199',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/vopsele-lavabile/c/199',
   },
   {
     internalCode: 'GRUND_IZOLATOR_INTERIOR',
     name: 'Grund izolator interior (per L)',
-    category: 'Finisaje Brute', subcategory: 'Vopsea', unit: 'L', pricePerUnit: 6,
+    category: 'Finisaje Fine', subcategory: 'Vopsea Lavabilă', unit: 'L', pricePerUnit: 6,
     description: 'Grund de penetrare și izolare, aplicat înainte de vopsea lavabilă. Consum: 0.10 L/mp (specificație producători Kober, Deutek). SR EN 1062-1 — strat preparator obligatoriu pe tencuială nouă.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/grunduri/c/201',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/grunduri/c/201',
   },
   {
     internalCode: 'VOPSEA_LAVABILA_EXTERIOR_L',
     name: 'Vopsea lavabilă exterior siloxanică (per L)',
-    category: 'Finisaje Brute', subcategory: 'Vopsea', unit: 'L', pricePerUnit: 18,
+    category: 'Finisaje Fine', subcategory: 'Vopsea Lavabilă', unit: 'L', pricePerUnit: 18,
     description: 'Vopsea exterioară siloxanică, rezistentă UV și intemperii. SR EN 1062-1 clasa W3 (impermeabilă la apă). Consum: 0.15 L/mp/strat × 2 straturi = 0.30 L/mp. Alternativă la tencuiala decorativă pentru fațade simple.',
     isDefault: false,
   },
@@ -527,7 +590,7 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
     name: 'Glaf PVC exterior (ml)',
     category: 'Tâmplărie', subcategory: 'Accesorii', unit: 'ml', pricePerUnit: 45,
     description: 'Glaf PVC cu picurător pentru etanșarea exterioară a ferestrei. Obligatoriu la montarea tâmplăriei pentru evitarea infiltrațiilor (SR EN 14351-1). Lățime adaptabilă 20-40cm.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/glafuri/c/263',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/glafuri/c/263',
   },
   {
     internalCode: 'GLAF_PVC_INTERIOR',
@@ -545,14 +608,14 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
     name: 'Faianță ceramică 30×60cm (baie/bucătărie)',
     category: 'Finisaje Fine', subcategory: 'Placaje', unit: 'mp', pricePerUnit: 55,
     description: 'Faianță ceramică pentru pereți baie și bucătărie. Glazurată, impermeabilă, clasa de absorbție BIb (SR EN 14411). Standard rezidențial.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/faianta/c/140',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/faianta/c/140',
   },
   {
     internalCode: 'ADEZIV_FLEXIBIL_GRESIE_SAC',
     name: 'Adeziv flexibil C2T gresie/faianță (sac 25kg)',
     category: 'Finisaje Fine', subcategory: 'Adezivi', unit: 'sac', pricePerUnit: 35,
     description: 'Adeziv ciment flexibil clasa C2T (SR EN 12004) pentru gresie și faianță. Consum: 3.5-4.5 kg/mp (strat 6mm). Obligatoriu clasa C2 pentru suprafețe cu deformații (planșee, încălzire în pardoseală).',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/adezivi-gresie-faianta/c/303',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/adezivi-gresie-faianta/c/303',
   },
   {
     internalCode: 'ROST_GRESIE_KG',
@@ -564,14 +627,14 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
   {
     internalCode: 'FOLIE_SEPARATOARE_PARCHET',
     name: 'Folie separatoare sub parchet (mp)',
-    category: 'Finisaje Fine', subcategory: 'Pardoseli calde', unit: 'mp', pricePerUnit: 3.5,
+    category: 'Finisaje Fine', subcategory: 'Parchet', unit: 'mp', pricePerUnit: 3.5,
     description: 'Folie PE + spumă 2mm sub parchet laminat, obligatorie conform specificațiilor producătorilor de parchet. Rol: barieră umiditate, atenuare zgomot de impact (SR EN ISO 717-2).',
     isDefault: true,
   },
   {
     internalCode: 'PROFIL_TRECERE_PARCHET',
     name: 'Profil de trecere parchet-gresie (ml)',
-    category: 'Finisaje Fine', subcategory: 'Pardoseli calde', unit: 'ml', pricePerUnit: 25,
+    category: 'Finisaje Fine', subcategory: 'Parchet', unit: 'ml', pricePerUnit: 25,
     description: 'Profil metalic/PVC la trecerea dintre pardoseala caldă (parchet) și pardoseala rece (gresie). Finisaj profesional obligatoriu la praguri și treceri.',
     isDefault: true,
   },
@@ -584,147 +647,169 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
   {
     internalCode: 'TEAVA_PPR_20MM',
     name: 'Țeavă PPR 20mm PN20 (ml)',
-    category: 'Instalații Sanitare', subcategory: 'Alimentare apă', unit: 'ml', pricePerUnit: 6,
+    category: 'Instalații', subcategory: 'Țevi Alimentare Apă', unit: 'ml', pricePerUnit: 6,
     description: 'Țeavă polipropilenă reticulată PN20 Ø20mm, pentru distribuție apă rece și caldă. I 9-2022 §8.3 — conducte de legătură de la distribuitor la obiectul sanitar, max 8m fără recirculare. SR EN ISO 15874.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/tevi-ppr/c/403',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tevi-ppr/c/403',
+  },
+
+  {
+    internalCode: 'plumbing_supply',
+    name: 'Țeavă PPR Ø20mm inserție fibră compozită',
+    category: 'Instalații', subcategory: 'Țevi Alimentare Apă', unit: 'ml', pricePerUnit: 7.5,
+    description: 'Conducte pentru distribuția apei calde și reci menajere, dilatare termică redusă.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/teava-ppr-verde-cu-fibra-compozita-20-mm-x-3-4-mm-pn20/p/2012177'
+  },
+  {
+    internalCode: 'plumbing_drainage_main',
+    name: 'Țeavă canalizare interioară PP Ø110mm',
+    category: 'Instalații', subcategory: 'Canalizare Interioară', unit: 'ml', pricePerUnit: 25.0,
+    description: 'Conductă de scurgere principală ignifugată pentru ape uzate, rezistentă la temperaturi înalte.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/teava-pp-canalizare-interioara-polipropilena-110-x-2-7-mm-3-m/p/2004245'
+  },
+  {
+    internalCode: 'plumbing_drainage_secondary',
+    name: 'Țeavă canalizare interioară PP Ø50mm',
+    category: 'Instalații', subcategory: 'Canalizare Interioară', unit: 'ml', pricePerUnit: 15.0,
+    description: 'Țeavă de scurgere secundară destinată conectării lavoarelor, cabinelor de duș și electrocasnicelor.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/teava-pp-canalizare-interioara-polipropilena-50-x-1-8-mm-2-m/p/2004232'
   },
   {
     internalCode: 'TEAVA_PPR_25MM',
     name: 'Țeavă PPR 25mm PN20 (ml)',
-    category: 'Instalații Sanitare', subcategory: 'Alimentare apă', unit: 'ml', pricePerUnit: 9,
+    category: 'Instalații', subcategory: 'Țevi Alimentare Apă', unit: 'ml', pricePerUnit: 9,
     description: 'Țeavă PPR PN20 Ø25mm, coloană principală distribuție apă. I 9-2022 §8.2 — coloane de alimentare dimensionate la debitul simultan maxim (SR EN 806-3).',
     isDefault: true,
   },
   {
     internalCode: 'TEAVA_PEX_16MM',
     name: 'Țeavă PEX 16mm (ml) — distribuție',
-    category: 'Instalații Sanitare', subcategory: 'Alimentare apă', unit: 'ml', pricePerUnit: 7,
+    category: 'Instalații', subcategory: 'Țevi Alimentare Apă', unit: 'ml', pricePerUnit: 7,
     description: 'Țeavă polietilenă reticulată Ø16mm, alternativă flexibilă la PPR pentru trasee în pardoseală. SR EN ISO 15875. I 9-2022 — admisă pentru instalații interioare.',
     isDefault: false,
   },
   {
     internalCode: 'TEAVA_PVC_D110',
     name: 'Țeavă PVC canalizare Ø110mm (ml)',
-    category: 'Instalații Sanitare', subcategory: 'Canalizare', unit: 'ml', pricePerUnit: 25,
+    category: 'Instalații', subcategory: 'Canalizare Interioară', unit: 'ml', pricePerUnit: 25,
     description: 'Coloană principală canalizare menajeră. I 9-2022 §13.3 + SR EN 12056-2 sistem II — Ø110mm obligatoriu pentru coloane verticale care primesc WC. Panta min 2% pe orizontală.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/tevi-canalizare/c/408',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tevi-canalizare/c/408',
   },
   {
     internalCode: 'TEAVA_PVC_D50',
     name: 'Țeavă PVC canalizare Ø50mm (ml)',
-    category: 'Instalații Sanitare', subcategory: 'Canalizare', unit: 'ml', pricePerUnit: 15,
+    category: 'Instalații', subcategory: 'Canalizare Interioară', unit: 'ml', pricePerUnit: 15,
     description: 'Conductă de legătură obiecte sanitare (lavoar, duș, chiuvetă). I 9-2022 §13 + SR EN 12056-2 — Ø50mm pentru lavoar și duș, max debit specific 0.5 l/s. Panta 2-3%.',
     isDefault: true,
   },
   {
     internalCode: 'SIFON_PARDOSEALA',
     name: 'Sifon pardoseală inox Ø50mm',
-    category: 'Instalații Sanitare', subcategory: 'Obiecte sanitare', unit: 'buc', pricePerUnit: 65,
+    category: 'Instalații', subcategory: 'Canalizare Interioară', unit: 'buc', pricePerUnit: 65,
     description: 'Sifon de pardoseală cu gardă hidraulică min 50mm, conform I 9-2022 §5.5 — obligatoriu în băi, bucătării și centrale termice pentru colectarea apelor accidentale.',
     isDefault: true,
   },
   {
     internalCode: 'VAS_WC_SUSPENDAT',
     name: 'Vas WC suspendat ceramic',
-    category: 'Instalații Sanitare', subcategory: 'Obiecte sanitare', unit: 'buc', pricePerUnit: 850,
+    category: 'Instalații', subcategory: 'Obiecte Sanitare', unit: 'buc', pricePerUnit: 850,
     description: 'Vas WC suspendat, ceramic glazurat, cu sistem de spălare 6/3L (conform Directivei Europene 92/42/CEE). I 9-2022 Tab.1 — dotat obligatoriu în apartamente (1 WC/locință).',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/vase-wc/c/418',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/vase-wc/c/418',
   },
   {
     internalCode: 'CADRU_WC_SUSPENDAT',
     name: 'Cadru încastrat WC suspendat (Geberit UP200)',
-    category: 'Instalații Sanitare', subcategory: 'Obiecte sanitare', unit: 'buc', pricePerUnit: 650,
+    category: 'Instalații', subcategory: 'Obiecte Sanitare', unit: 'buc', pricePerUnit: 650,
     description: 'Cadru de montaj îngropat pentru WC suspendat, cu rezervor încastrat 6/3L (SR EN 12541). I 9-2022 — rezervoarele cu spălare eficientă obligatorii în clădiri noi conform Legea 372/2005.',
     isDefault: true,
   },
   {
     internalCode: 'LAVOAR_CERAMIC',
     name: 'Lavoar ceramic 60cm (cu sau fără piedestal)',
-    category: 'Instalații Sanitare', subcategory: 'Obiecte sanitare', unit: 'buc', pricePerUnit: 250,
+    category: 'Instalații', subcategory: 'Obiecte Sanitare', unit: 'buc', pricePerUnit: 250,
     description: 'Lavoar ceramic 60cm SR EN 14688. I 9-2022 Tab.1 — obligatoriu în baie + bucătărie. Consum apă: debit specific qs=0.2 l/s (SR EN 806-3 Tab.1).',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/lavoare/c/419',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/lavoare/c/419',
   },
   {
     internalCode: 'BATERIE_LAVOAR',
     name: 'Baterie monocomandă lavoar (cu economizor)',
-    category: 'Instalații Sanitare', subcategory: 'Obiecte sanitare', unit: 'buc', pricePerUnit: 280,
+    category: 'Instalații', subcategory: 'Obiecte Sanitare', unit: 'buc', pricePerUnit: 280,
     description: 'Baterie monocomandă cu limitator de debit 6L/min (Directiva 92/42/CEE). I 9-2022 §6 — robinete cu economizor de apă recomandate în clădiri noi.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/baterii/c/430',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/baterii/c/430',
   },
   {
     internalCode: 'CADA_BAIE_ACRILICA',
     name: 'Cadă baie acrilică 170×70cm',
-    category: 'Instalații Sanitare', subcategory: 'Obiecte sanitare', unit: 'buc', pricePerUnit: 650,
+    category: 'Instalații', subcategory: 'Obiecte Sanitare', unit: 'buc', pricePerUnit: 650,
     description: 'Cadă acrilică 170×70cm, SR EN 198. I 9-2022 Tab.1 — opțiune în loc de cabina duș. Consum apă: qs=0.3 l/s (SR EN 806-3). Permite și instalarea unui sistem de duș deasupra.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/cazi-baie/c/422',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/cazi-baie/c/422',
   },
   {
     internalCode: 'CABINA_DUS',
     name: 'Cabină duș 80×80cm cu panou fix',
-    category: 'Instalații Sanitare', subcategory: 'Obiecte sanitare', unit: 'buc', pricePerUnit: 750,
+    category: 'Instalații', subcategory: 'Obiecte Sanitare', unit: 'buc', pricePerUnit: 750,
     description: 'Cabină duș 80×80cm cu geam securizat 6mm (SR EN 12150). Alternativă la cada de baie, preferată în băi mici. I 9-2022 — qs=0.2 l/s pentru duș.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/cabine-dus/c/423',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/cabine-dus/c/423',
   },
   {
     internalCode: 'BATERIE_CADA_DUS',
     name: 'Baterie termostatată cadă/duș',
-    category: 'Instalații Sanitare', subcategory: 'Obiecte sanitare', unit: 'buc', pricePerUnit: 350,
+    category: 'Instalații', subcategory: 'Obiecte Sanitare', unit: 'buc', pricePerUnit: 350,
     description: 'Baterie termostatată cu limitare temperatură la 38°C (obligatoriu conform I 9-2022 §11.13 — protecție opărire). Debit max 12L/min.',
     isDefault: true,
   },
   {
     internalCode: 'CHIUVETA_INOX',
     name: 'Chiuvetă inox bucătărie 1.5 cuve',
-    category: 'Instalații Sanitare', subcategory: 'Obiecte sanitare', unit: 'buc', pricePerUnit: 350,
+    category: 'Instalații', subcategory: 'Obiecte Sanitare', unit: 'buc', pricePerUnit: 350,
     description: 'Chiuvetă inox 1.5 cuve SR EN 13310. I 9-2022 Tab.1 — obligatorie în bucătărie. qs=0.2 l/s (SR EN 806-3).',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/chiuvete-bucatarie/c/431',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/chiuvete-bucatarie/c/431',
   },
   {
     internalCode: 'BATERIE_BUCATARIE',
     name: 'Baterie bucătărie cu cap extensibil',
-    category: 'Instalații Sanitare', subcategory: 'Obiecte sanitare', unit: 'buc', pricePerUnit: 280,
+    category: 'Instalații', subcategory: 'Obiecte Sanitare', unit: 'buc', pricePerUnit: 280,
     description: 'Baterie bucătărie monocomandă cu cap rabatabil. I 9-2022 §6 — racordare la apă rece și caldă, rezistentă la presiuni de 0.1-0.5 MPa (rețeaua de distribuție).',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/baterii/c/430',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/baterii/c/430',
   },
   {
     internalCode: 'CENTRALA_TERMICA_GAZ',
     name: 'Centrală termică condensare gaz 24kW',
-    category: 'Instalații Sanitare', subcategory: 'Instalații termice', unit: 'buc', pricePerUnit: 5500,
+    category: 'Instalații', subcategory: 'Echipamente Termice', unit: 'buc', pricePerUnit: 5500,
     description: 'Centrală în condensare ≥24kW (Vaillant ecoTEC, Viessmann Vitodens sau echivalent). Eficiență ≥109% (Directiva 92/42/CEE, clasa 4). I 9-2022 §11 — sistem de preparare ACM și încălzire centralizat. Recomandat conform Legii 372/2005 (performanță energetică).',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/centrale-termice/c/439',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/centrale-termice/c/439',
   },
   {
     internalCode: 'BOILER_ELECTRIC_80L',
     name: 'Boiler electric 80L',
-    category: 'Instalații Sanitare', subcategory: 'Instalații termice', unit: 'buc', pricePerUnit: 800,
+    category: 'Instalații', subcategory: 'Echipamente Termice', unit: 'buc', pricePerUnit: 800,
     description: 'Boiler electric 80L, 2kW. Alternativă locală la centrala termică pentru preparare ACM. I 9-2022 Tab.1 — capacitate recomandata 50-80L/persoana × 2-3 persoane. Protecție anti-legionella la 60°C.',
-    isDefault: false, storeUrl: 'https://www.dedeman.ro/ro/boilere/c/440',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/boilere/c/440',
   },
   {
     internalCode: 'RADIATOR_PANEL_600X900',
     name: 'Radiator panel oțel 600×900mm (tip 22)',
-    category: 'Instalații Sanitare', subcategory: 'Instalații termice', unit: 'buc', pricePerUnit: 450,
+    category: 'Instalații', subcategory: 'Calorifere', unit: 'buc', pricePerUnit: 450,
     description: 'Radiator panou oțel tip 22 (dublu panou + dublu convector), 600×900mm, putere ~1800W la 75/65°C. SR EN 442-1. I 9-2022 §14 — dimensionat la necesarul termic al încăperii (W/mp funcție de zona climatică).',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/radiatoare/c/441',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/radiatoare/c/441',
   },
   {
     internalCode: 'ROBINET_TERMOSTATIC',
     name: 'Robinet termostatic radiator (cap termostatic)',
-    category: 'Instalații Sanitare', subcategory: 'Instalații termice', unit: 'buc', pricePerUnit: 85,
+    category: 'Instalații', subcategory: 'Calorifere', unit: 'buc', pricePerUnit: 85,
     description: 'Robinet termostatic cu cap termostatic reglabil 6-28°C. I 9-2022 §14.8 — obligatoriu la fiecare radiator conform Directivei 2012/27/UE (eficiență energetică clădiri). Economie 15-30% energie termică.',
     isDefault: true,
   },
   {
     internalCode: 'VAS_EXPANSIUNE_25L',
     name: 'Vas de expansiune 25L',
-    category: 'Instalații Sanitare', subcategory: 'Instalații termice', unit: 'buc', pricePerUnit: 180,
+    category: 'Instalații', subcategory: 'Echipamente Termice', unit: 'buc', pricePerUnit: 180,
     description: 'Vas de expansiune cu membrană 25L pentru instalație de încălzire. I 9-2022 §14.4 — obligatoriu în instalații închise pentru preluarea dilatărilor termice. Presiune preîncărcare 1.5 bar.',
     isDefault: true,
   },
   {
     internalCode: 'POMPA_CIRCULATIE',
     name: 'Pompă de circulație instalație termică',
-    category: 'Instalații Sanitare', subcategory: 'Instalații termice', unit: 'buc', pricePerUnit: 350,
+    category: 'Instalații', subcategory: 'Echipamente Termice', unit: 'buc', pricePerUnit: 350,
     description: 'Pompă circulație cu turație variabilă (clasă energetică A — Regulamentul UE 641/2009). I 9-2022 §14.6 — obligatorie în sistemele de încălzire cu apă caldă pentru circulația agentului termic.',
     isDefault: true,
   },
@@ -737,93 +822,172 @@ const BASELINE_MATERIALS: BaselineMaterial[] = [
   {
     internalCode: 'TABLOU_ELECTRIC_24M',
     name: 'Tablou electric 24 module IP40',
-    category: 'Instalații Electrice', subcategory: 'Tablouri', unit: 'buc', pricePerUnit: 280,
+    category: 'Instalații', subcategory: 'Tablouri și Siguranțe', unit: 'buc', pricePerUnit: 280,
     description: 'Tablou electric de distribuție 24 module, IP40, SR EN 61439-3. I 7-2011 §4 — tabloul principal al locuinței conține siguranțele automate, diferențialele și bara de nul+PE. Dimensionat la min 12 circuite pentru o casă P+1.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/tablouri-electrice/c/470',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tablouri-electrice/c/470',
+  },
+
+  {
+    internalCode: 'electrical_cable_prize',
+    name: 'Cablu Cupru CYY-F 3x2.5 mm² prize',
+    category: 'Instalații', subcategory: 'Cablu Prize', unit: 'ml', pricePerUnit: 8.5,
+    description: 'Cablu din cupru rigid rezistent la flacără pentru alimentarea circuitelor de prize conform I 7-2011.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/cablu-cupru-cyy-f-3x2-5-mmp/p/1023773'
+  },
+  {
+    internalCode: 'electrical_cable_light',
+    name: 'Cablu Cupru CYY-F 3x1.5 mm² iluminat',
+    category: 'Instalații', subcategory: 'Cablu Iluminat', unit: 'ml', pricePerUnit: 5.5,
+    description: 'Cablu standard pentru realizarea circuitelor de iluminat rezidențiale, cupru unifilar.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/cablu-cupru-cyy-f-3x1-5-mmp/p/1023771'
+  },
+  {
+    internalCode: 'electrical_conduit',
+    name: 'Tub de protecție flexibil copex Ø20mm',
+    category: 'Instalații', subcategory: 'Tuburi și Copex', unit: 'ml', pricePerUnit: 3.0,
+    description: 'Tub izolat gofrat din PVC auto-stingibil pentru trecerea cablurilor prin zidărie.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tub-flexibil-gofrat-copex-pvc-d20/p/1010321'
   },
   {
     internalCode: 'SIGURANTA_AUTOMATA_16A',
     name: 'Siguranță automată 16A/1P curba B',
-    category: 'Instalații Electrice', subcategory: 'Protecție', unit: 'buc', pricePerUnit: 25,
+    category: 'Instalații', subcategory: 'Tablouri și Siguranțe', unit: 'buc', pricePerUnit: 25,
     description: 'Întreruptor automat 16A monofazic curba B, SR EN 60898-1. I 7-2011 §5.3 — protecție circuit prize (max 8 prize/circuit la 16A) și aparate casnice. Curent de defect min 2500A.',
     isDefault: true,
   },
   {
     internalCode: 'SIGURANTA_AUTOMATA_20A',
     name: 'Siguranță automată 20A/1P curba B',
-    category: 'Instalații Electrice', subcategory: 'Protecție', unit: 'buc', pricePerUnit: 28,
+    category: 'Instalații', subcategory: 'Tablouri și Siguranțe', unit: 'buc', pricePerUnit: 28,
     description: 'Întreruptor automat 20A curba B, SR EN 60898-1. I 7-2011 §5.3 — protecție circuit aparate mari (mașina de spălat, uscător, boiler). Circuite dedicate separate.',
     isDefault: false,
   },
   {
     internalCode: 'SIGURANTA_DIFERENTIALA_30MA',
     name: 'Siguranță diferențială 30mA/2P 40A',
-    category: 'Instalații Electrice', subcategory: 'Protecție', unit: 'buc', pricePerUnit: 120,
+    category: 'Instalații', subcategory: 'Tablouri și Siguranțe', unit: 'buc', pricePerUnit: 120,
     description: 'Întreruptor diferențial 30mA sensibilitate tip A, SR EN 61008-1. I 7-2011 §4.1 (Tab.4.1) — protecție obligatorie împotriva curenților de defect, obligatoriu pentru toate circuitele de prize și baie. Timp deconectare <30ms.',
     isDefault: true,
   },
   {
     internalCode: 'CABLU_CYY_F_3X2_5',
     name: 'Cablu CYY-F 3×2.5mm² (ml)',
-    category: 'Instalații Electrice', subcategory: 'Cabluri', unit: 'ml', pricePerUnit: 8.5,
+    category: 'Instalații', subcategory: 'Cablu Prize', unit: 'ml', pricePerUnit: 8.5,
     description: 'Cablu cupru flexibil izolat PVC, 3 conductoare (faza+nul+PE) 2.5mm², SR CEI 60227. I 7-2011 §5 — standard pentru circuite prize (capacitate 16A/2500W). Montat în tub PVC sub tencuială.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/cabluri-electrice/c/468',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/cabluri-electrice/c/468',
   },
   {
     internalCode: 'CABLU_CYY_F_3X1_5',
     name: 'Cablu CYY-F 3×1.5mm² (ml)',
-    category: 'Instalații Electrice', subcategory: 'Cabluri', unit: 'ml', pricePerUnit: 5.5,
+    category: 'Instalații', subcategory: 'Cablu Iluminat', unit: 'ml', pricePerUnit: 5.5,
     description: 'Cablu cupru flexibil 3×1.5mm², SR CEI 60227. I 7-2011 §5 — standard pentru circuite de iluminat (capacitate 10A/2300W). Mai subțire decât cablul de prize, permite mai multe conductoare per tub.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/cabluri-electrice/c/468',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/cabluri-electrice/c/468',
   },
   {
     internalCode: 'TUB_PVC_D20_ML',
     name: 'Tub protecție PVC Ø20mm (ml)',
-    category: 'Instalații Electrice', subcategory: 'Cabluri', unit: 'ml', pricePerUnit: 3,
+    category: 'Instalații', subcategory: 'Tuburi și Copex', unit: 'ml', pricePerUnit: 3,
     description: 'Tub protecție PVC gofrat Ø20mm (exterior), SR EN 61386-1. I 7-2011 Tab.4.1 — protecție obligatorie pentru conductoare montate sub tencuială. Ø20mm acceptă max 2 cabluri 3×2.5mm².',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/tuburi-protectie-cablu/c/469',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/tuburi-protectie-cablu/c/469',
   },
   {
     internalCode: 'TUB_PVC_D16_ML',
     name: 'Tub protecție PVC Ø16mm (ml)',
-    category: 'Instalații Electrice', subcategory: 'Cabluri', unit: 'ml', pricePerUnit: 2.5,
+    category: 'Instalații', subcategory: 'Tuburi și Copex', unit: 'ml', pricePerUnit: 2.5,
     description: 'Tub protecție PVC gofrat Ø16mm. I 7-2011 — utilizat pentru circuitele de iluminat (cablu 1.5mm² mai subțire). Montat înainte de tencuire.',
     isDefault: true,
   },
   {
     internalCode: 'PRIZA_DUBLA_16A',
     name: 'Priză dublă 16A cu împământare (buc)',
-    category: 'Instalații Electrice', subcategory: 'Aparataj', unit: 'buc', pricePerUnit: 25,
+    category: 'Instalații', subcategory: 'Aparataj (Prize/Întrerupătoare)', unit: 'buc', pricePerUnit: 25,
     description: 'Priză dublă 16A/250V cu contact de protecție (împământare), tip Schuko, SR EN 60884-2-1. I 7-2011 Anexă — dotare minimă pe cameră: living 3 prize, dormitor 2 prize, bucătărie 4 prize (cu circuit dedicat). Montat în doze de instalare.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/prize-intrerupatoare/c/471',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/prize-intrerupatoare/c/471',
   },
   {
     internalCode: 'INTRERUPATOR_SIMPLU',
     name: 'Întrerupător simplu 10A (buc)',
-    category: 'Instalații Electrice', subcategory: 'Aparataj', unit: 'buc', pricePerUnit: 18,
+    category: 'Instalații', subcategory: 'Aparataj (Prize/Întrerupătoare)', unit: 'buc', pricePerUnit: 18,
     description: 'Întrerupător simplu 10A/250V, SR EN 60669-1. I 7-2011 — 1 întrerupător per circuit lumina/cameră. Standard rezidențial. Același serie cu prizele pentru estetică uniformă.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/prize-intrerupatoare/c/471',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/prize-intrerupatoare/c/471',
   },
   {
     internalCode: 'COMUTATOR_CAP_SCARA',
     name: 'Comutator cap-scară 10A (buc)',
-    category: 'Instalații Electrice', subcategory: 'Aparataj', unit: 'buc', pricePerUnit: 22,
+    category: 'Instalații', subcategory: 'Aparataj (Prize/Întrerupătoare)', unit: 'buc', pricePerUnit: 22,
     description: 'Comutator pentru comandă lumina din 2 locuri (cap-scară), SR EN 60669-1. I 7-2011 — obligatoriu la scări, holuri lungi și camere cu 2 intrări. 2 comutatoare per circuit comandat din 2 locuri.',
     isDefault: false,
   },
   {
     internalCode: 'CUTIE_DERIVATIE',
     name: 'Cutie derivație IP44 (buc)',
-    category: 'Instalații Electrice', subcategory: 'Aparataj', unit: 'buc', pricePerUnit: 12,
+    category: 'Instalații', subcategory: 'Doze și Accesorii', unit: 'buc', pricePerUnit: 12,
     description: 'Cutie de derivație cu capac, IP44, SR EN 60670. I 7-2011 §3 — obligatorie la orice ramificație a circuitelor electrice. Permite accesul ulterior la derivații conform normei. 1 cutie la fiecare ramificație de circuit.',
     isDefault: true,
   },
   {
     internalCode: 'SPOT_LED_INCASTRAT',
     name: 'Spot LED incastrat 7W GU10 (buc)',
-    category: 'Instalații Electrice', subcategory: 'Corpuri de iluminat', unit: 'buc', pricePerUnit: 35,
+    category: 'Instalații', subcategory: 'Aparataj (Prize/Întrerupătoare)', unit: 'buc', pricePerUnit: 35,
     description: 'Corp de iluminat incastrat LED 7W/630lm, clasa A++ (Reg. UE 874/2012). I 7-2011 §6 — iluminatul locuinței dimensionat la min 200 lux cameră (SR EN 12464-1). ~4-6 spoturi/cameră 12mp.',
-    isDefault: true, storeUrl: 'https://www.dedeman.ro/ro/spoturi/c/483',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/spoturi/c/483',
+  },
+  // ── MOCK MATERIALS FROM USER REQUEST ───────────────────────────────────────────────
+  {
+    internalCode: 'CARAMIDA_30_POROTHERM',
+    name: 'Cărămidă Porotherm 30 N+F',
+    category: 'Structură', subcategory: 'Zidărie Cărămidă', unit: 'mp', pricePerUnit: 110,
+    description: 'Cărămidă eficientă termic pentru pereți exteriori 30cm.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/caramida-porotherm-30-n-f-250-x-300-x-238-mm-lxgxh/p/6016147', structuralType: 'CARAMIDA'
+  },
+  {
+    internalCode: 'CARAMIDA_30_BKS',
+    name: 'Cărămidă BKS 30',
+    category: 'Structură', subcategory: 'Zidărie Cărămidă', unit: 'mp', pricePerUnit: 95,
+    description: 'Cărămidă portantă 30cm, varianta economică.',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/caramida-brikston-bks-30-250-x-300-x-238-mm-lxgxh/p/6016180', structuralType: 'CARAMIDA'
+  },
+  {
+    internalCode: 'INTERIOR_WALL_12_POROTHERM',
+    name: 'Cărămidă Porotherm 11.5 N+F',
+    category: 'Structură', subcategory: 'Zidărie BCA', unit: 'mp', pricePerUnit: 45,
+    description: 'Cărămidă pentru pereți despărțitori de 11.5cm.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/caramida-porotherm-11-5-n-f-500-x-115-x-238-mm-lxgxh/p/6016149', structuralType: 'CARAMIDA'
+  },
+  {
+    internalCode: 'INTERIOR_WALL_12_YTONG',
+    name: 'BCA Ytong 10cm',
+    category: 'Structură', subcategory: 'Zidărie BCA', unit: 'mp', pricePerUnit: 35,
+    description: 'BCA pentru pereți de compartimentare ușoară.',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/bca-ytong-clasic-nf-599-x-100-x-199-mm-lxgxh/p/6053255', structuralType: 'BCA'
+  },
+  {
+    internalCode: 'FEREASTRA_AL_SCHUCO',
+    name: 'Fereastră Aluminiu Schuco',
+    category: 'Tâmplărie', subcategory: 'Fereastră Aluminiu', unit: 'buc', pricePerUnit: 2500,
+    description: 'Profil aluminiu premium pentru ferestre exterioare.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/ferestre/c/258'
+  },
+  {
+    internalCode: 'FEREASTRA_AL_CORTIZO',
+    name: 'Fereastră Aluminiu Cortizo',
+    category: 'Tâmplărie', subcategory: 'Fereastră Aluminiu', unit: 'buc', pricePerUnit: 1900,
+    description: 'Profil aluminiu varianta optimă, izolare bună.',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/ferestre/c/258'
+  },
+  {
+    internalCode: 'ADEZIV_BCA_CERESIT',
+    name: 'Adeziv BCA Ceresit CT 21',
+    category: 'Structură', subcategory: 'ADHESIVE_MASONRY', unit: 'sac', pricePerUnit: 26,
+    description: 'Adeziv pentru zidărie din BCA în strat subțire.',
+    isDefault: true, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/adeziv-bca-si-boltari-ceresit-ct-21-25-kg/p/5001358'
+  },
+  {
+    internalCode: 'ADEZIV_BCA_WEBER',
+    name: 'Adeziv BCA Weber P118',
+    category: 'Structură', subcategory: 'ADHESIVE_MASONRY', unit: 'sac', pricePerUnit: 22,
+    description: 'Adeziv standard pentru fixare BCA.',
+    isDefault: false, storeName: 'Dedeman', storeUrl: 'https://www.dedeman.ro/ro/adeziv-bca-weber-p118-25-kg/p/5013064'
   }
 ];
 
@@ -846,10 +1010,13 @@ async function main() {
         where: { internalCode: mat.internalCode },
         data: {
           name:           mat.name,
+          category:       mat.category,
           subcategory:    mat.subcategory,
           description:    mat.description,
+          storeName:      mat.storeName || 'Generic',
           storeUrl:       mat.storeUrl || null,
           structuralType: mat.structuralType ?? null,
+          compressiveStrength: mat.compressiveStrength ?? null,
         } as any, // structuralType e în schema.prisma; types se regenerează după migrate
       });
       console.log(`  [UPDATE] ${mat.internalCode}`);
@@ -866,9 +1033,11 @@ async function main() {
           description:    mat.description,
           isDefault:      mat.isDefault,
           brand:          null,
+          storeName:      mat.storeName || 'Generic',
           storeUrl:       mat.storeUrl || null,
           uValue:         null,
           structuralType: mat.structuralType ?? null,
+          compressiveStrength: mat.compressiveStrength ?? null,
         } as any, // structuralType e în schema.prisma; types se regenerează după migrate
       });
       console.log(`  [CREATE] ${mat.internalCode}`);
@@ -915,14 +1084,8 @@ async function main() {
   }
   console.log(`[seedBaselineMaterials] Alternative setate cu succes!`);
   
-  // Rulăm sincronizarea cu web scraper-ul automat
-  console.log(`\n[seedBaselineMaterials] Rulare Web Scraper & Vectorizare...`);
-  try {
-    const syncResult = await scraperService.syncAllMaterials({ generateEmbeddings: true });
-    console.log(`[seedBaselineMaterials] Scraper OK: ${syncResult.updated} materiale actualizate, ${syncResult.failed} erori.`);
-  } catch(e) {
-    console.error(`[seedBaselineMaterials] Eroare la scraper sync:`, e);
-  }
+  // Scraper-ul e dezactivat în producție/seed — prețurile se actualizează manual din Admin sau via job asincron
+  console.log(`\n[seedBaselineMaterials] Scraper dezactivat în seed. Prețuri actualizate manual/job separat.`);
 
   console.log('\n[VALIDARE INTEGRITATE BOM]:');
   const fs = await import('fs');
@@ -952,6 +1115,29 @@ async function main() {
     process.exit(1);
   } else {
     console.log('\n✅ Toate materialele BOM sunt prezente în catalog.');
+  }
+
+  console.log('\n[VECTORIZARE RAG]: Se generează embeddings pentru materiale...');
+  try {
+    const allMaterials = await prisma.material.findMany();
+    let vecCount = 0;
+    for (const mat of allMaterials) {
+      if (!mat.description) continue;
+      
+      await saveMaterialEmbedding(
+        mat.id,
+        mat.name,
+        mat.description,
+        {},
+        'seed_baseline'
+      );
+      vecCount++;
+      // Mic delay pentru a nu lovi rate limit-ul Gemini (depinde de tier, dar 200ms e safe)
+      await new Promise(r => setTimeout(r, 200));
+    }
+    console.log(`✅ Vectorizare finalizată cu succes pentru ${vecCount} materiale!`);
+  } catch (err: any) {
+    console.error('❌ Eroare la vectorizarea materialelor:', err.message);
   }
 }
 

@@ -26,6 +26,9 @@ export const Materials = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Toate');
+  const [categoriesList, setCategoriesList] = useState<string[]>(['Toate']);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -35,9 +38,21 @@ export const Materials = () => {
 
   const fetchMaterials = () => {
     setIsLoading(true);
-    apiPrivate.get('/materials')
+    apiPrivate.get('/materials', {
+      params: {
+        page,
+        limit: 20,
+        search: searchTerm,
+        category: selectedCategory !== 'Toate' ? selectedCategory : undefined
+      }
+    })
       .then(res => {
-        setMaterials(res.data);
+        if (res.data?.data) {
+          setMaterials(res.data.data);
+          setTotalPages(res.data.pagination?.totalPages || 1);
+        } else {
+          setMaterials(res.data as any); // fallback
+        }
       })
       .catch(err => {
         console.error("Eroare preluare materiale:", err);
@@ -47,9 +62,24 @@ export const Materials = () => {
       });
   };
 
+  const fetchTaxonomy = async () => {
+    try {
+      const res = await apiPrivate.get('/materials/taxonomy');
+      if (res.data?.success) {
+        setCategoriesList(['Toate', ...res.data.categories]);
+      }
+    } catch (err) {
+      console.error('Eroare la preluarea taxonomiei', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTaxonomy();
+  }, []);
+
   useEffect(() => {
     fetchMaterials();
-  }, []);
+  }, [page, selectedCategory, searchTerm]);
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -90,13 +120,7 @@ export const Materials = () => {
     }
   };
 
-  const categories = ['Toate', ...Array.from(new Set(materials.map(m => m.category)))];
-
-  const filteredMaterials = materials.filter(m => {
-    const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'Toate' || m.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredMaterials = materials; // backend filters now
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -142,10 +166,10 @@ export const Materials = () => {
                   <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
                     Categorii
                   </div>
-                  {categories.map(cat => (
+                  {categoriesList.map(cat => (
                     <button
                       key={cat}
-                      onClick={() => { setSelectedCategory(cat); setIsFilterOpen(false); }}
+                      onClick={() => { setSelectedCategory(cat); setPage(1); setIsFilterOpen(false); }}
                       className={`w-full text-left px-4 py-2 text-sm transition-colors ${
                         selectedCategory === cat 
                           ? 'text-buildorange font-semibold bg-orange-50' 
@@ -267,6 +291,31 @@ export const Materials = () => {
               </div>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center mt-6">
+          <span className="text-sm text-slate-500">
+            Pagina {page} din {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={page === 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-700 disabled:opacity-50 transition-colors hover:bg-slate-50"
+            >
+              Înapoi
+            </button>
+            <button
+              disabled={page === totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-700 disabled:opacity-50 transition-colors hover:bg-slate-50"
+            >
+              Înainte
+            </button>
+          </div>
         </div>
       )}
 

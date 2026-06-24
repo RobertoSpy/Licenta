@@ -18,7 +18,9 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
 // Preluare proiecte user curent
 export const getUserProjects = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const projects = await projectService.getUserProjects(req.user!.id);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const projects = await projectService.getUserProjects(req.user!.id, page, limit);
     res.json(projects);
   } catch (error) {
     console.error('Eroare preluare proiecte:', error);

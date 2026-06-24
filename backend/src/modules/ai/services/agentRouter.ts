@@ -103,11 +103,11 @@ export async function detectRequiredAgents(
 
       for (const [agent, vector] of Object.entries(cachedAgentEmbeddings)) {
         const similarity = cosineSimilarity(questionEmbedding, vector);
-        if (similarity > 0.60) {
-          console.log(`[detectRequiredAgents] Semantic Match -> Agent: ${agent} (Scor: ${similarity.toFixed(2)}) pentru "${question}"`);
+        const PRIMARY_THRESHOLD = 0.60;
+        if (similarity >= PRIMARY_THRESHOLD) {
+          console.log(`[detectRequiredAgents] Semantic Match (PRIMARY) -> Agent: ${agent} (Scor: ${similarity.toFixed(2)}) pentru "${question}"`);
           agents.add(agent as AgentType);
           foundSemantic = true;
-          
           if (agent === 'deviz') agents.add('materiale');
         }
       }
@@ -131,8 +131,9 @@ export async function detectRequiredAgents(
   }
 
   if (agents.size === 0) {
-    agents.add('legal');
+    agents.add('general');
   }
 
-  return [...agents];
+  const finalAgents = [...agents];
+  return finalAgents.slice(0, 3);
 }

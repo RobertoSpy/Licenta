@@ -78,28 +78,57 @@ function computeOpeningIssues(
   const doors = elements.filter(el => el.type === 'door');
   const windows = elements.filter(el => el.type === 'window');
 
-  // RULE 1 — DOOR_OVERLAP: any 2 doors whose centers are < threshold apart
-  for (let i = 0; i < doors.length; i++) {
-    for (let j = i + 1; j < doors.length; j++) {
-      const a = doors[i], b = doors[j];
+  // RULE 1 — OPENING_OVERLAP: any 2 openings (door/window) whose centers are < threshold apart
+  const openings = [...doors, ...windows];
+  for (let i = 0; i < openings.length; i++) {
+    for (let j = i + 1; j < openings.length; j++) {
+      const a = openings[i], b = openings[j];
       const dist = Math.hypot(
         (a.x + a.width / 2) - (b.x + b.width / 2),
         (a.y + a.height / 2) - (b.y + b.height / 2)
       );
       if (dist < OVERLAP_THRESHOLD_PX) {
         issues.push({
-          targetType: 'door',
+          targetType: a.type as 'door' | 'project',
           targetId: a.id,
-          code: 'DOOR_OVERLAP',
+          code: 'OPENING_OVERLAP',
           severity: 'error',
           article: 'Art. 1 — Reguli geometrice',
-          message: `Două uși sunt suprapuse (distanța centrelor: ${dist.toFixed(0)}px). Îndepărtați sau ștergeți una.`,
+          message: `O ușă și o fereastră (sau două uși/ferestre) se suprapun (distanța centrelor: ${dist.toFixed(0)}px). Îndepărtați sau ștergeți una.`,
           currentValue: dist,
           requiredValue: OVERLAP_THRESHOLD_PX,
           deltaValue: OVERLAP_THRESHOLD_PX - dist,
-          suggestion: 'Ștergeți ușa suprapusă din panoul Proprietăți sau repoziționați-o.',
+          suggestion: 'Ștergeți elementul suprapus din panoul Proprietăți sau repoziționați-l.',
         });
       }
+    }
+  }
+
+  // RULE 1.5 — INTERIOR_WINDOW: Windows should not be placed on interior walls
+  for (const win of windows) {
+    const cx = win.x + win.width / 2;
+    const cy = win.y + win.height / 2;
+    const intersectingRooms = elements.filter(el => {
+      if (el.type !== 'room') return false;
+      return (
+        cx >= el.x - 15 && cx <= el.x + el.width + 15 &&
+        cy >= el.y - 15 && cy <= el.y + el.height + 15
+      );
+    });
+
+    if (intersectingRooms.length > 1) {
+      issues.push({
+        targetType: 'project',
+        targetId: win.id,
+        code: 'INTERIOR_WINDOW',
+        severity: 'error',
+        article: 'Art. 1 — Reguli geometrice',
+        message: 'O fereastră a fost plasată pe un perete interior (între două camere). Ferestrele trebuie plasate doar pe pereții exteriori.',
+        currentValue: intersectingRooms.length,
+        requiredValue: 1,
+        deltaValue: intersectingRooms.length - 1,
+        suggestion: 'Mutați fereastra pe un perete exterior sau ștergeți-o.',
+      });
     }
   }
 
@@ -193,7 +222,7 @@ export function useConformityCheck(
   }, [rooms, elements]);
 
   // Stable keys for effect dependencies
-  const roomsKey = rooms.map((r) => `${r.id}:${r.usableSqm}:${r.label ?? ''}`).join('|');
+  const roomsKey = rooms.map((r) => `${r.id}:${r.usableSqm}:${r.label ?? ''}:${(r as any).roomType ?? ''}`).join('|');
   const doorsKey = (doors ?? []).map((d) => `${d.id}:${d.widthM}`).join('|');
   const windowsKey = (elements ?? []).filter(e => e.type === 'window').map(w => `${w.id}:${w.width}:${w.height}:${w.x}:${w.y}`).join('|');
   const validationKey = `${roomsKey}::${doorsKey}::${windowsKey}::${buildingPurpose ?? 'residential'}`;
@@ -272,6 +301,7 @@ export function useConformityCheck(
           return {
             id: r.id,
             label: r.label,
+            type: (r as any).roomType ?? undefined, // type-ul definit de AI (dormitor, living etc.)
             usableSqm: r.usableSqm,
             widthM: r.widthM,
             heightM: r.heightM,
@@ -302,6 +332,22 @@ export function useConformityCheck(
           }
           return { id: d.id, widthM: d.widthM, isExterior };
         }),
+        virtualBoundaries: elements?.filter(e => e.type === 'wall' && e.metadata?.isVirtualBoundary === true).map(wall => {
+          const intersectingRooms = elements.filter(el => {
+            if (el.type !== 'room') return false;
+            // Bounding box intersection cu marjă (pereții împart granițele)
+            return (
+              wall.x <= el.x + el.width + 5 &&
+              wall.x + wall.width >= el.x - 5 &&
+              wall.y <= el.y + el.height + 5 &&
+              wall.y + wall.height >= el.y - 5
+            );
+          });
+          if (intersectingRooms.length === 2) {
+            return { roomIdA: intersectingRooms[0].id, roomIdB: intersectingRooms[1].id };
+          }
+          return null;
+        }).filter(Boolean) as Array<{roomIdA: string; roomIdB: string}>,
         buildingPurpose: buildingPurpose ?? 'residential',
       };
 

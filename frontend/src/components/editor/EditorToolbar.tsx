@@ -103,28 +103,7 @@ export const EditorToolbar: React.FC<Props> = ({ onSave, onExportPNG, onExportPD
         </button>
       </div>
 
-      {/* Copilot AI Button */}
-      {onToggleChat && (
-        <>
-          <div className="w-px h-7 bg-slate-200" />
-          <button
-            onClick={onToggleChat}
-            className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              isChatOpen
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-            }`}
-          >
-            {unreadCount && unreadCount > 0 && !isChatOpen && (
-              <div className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-md animate-pulse">
-                {unreadCount}
-              </div>
-            )}
-            <Brain className="w-4 h-4" />
-            <span>Copilot AI</span>
-          </button>
-        </>
-      )}
+      {/* Copilot AI Button (Moved to AIChatBubble) */}
 
       <div className="flex-1" />
 

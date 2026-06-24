@@ -32,7 +32,7 @@ export const geospatialService = {
       while (attempt < maxAttempts) {
         try {
           const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ro${opts?.email ? `&email=${encodeURIComponent(opts.email)}` : ''}`;
-          const response = await axios.get(url, { headers: { 'User-Agent': 'BuildWise/1.0 (+https://example.com)' } });
+          const response = await axios.get(url, { headers: { 'User-Agent': 'Zidario/1.0 (+https://example.com)' } });
 
           const addr = response.data.address || {};
           let county = addr.county || addr.state || addr.region || addr.city || addr.municipality || addr.town || '';

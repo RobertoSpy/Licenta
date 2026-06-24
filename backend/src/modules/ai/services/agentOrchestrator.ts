@@ -116,7 +116,8 @@ export const agentOrchestrator = {
 };
 
 export async function suggestRoomProgram(input: SuggestRoomsInput): Promise<RoomSuggestion> {
-  const targetArea = Math.min(Math.max(input.houseAreaSqm, 40), input.plotAreaSqm);
+  const plotLimit = input.plotAreaSqm ?? 1000000; // prevent Math.min to 0
+  const targetArea = Math.min(Math.max(input.houseAreaSqm, 40), plotLimit);
   
 
 

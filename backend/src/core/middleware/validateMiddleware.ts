@@ -92,6 +92,8 @@ export const suggestRoomsSchema = z.object({
   totalFloors: z.number().min(1).optional().default(1),
   projectData: z.any().optional(),
   screenContext: z.any().optional(),
+  userRefinementText: z.string().optional(),
+  previousRooms: z.array(z.any()).optional(),
 }).strip();
 
 // ==========================================

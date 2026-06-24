@@ -58,7 +58,14 @@ export function squarifyPartition(bbox: BBoxM, items: WeightedItem[], preserveOr
     return items.map(i => ({ id: i.id, bbox: { ...bbox, w: bbox.w / items.length }, original: i.original }));
   }
 
-  const sorted = preserveOrder ? [...items] : [...items].sort((a, b) => b.weight - a.weight);
+  let sorted: WeightedItem[] = [];
+  
+  if (preserveOrder) {
+    sorted = [...items];
+  } else {
+    sorted = [...items].sort((a, b) => b.weight - a.weight);
+  }
+
   const areas = sorted.map(i => (i.weight / totalWeight) * totalArea);
 
   const resultBBoxes: BBoxM[] = [];

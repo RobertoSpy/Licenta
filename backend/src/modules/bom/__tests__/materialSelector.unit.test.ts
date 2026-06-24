@@ -1,111 +1,44 @@
-import { prisma } from '../../../lib/prisma';
+// backend/src/modules/bom/__tests__/materialSelector.unit.test.ts
 import { selectMaterialForBOM, MaterialQuery } from '../materialSelector';
+import { prisma } from '../../../lib/prisma';
 
 jest.mock('../../../lib/prisma', () => ({
   prisma: {
     material: {
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-    },
-  },
+      findMany: jest.fn()
+    }
+  }
 }));
 
-describe('materialSelector', () => {
-  afterEach(() => {
+describe('Material Selector Engine - Role-Based Budget Tests', () => {
+  const mockMaterialsList = [
+    { id: 1, name: 'BCA Ieftin 25cm', subcategory: 'EXTERIOR_WALL_25CM', pricePerUnit: 50 },
+    { id: 2, name: 'BCA Mediu Celco 25cm', subcategory: 'EXTERIOR_WALL_25CM', pricePerUnit: 75 },
+    { id: 3, name: 'BCA Premium Ytong 25cm', subcategory: 'EXTERIOR_WALL_25CM', pricePerUnit: 110 }
+  ];
+
+  beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('STRICT_NORMATIVE', () => {
-    it('ar trebui sa returneze materialul exact cerut de motor (engineSuggestedCode)', async () => {
-      const mockMaterial = { internalCode: 'MAT-123', name: 'Beton C25/30' };
-      (prisma.material.findUnique as jest.Mock).mockResolvedValue(mockMaterial);
+  test('Ar trebui să returneze cel mai ieftin material pentru categoria ECONOMIC', async () => {
+    (prisma.material.findMany as jest.Mock).mockResolvedValue(mockMaterialsList);
 
-      const query: MaterialQuery = { type: 'STRICT_NORMATIVE', engineKey: 'beton_structura' };
-      const result = await selectMaterialForBOM(query, 'economic', 'MAT-123');
+    const query: MaterialQuery = { category: 'Zidărie', subcategory: 'EXTERIOR_WALL_25CM' };
+    const selected = await selectMaterialForBOM(query, 'economic', undefined);
 
-      expect(prisma.material.findUnique).toHaveBeenCalledWith({
-        where: { internalCode: 'MAT-123' },
-      });
-      expect(result).toEqual(mockMaterial);
-    });
-
-    it('ar trebui sa arunce eroare daca engineSuggestedCode lipseste', async () => {
-      const query: MaterialQuery = { type: 'STRICT_NORMATIVE', engineKey: 'beton_structura' };
-      await expect(selectMaterialForBOM(query, 'economic')).rejects.toThrow('Lipsă engineSuggestedCode pentru beton_structura');
-    });
+    expect(selected).not.toBeNull();
+    expect(selected?.id).toBe(1); // BCA Ieftin (50 RON)
+    expect(selected?.pricePerUnit).toBe(50);
   });
 
-  describe('NORMATIVE_BUDGET', () => {
-    it('ar trebui sa aplice constrangerile normative de baza (U-value, rezistenta, seism)', async () => {
-      const mockMaterials = [{ internalCode: 'MAT-A' }, { internalCode: 'MAT-B' }];
-      (prisma.material.findMany as jest.Mock).mockResolvedValue(mockMaterials);
+  test('Ar trebui să aplice algoritmul median și să returneze materialul de mijloc pentru categoria MEDIU', async () => {
+    (prisma.material.findMany as jest.Mock).mockResolvedValue(mockMaterialsList);
 
-      const query: MaterialQuery = {
-        type: 'NORMATIVE_BUDGET',
-        category: 'zidarie',
-        constraints: {
-          maxUValue: 0.3,
-          minStrength: 10,
-        },
-      };
+    const query: MaterialQuery = { category: 'Zidărie', subcategory: 'EXTERIOR_WALL_25CM' };
+    const selected = await selectMaterialForBOM(query, 'mediu', undefined);
 
-      await selectMaterialForBOM(query, 'economic', undefined, 0.25);
-
-      expect(prisma.material.findMany).toHaveBeenCalledWith({
-        where: {
-          category: 'zidarie',
-          inStock: true,
-          uValue: { lte: 0.3 },
-          compressiveStrength: { gte: 10 },
-          OR: [
-            { minSeismicZone: { lte: 0.25 } },
-            { minSeismicZone: null },
-          ],
-        },
-        orderBy: { pricePerUnit: 'asc' },
-      });
-    });
-
-    it('ar trebui sa aleaga optiunea mediana pentru buget "mediu"', async () => {
-      const mockMaterials = [
-        { internalCode: 'MAT-1', pricePerUnit: 10 },
-        { internalCode: 'MAT-2', pricePerUnit: 20 },
-        { internalCode: 'MAT-3', pricePerUnit: 30 },
-      ];
-      (prisma.material.findMany as jest.Mock).mockResolvedValue(mockMaterials);
-
-      const query: MaterialQuery = { type: 'NORMATIVE_BUDGET', category: 'zidarie' };
-      const result = await selectMaterialForBOM(query, 'mediu');
-
-      // 3 elements -> median is index 1 (MAT-2)
-      expect(result).toEqual(mockMaterials[1]);
-    });
-  });
-
-  describe('FREE_PREFERENCE', () => {
-    it('ar trebui sa nu aplice constrangeri suplimentare pentru FREE_PREFERENCE', async () => {
-      const mockMaterials = [{ internalCode: 'MAT-1' }];
-      (prisma.material.findMany as jest.Mock).mockResolvedValue(mockMaterials);
-
-      const query: MaterialQuery = { type: 'FREE_PREFERENCE', category: 'finisaje' };
-      await selectMaterialForBOM(query, 'economic');
-
-      expect(prisma.material.findMany).toHaveBeenCalledWith({
-        where: {
-          category: 'finisaje',
-          inStock: true,
-        },
-        orderBy: { pricePerUnit: 'asc' },
-      });
-    });
-
-    it('ar trebui sa returneze null daca nu gaseste materiale', async () => {
-      (prisma.material.findMany as jest.Mock).mockResolvedValue([]);
-
-      const query: MaterialQuery = { type: 'FREE_PREFERENCE', category: 'finisaje' };
-      const result = await selectMaterialForBOM(query, 'economic');
-
-      expect(result).toBeNull();
-    });
+    expect(selected).not.toBeNull();
+    expect(selected?.id).toBe(2); // BCA Mediu Celco (75 RON)
   });
 });

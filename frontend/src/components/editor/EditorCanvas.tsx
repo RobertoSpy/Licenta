@@ -233,7 +233,7 @@ export const EditorCanvas: React.FC<Props> = ({ width, height, stageRef }) => {
                   height={el.height}
                   fill={fill}
                   stroke={isSelected ? '#ef4444' : stroke}
-                  strokeWidth={isSelected ? 2.5 : 1.5}
+                  strokeWidth={isSelected ? 4 : 3}
                   dash={isTerasa ? [6, 4] : undefined}
                   cornerRadius={isTerasa ? 0 : 6}
                   shadowEnabled={!isTerasa}

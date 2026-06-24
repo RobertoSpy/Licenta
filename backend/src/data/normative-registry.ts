@@ -64,10 +64,10 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
       /Anexa\s*B/i, // spectrul de răspuns elastic — valori numerice pure
     ],
     agentRules: [
-      { pattern: /amplasament|zonare|teritoriu|județ|localitate|hartă/i,          agent: 'seismic' },
-      { pattern: /regularitate|simetrie|clasa de importanță|factor.*importanță/i,  agent: 'architectural' },
-      { pattern: /zidărie|beton armat|ductilitate|DCH|DCM|ZIA|ZNA|ZC|armare/i,    agent: 'structural' },
-      { pattern: /fundație|teren de fundare|litologie|stratificare/i,              agent: 'geotehnic' },
+      { pattern: /amplasament|zonare|teritoriu|județ|localitate|hartă/i, agent: 'seismic' },
+      { pattern: /regularitate|simetrie|clasa de importanță|factor.*importanță/i, agent: 'architectural' },
+      { pattern: /zidărie|beton armat|ductilitate|DCH|DCM|ZIA|ZNA|ZC|armare/i, agent: 'structural' },
+      { pattern: /fundație|teren de fundare|litologie|stratificare/i, agent: 'geotehnic' },
     ],
   },
 
@@ -78,7 +78,7 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
     ],
     agentRules: [
       { pattern: /identificare.*sol|tip.*teren|argilos|nisipos|pietros|stâncos|coeziv/i, agent: 'geotehnic' },
-      { pattern: /fundație|adâncime.*fundare|presiune.*teren|capacitate portantă/i,       agent: 'geotehnic' },
+      { pattern: /fundație|adâncime.*fundare|presiune.*teren|capacitate portantă/i, agent: 'geotehnic' },
     ],
   },
 
@@ -86,10 +86,10 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
     defaultAgent: 'structural',
     skipPatterns: [], // CR6 este 100% text tehnic — nimic nu e în JSON
     agentRules: [
-      { pattern: /zidărie nearmată|ZNA/i,                                          agent: 'structural' },
-      { pattern: /zidărie confinată|ZC\b/i,                                        agent: 'structural' },
-      { pattern: /zidărie cu inimă armată|ZIA/i,                                   agent: 'structural' },
-      { pattern: /grosime.*perete|perete.*structural|dimensionare/i,               agent: 'structural' },
+      { pattern: /zidărie nearmată|ZNA/i, agent: 'structural' },
+      { pattern: /zidărie confinată|ZC\b/i, agent: 'structural' },
+      { pattern: /zidărie cu inimă armată|ZIA/i, agent: 'structural' },
+      { pattern: /grosime.*perete|perete.*structural|dimensionare/i, agent: 'structural' },
     ],
   },
 
@@ -100,8 +100,8 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
       // Clase de expunere XF = îngheț/dezgheț → routing explicit la structural
       // (bomService.ts folosește frostDepthCm deterministic, RAG explică de ce)
       { pattern: /beton|armătură|cofraj|turnare|rezistență caracteristică|clasa.*beton|C\d{2}/i, agent: 'structural' },
-      { pattern: /expunere.*îngheț|XF\d|XC\d|mediu agresiv|durabilitate/i,                      agent: 'structural' },
-      { pattern: /fundație|radier|subsol/i,                                                       agent: 'geotehnic' },
+      { pattern: /expunere.*îngheț|XF\d|XC\d|mediu agresiv|durabilitate/i, agent: 'structural' },
+      { pattern: /fundație|radier|subsol/i, agent: 'geotehnic' },
     ],
   },
 
@@ -111,8 +111,8 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
       /Anexa\s*A/i, // tabelul qb/vb per județ — e în wind-zones.json
     ],
     agentRules: [
-      { pattern: /categori.*teren|rugozitate|expunere la vânt/i,                   agent: 'architectural' },
-      { pattern: /acoperiș|suțiune|smulgere|coeficient.*presiune|cpe\b|cpj\b/i,   agent: 'structural' },
+      { pattern: /categori.*teren|rugozitate|expunere la vânt/i, agent: 'architectural' },
+      { pattern: /acoperiș|suțiune|smulgere|coeficient.*presiune|cpe\b|cpj\b/i, agent: 'structural' },
     ],
   },
 
@@ -120,7 +120,7 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
     defaultAgent: 'legal',
     skipPatterns: [],
     agentRules: [
-      { pattern: /suprafață|cameră|living|dormitor|baie|bucătărie|hol|debara/i,    agent: 'legal' },
+      { pattern: /suprafață|cameră|living|dormitor|baie|bucătărie|hol|debara/i, agent: 'legal' },
     ],
   },
 
@@ -132,7 +132,7 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
       // AC = Autorizație de Construire
       { pattern: /autorizație|certificat.*urbanism|aviz|DTAC|\bAC\b|construire|demolare/i, agent: 'legal' },
       // Art. 11 — lucrări care nu necesită autorizație (garduri, reparații minore etc.)
-      { pattern: /excepții|fără.*autorizație|art.*11|lucrări.*scutite/i,                   agent: 'legal' },
+      { pattern: /excepții|fără.*autorizație|art.*11|lucrări.*scutite/i, agent: 'legal' },
     ],
   },
 
@@ -143,7 +143,7 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
       // Cele 6 cerințe fundamentale — text explicativ, nu date numerice
       { pattern: /cerință.*fundamentală|rezistență mecanică|securitate.*incendiu|igienă|sănătate|zgomot|economie.*energie/i, agent: 'legal' },
       // Responsabilități tehnice → routing la structural (diriginte, ISC, carte tehnică)
-      { pattern: /diriginte.*șantier|responsabil.*tehnic|recepție|carte.*tehnică|\bISC\b|verificator.*proiect/i,           agent: 'structural' },
+      { pattern: /diriginte.*șantier|responsabil.*tehnic|recepție|carte.*tehnică|\bISC\b|verificator.*proiect/i, agent: 'structural' },
     ],
   },
 
@@ -151,8 +151,8 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
     defaultAgent: 'geotehnic',
     skipPatterns: [],
     agentRules: [
-      { pattern: /studiu geotehnic|raport geotehnic|investigație|foraj|sondaj/i,   agent: 'geotehnic' },
-      { pattern: /risc geotehnic|categorie geotehnică/i,                           agent: 'geotehnic' },
+      { pattern: /studiu geotehnic|raport geotehnic|investigație|foraj|sondaj/i, agent: 'geotehnic' },
+      { pattern: /risc geotehnic|categorie geotehnică/i, agent: 'geotehnic' },
     ],
   },
 
@@ -162,8 +162,8 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
     defaultAgent: 'architectural',
     skipPatterns: [],
     agentRules: [
-      { pattern: /POT|CUT|ocupare.*teren|utilizare.*teren|procent.*ocupare/i,              agent: 'architectural' },
-      { pattern: /aliniere|retragere|regim.*înălțime|zonă.*teren|front.*stradal/i,         agent: 'architectural' },
+      { pattern: /POT|CUT|ocupare.*teren|utilizare.*teren|procent.*ocupare/i, agent: 'architectural' },
+      { pattern: /aliniere|retragere|regim.*înălțime|zonă.*teren|front.*stradal/i, agent: 'architectural' },
       { pattern: /PUG|PUZ|PUD|plan urbanistic|regulament.*urbanism|amenajare.*teritoriu/i, agent: 'legal' },
     ],
   },
@@ -174,10 +174,10 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
     defaultAgent: 'architectural',
     skipPatterns: [],
     agentRules: [
-      { pattern: /evacuare|timp.*evacuare|traseu.*evacuare|scară.*evacuare/i,              agent: 'architectural' },
-      { pattern: /compartiment.*incendiu|rezistență la foc|\bREI\b|\bR\s*\d+/i,           agent: 'structural' },
-      { pattern: /instalație.*stingere|sprinkler|detector.*fum|alarmă.*incendiu/i,         agent: 'structural' },
-      { pattern: /risc.*incendiu|categorie.*pericol|densitate.*sarcinii termice/i,          agent: 'architectural' },
+      { pattern: /evacuare|timp.*evacuare|traseu.*evacuare|scară.*evacuare/i, agent: 'architectural' },
+      { pattern: /compartiment.*incendiu|rezistență la foc|\bREI\b|\bR\s*\d+/i, agent: 'structural' },
+      { pattern: /instalație.*stingere|sprinkler|detector.*fum|alarmă.*incendiu/i, agent: 'structural' },
+      { pattern: /risc.*incendiu|categorie.*pericol|densitate.*sarcinii termice/i, agent: 'architectural' },
     ],
   },
 
@@ -186,9 +186,9 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
     defaultAgent: 'architectural',
     skipPatterns: [],
     agentRules: [
-      { pattern: /rampă|pantă|lățime.*coridor|accesibilitate|handicap|dizabilită/i,       agent: 'architectural' },
-      { pattern: /baie.*accesibil|grup.*sanitar|wc.*dizabilitat/i,                       agent: 'architectural' },
-      { pattern: /dimensiuni.*uși|ușă.*accesibil|trecere.*liberă/i,                       agent: 'architectural' },
+      { pattern: /rampă|pantă|lățime.*coridor|accesibilitate|handicap|dizabilită/i, agent: 'architectural' },
+      { pattern: /baie.*accesibil|grup.*sanitar|wc.*dizabilitat/i, agent: 'architectural' },
+      { pattern: /dimensiuni.*uși|ușă.*accesibil|trecere.*liberă/i, agent: 'architectural' },
     ],
   },
 
@@ -200,11 +200,11 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
     defaultAgent: 'architectural',
     skipPatterns: [],
     agentRules: [
-      { pattern: /zonă.*zi|zonă.*noapte|zona de zi|zona de noapte|separare.*funcțional/i,  agent: 'architectural' },
-      { pattern: /circulație|distribuție|hol|antreu|coridor|acces/i,                       agent: 'architectural' },
-      { pattern: /iluminare naturală|ventilare naturală|orientare.*cameră/i,               agent: 'architectural' },
-      { pattern: /suprafață.*cameră|suprafață minimă|aria utilă|mp minim/i,                agent: 'legal' },
-      { pattern: /dormitor|living|bucătărie|baie|salon|sufragerie/i,                      agent: 'legal' },
+      { pattern: /zonă.*zi|zonă.*noapte|zona de zi|zona de noapte|separare.*funcțional/i, agent: 'architectural' },
+      { pattern: /circulație|distribuție|hol|antreu|coridor|acces/i, agent: 'architectural' },
+      { pattern: /iluminare naturală|ventilare naturală|orientare.*cameră/i, agent: 'architectural' },
+      { pattern: /suprafață.*cameră|suprafață minimă|aria utilă|mp minim/i, agent: 'legal' },
+      { pattern: /dormitor|living|bucătărie|baie|salon|sufragerie/i, agent: 'legal' },
     ],
   },
 
@@ -289,30 +289,30 @@ export const NORMATIVE_REGISTRY: Record<string, NormativeConfig> = {
 // ─────────────────────────────────────────────────────────────────
 
 export const NORMATIVE_FILES: Record<string, string> = {
-  'P100-1-2013':   'cod-de-proiectare-seismic-indicativ-P100-1-2013.md',
-  'NP112-2014':    'III_26_NP_112_2014.md',
-  'CR6-2013':      'V_9_3_CR_6_2013.md',
-  'NE012-1-2022':  'Monitorul Oficial Partea I nr. 53Bis - Ordin + anexa__NE 012-1-2022.md',
-  'CR1-1-4-2012':  'CR-1-1-4-2012.md',
+  'P100-1-2013': 'cod-de-proiectare-seismic-indicativ-P100-1-2013.md',
+  'NP112-2014': 'III_26_NP_112_2014.md',
+  'CR6-2013': 'V_9_3_CR_6_2013.md',
+  'NE012-1-2022': 'Monitorul Oficial Partea I nr. 53Bis - Ordin + anexa__NE 012-1-2022.md',
+  'CR1-1-4-2012': 'CR-1-1-4-2012.md',
   'Legea114-1996': 'Legea_locuintei (2).md',
-  'Legea50-1991':  'Lege 50 1991(r2).md',
-  'Legea10-1995':  'Lege 10 1995.md',
-  'NP074-2022':    'NP_074-2022_.md',
+  'Legea50-1991': 'Lege 50 1991(r2).md',
+  'Legea10-1995': 'Lege 10 1995.md',
+  'NP074-2022': 'NP_074-2022_.md',
   'Legea350-2001': 'Lege 350 2001.md',
-  'P118-99':       'P118-99.md',
-  'NP051-2012':    '17_23_NP_051_2012.md',
-  'NP057-2002':    '17_18_NP_057_2002.md',
-  'I9-2022':       '45 NORMATIV I9 - 2022.md',
-  'I7-2011':       'Normativ-pentru-proiectarea-executia-si-exploatarea-instalatiilor-electrice-aferente-cladirilor-indicativ-I-7-2011.md',
-  'MC001-2022':         'Mc-001-2022-Metodologie-calcul-performanta-energetica-cladiri.md',
-  'Legea372-2005':      'legea-nr-372-2005-privind-performanta-energetica-a-cladirilor.md',
+  'P118-99': 'P118-99.md',
+  'NP051-2012': '17_23_NP_051_2012.md',
+  'NP057-2002': '17_18_NP_057_2002.md',
+  'I9-2022': '45 NORMATIV I9 - 2022.md',
+  'I7-2011': 'Normativ-pentru-proiectarea-executia-si-exploatarea-instalatiilor-electrice-aferente-cladirilor-indicativ-I-7-2011.md',
+  'MC001-2022': 'Mc-001-2022-Metodologie-calcul-performanta-energetica-cladiri.md',
+  'Legea372-2005': 'legea-nr-372-2005-privind-performanta-energetica-a-cladirilor.md',
   // Agent Financial — buletine INSSE și indici cost
-  'BULETIN-INSSE-2021':     'buletin_decembrie_2021.txt',
+  'BULETIN-INSSE-2021': 'buletin_decembrie_2021.txt',
   'BULETIN-INSSE-2022-IUN': 'buletin_iunie_2022.txt',
   'BULETIN-INSSE-2022-IUL': 'buletin_iulie_2022.txt',
-  'BULETIN-INSSE-2026':     'buletin_martie_2026.txt',
-  'INDICII-COST':           'Indicii-cost-in-constructii.md',
-  'ANEXE-4':                'ANEXE-4.md',
+  'BULETIN-INSSE-2026': 'buletin_martie_2026.txt',
+  'INDICII-COST': 'Indicii-cost-in-constructii.md',
+  'ANEXE-4': 'ANEXE-4.md',
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -331,41 +331,41 @@ export type BuildingPurpose = 'residential' | 'commercial' | 'mixed';
 export const AGENT_SOURCES_BY_PURPOSE: Record<BuildingPurpose, Record<AgentType, string[]>> = {
   residential: {
     architectural: ['CR1-1-4-2012', 'Legea350-2001', 'NP051-2012', 'NP057-2002', 'P118-99'],
-    legal:         ['Legea114-1996', 'Legea50-1991', 'Legea10-1995', 'NP057-2002'],
-    structural:    ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012', 'P118-99'],
-    seismic:       ['P100-1-2013'],
-    geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
-    general:       ACTIVE_SOURCES,
-    energetic:     ['MC001-2022', 'Legea372-2005'],
-    instalatii:    ['I9-2022', 'I7-2011'],
-    materiale:     [],
-    deviz:         [],
-    financial:     ['BULETIN-INSSE-2021', 'BULETIN-INSSE-2022-IUN', 'BULETIN-INSSE-2022-IUL', 'BULETIN-INSSE-2026', 'INDICII-COST', 'ANEXE-4'],
+    legal: ['Legea114-1996', 'Legea50-1991', 'Legea10-1995', 'NP057-2002'],
+    structural: ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012', 'P118-99'],
+    seismic: ['P100-1-2013'],
+    geotehnic: ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
+    general: ACTIVE_SOURCES,
+    energetic: ['MC001-2022', 'Legea372-2005'],
+    instalatii: ['I9-2022', 'I7-2011'],
+    materiale: [],
+    deviz: [],
+    financial: ['BULETIN-INSSE-2021', 'BULETIN-INSSE-2022-IUN', 'BULETIN-INSSE-2022-IUL', 'BULETIN-INSSE-2026', 'INDICII-COST', 'ANEXE-4'],
   },
   commercial: {
     architectural: ['CR1-1-4-2012', 'P100-1-2013', 'Legea350-2001', 'P118-99', 'NP051-2012'],
-    legal:         ['Legea50-1991', 'Legea10-1995'],
-    structural:    ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012', 'P118-99'],
-    seismic:       ['P100-1-2013'],
-    geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
-    general:       ACTIVE_SOURCES,
-    energetic:     ['MC001-2022', 'Legea372-2005'],
-    instalatii:    ['I9-2022', 'I7-2011'],
-    materiale:     [],
-    deviz:         [],
-    financial:     ['BULETIN-INSSE-2021', 'BULETIN-INSSE-2022-IUN', 'BULETIN-INSSE-2022-IUL', 'BULETIN-INSSE-2026', 'INDICII-COST', 'ANEXE-4'],
+    legal: ['Legea50-1991', 'Legea10-1995'],
+    structural: ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012', 'P118-99'],
+    seismic: ['P100-1-2013'],
+    geotehnic: ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
+    general: ACTIVE_SOURCES,
+    energetic: ['MC001-2022', 'Legea372-2005'],
+    instalatii: ['I9-2022', 'I7-2011'],
+    materiale: [],
+    deviz: [],
+    financial: ['BULETIN-INSSE-2021', 'BULETIN-INSSE-2022-IUN', 'BULETIN-INSSE-2022-IUL', 'BULETIN-INSSE-2026', 'INDICII-COST', 'ANEXE-4'],
   },
   mixed: {
     architectural: ['CR1-1-4-2012', 'P100-1-2013', 'Legea350-2001', 'P118-99', 'NP051-2012', 'NP057-2002'],
-    legal:         ['Legea114-1996', 'Legea50-1991', 'Legea10-1995', 'NP057-2002'],
-    structural:    ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012', 'P118-99'],
-    seismic:       ['P100-1-2013'],
-    geotehnic:     ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
-    general:       ACTIVE_SOURCES,
-    energetic:     ['MC001-2022', 'Legea372-2005'],
-    instalatii:    ['I9-2022', 'I7-2011'],
-    materiale:     [],
-    deviz:         [],
-    financial:     ['BULETIN-INSSE-2021', 'BULETIN-INSSE-2022-IUN', 'BULETIN-INSSE-2022-IUL', 'BULETIN-INSSE-2026', 'INDICII-COST', 'ANEXE-4'],
+    legal: ['Legea114-1996', 'Legea50-1991', 'Legea10-1995', 'NP057-2002'],
+    structural: ['CR6-2013', 'NE012-1-2022', 'P100-1-2013', 'CR1-1-4-2012', 'P118-99'],
+    seismic: ['P100-1-2013'],
+    geotehnic: ['NP112-2014', 'NP074-2022', 'P100-1-2013'],
+    general: ACTIVE_SOURCES,
+    energetic: ['MC001-2022', 'Legea372-2005'],
+    instalatii: ['I9-2022', 'I7-2011'],
+    materiale: [],
+    deviz: [],
+    financial: ['BULETIN-INSSE-2021', 'BULETIN-INSSE-2022-IUN', 'BULETIN-INSSE-2022-IUL', 'BULETIN-INSSE-2026', 'INDICII-COST', 'ANEXE-4'],
   },
 };

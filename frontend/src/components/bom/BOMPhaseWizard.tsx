@@ -4,7 +4,7 @@
 // Layout: bara de progres verticală (stânga) + BOMPhaseCard (dreapta).
 
 import { useState, useCallback } from 'react';
-import { CheckCircle2, Lock, Circle, PartyPopper, Download, Home, Briefcase } from 'lucide-react';
+import { CheckCircle2, Lock, Circle, PartyPopper, Download, Home, Briefcase, Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { api, apiPrivate } from '../../api/axios';
@@ -56,6 +56,7 @@ export const BOMPhaseWizard = ({
   // Faza vizuală locală — poate fi diferită de cea activă din DB
   // (utilizatorul poate naviga înapoi la etape confirmate)
   const [localActivePhase, setLocalActivePhase] = useState<BomPhaseKey | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const navigate = useNavigate();
 
   const handleDownloadPDF = async () => {
@@ -211,13 +212,30 @@ export const BOMPhaseWizard = ({
   }
 
   return (
-    <div className="grid grid-cols-[200px_1fr] gap-6 items-start">
+    <div className="flex gap-6 items-start relative">
 
       {/* ── Bara de progres verticală ── */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-4 sticky top-4">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 px-2">
-          Etape Construcție
-        </p>
+      <AnimatePresence initial={false}>
+        {isSidebarOpen && (
+          <motion.div
+            initial={{ width: 0, opacity: 0, marginLeft: -24 }}
+            animate={{ width: 220, opacity: 1, marginLeft: 0 }}
+            exit={{ width: 0, opacity: 0, marginLeft: -24 }}
+            transition={{ duration: 0.3 }}
+            className="shrink-0 overflow-hidden"
+          >
+            <div className="w-[220px] bg-white rounded-3xl border border-slate-100 shadow-sm p-4 sticky top-4">
+              <div className="flex items-center justify-between mb-4 px-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Etape Construcție
+                </p>
+                <button
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
         <div className="space-y-1">
           {PHASE_CONFIG.map((phase) => {
@@ -277,8 +295,22 @@ export const BOMPhaseWizard = ({
           </p>
         </div>
       </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* ── Card etapă activă ── */}
+      <div className="flex-1 min-w-0">
+        {!isSidebarOpen && (
+          <button 
+            onClick={() => setIsSidebarOpen(true)} 
+            className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-buildorange transition-colors bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 w-max"
+          >
+            <Menu className="w-4 h-4" />
+            <span>Afișează etapele</span>
+          </button>
+        )}
+
+        {/* ── Card etapă activă ── */}
       <AnimatePresence mode="wait">
         <motion.div
           key={effectiveActivePhase}
@@ -305,6 +337,7 @@ export const BOMPhaseWizard = ({
           )}
         </motion.div>
       </AnimatePresence>
+      </div>
       <div className="hidden">
         {/* Render BOMAdvisorChat invisibly just to hook up the chat logic and screen tutor.
             Usually it's rendered by the layout, but we need it here for canGoNext.

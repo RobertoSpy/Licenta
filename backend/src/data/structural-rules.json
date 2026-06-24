@@ -1,0 +1,61 @@
+{
+  "seismicRules": [
+    {
+      "agMin": 0.35,
+      "ductilityClass": "DCH",
+      "multiplier": 1.60
+    },
+    {
+      "agMin": 0.30,
+      "ductilityClass": "DCH",
+      "multiplier": 1.45
+    },
+    {
+      "agMin": 0.25,
+      "ductilityClass": "DCH",
+      "multiplier": 1.30
+    },
+    {
+      "agMin": 0.20,
+      "ductilityClass": "DCM",
+      "multiplier": 1.15
+    },
+    {
+      "agMin": 0.10,
+      "ductilityClass": "DCM",
+      "multiplier": 1.05
+    },
+    {
+      "agMin": 0,
+      "ductilityClass": "DCL",
+      "multiplier": 1.00
+    }
+  ],
+  "soilRules": [
+    {
+      "patternStr": "argi|lut|loess|loes|plastic|curgator|curgător",
+      "concreteMult": 1.35
+    },
+    {
+      "patternStr": "praf|mlastin|mlaștinos|turb|umpl|umplut|compresibil",
+      "concreteMult": 1.25
+    },
+    {
+      "patternStr": "nisip|nisipos",
+      "concreteMult": 1.10
+    },
+    {
+      "patternStr": "pietri|bolovan|balast|granular",
+      "concreteMult": 1.00
+    },
+    {
+      "patternStr": "stanc|stânc|roc|granit|calcar|bazalt",
+      "concreteMult": 0.90
+    }
+  ],
+  "constants": {
+    "basementDepthM": 2.80,
+    "basementSqmCoefficient": 0.50,
+    "defaultSoilConcreteMult": 1.05
+  }
+}

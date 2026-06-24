@@ -18,19 +18,19 @@ const containerVariants = {
 
 const cardVariants = {
   hidden: { opacity: 0, scale: 0.9, y: 20 },
-  visible: { 
-    opacity: 1, 
-    scale: 1, 
+  visible: {
+    opacity: 1,
+    scale: 1,
     y: 0,
-    transition: { 
-      type: "spring" as const, 
-      stiffness: 300, 
-      damping: 20, 
-      mass: 0.8 
+    transition: {
+      type: "spring" as const,
+      stiffness: 300,
+      damping: 20,
+      mass: 0.8
     }
   },
-  whileHover: { 
-    scale: 1.02, 
+  whileHover: {
+    scale: 1.02,
     y: -5,
     transition: { type: "spring" as const, stiffness: 400, damping: 10 }
   },
@@ -55,7 +55,7 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
   };
 
   return (
-    <motion.div 
+    <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -67,7 +67,7 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        
+
         {/* Style Selection - Staggered Cards */}
         <section className="space-y-6">
           <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -81,11 +81,10 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
                 whileHover="whileHover"
                 whileTap="whileTap"
                 onClick={() => updateData({ houseStyle: style.id })}
-                className={`p-5 rounded-2xl border-2 cursor-pointer transition-colors relative overflow-hidden ${
-                  data.houseStyle === style.id 
-                  ? 'border-indigo-600 bg-indigo-50/50' 
-                  : 'border-slate-100 hover:border-slate-200 bg-white'
-                }`}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-colors relative overflow-hidden ${data.houseStyle === style.id
+                    ? 'border-indigo-600 bg-indigo-50/50'
+                    : 'border-slate-100 hover:border-slate-200 bg-white'
+                  }`}
               >
                 <div className="flex justify-between items-start">
                   <div>
@@ -108,7 +107,7 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
           <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <Building2 className="w-5 h-5 text-amber-600" /> 2. Regim de Înălțime
           </h3>
-          
+
           <div className="bg-white border border-slate-200 rounded-3xl p-8 space-y-8">
             {/* Basement Toggle */}
             <div className="flex items-center justify-between">
@@ -116,11 +115,11 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
                 <h4 className="font-bold text-slate-900">Subsol Tehnic</h4>
                 <p className="text-xs text-slate-500">Recomandat pentru spații de depozitare sau garaj.</p>
               </div>
-              <button 
+              <button
                 onClick={toggleBasement}
                 className={`w-14 h-8 rounded-full transition-colors relative ${data.hasBasement ? 'bg-amber-500' : 'bg-slate-200'}`}
               >
-                <motion.div 
+                <motion.div
                   animate={{ x: data.hasBasement ? 24 : 4 }}
                   className="w-6 h-6 bg-white rounded-full absolute top-1 shadow-sm"
                 />
@@ -133,7 +132,7 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
                 <h4 className="font-bold text-slate-900 text-sm italic opacity-70">Niveluri supraterane:</h4>
                 <span className="text-xs font-bold text-slate-400">Limită locală: P + {maxFloors - 1}</span>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-3">
                 {[0, 1].map((count) => {
                   const total = 1 + count;
@@ -145,19 +144,18 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
                       key={count}
                       disabled={isBlocked}
                       onClick={() => setUpperFloors(count)}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all relative ${
-                        isActive 
-                        ? 'border-amber-500 bg-amber-50 text-amber-900' 
-                        : isBlocked 
-                        ? 'border-slate-50 bg-slate-50 opacity-40 cursor-not-allowed'
-                        : 'border-slate-100 hover:border-slate-200 text-slate-600'
-                      }`}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all relative ${isActive
+                          ? 'border-amber-500 bg-amber-50 text-amber-900'
+                          : isBlocked
+                            ? 'border-slate-50 bg-slate-50 opacity-40 cursor-not-allowed'
+                            : 'border-slate-100 hover:border-slate-200 text-slate-600'
+                        }`}
                     >
                       <span className="text-lg font-black">{count === 0 ? 'P' : `P+${count}`}</span>
                       <span className="text-[10px] font-bold uppercase tracking-widest text-center">{count === 0 ? 'Doar parter' : 'Parter + 1 etaj'}</span>
                       {isBlocked && (
                         <div className="absolute -top-1.5 -right-1.5">
-                           <AlertCircle className="w-4 h-4 text-slate-400 fill-white bg-white rounded-full" />
+                          <AlertCircle className="w-4 h-4 text-slate-400 fill-white bg-white rounded-full" />
                         </div>
                       )}
                     </button>
@@ -170,7 +168,7 @@ export const Step4HouseType = ({ data, updateData }: Props) => {
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex gap-3">
               <Info className="w-5 h-5 text-slate-400 shrink-0" />
               <p className="text-xs text-slate-500 leading-relaxed">
-                Configurația aleasă va genera automat structura devizului de materiale necesare pentru rezistență. 
+                Configurația aleasă va genera automat structura devizului de materiale necesare pentru rezistență.
                 Opțiunile indisponibile sunt filtrate pe baza analizei seismice de la pasul anterior.
               </p>
             </div>

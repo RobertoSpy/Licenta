@@ -4,12 +4,12 @@ export type BomPhaseKey =
   | 'fundatie'
   | 'structura'
   | 'planseu'
-  | 'termoizolatie'
   | 'acoperis'
-  | 'tamplarie'
-  | 'instalatii'
   | 'finisaje'
-  | 'exterior';
+  | 'tamplarie'
+  | 'termoizolatie'
+  | 'instalatii_electrice'
+  | 'instalatii_sanitare';
 
 export type BomPhaseState = {
   activePhase: BomPhaseKey;

@@ -10,6 +10,8 @@ export default function QuoteRequestsList() {
  const [quotes, setQuotes] = useState<Quote[]>([]);
  const [loading, setLoading] = useState(true);
  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+ const [page, setPage] = useState(1);
+ const [totalPages, setTotalPages] = useState(1);
 
  // Formular trimitere ofertă
  const [totalAmount, setTotalAmount] = useState<string>('');
@@ -29,13 +31,18 @@ export default function QuoteRequestsList() {
 
  useEffect(() => {
  fetchQuotes();
- }, []);
+ }, [page]);
 
  const fetchQuotes = async () => {
  setLoading(true);
  try {
- const data = await quoteApi.getContractorQuotes();
- setQuotes(data);
+ const res = await quoteApi.getContractorQuotes(page, 20);
+ if (res?.data) {
+   setQuotes(res.data);
+   setTotalPages(res.pagination?.totalPages || 1);
+ } else {
+   setQuotes(res as any);
+ }
  } catch (err) {
  console.error(err);
  } finally {
@@ -129,6 +136,31 @@ export default function QuoteRequestsList() {
  </div>
  ))}
  </div>
+
+  {/* Pagination for Quotes */}
+  {totalPages > 1 && (
+    <div className="flex justify-between items-center mt-4">
+      <span className="text-xs text-slate-500 font-medium">
+        Pagina {page} din {totalPages}
+      </span>
+      <div className="flex gap-2">
+        <button
+          disabled={page === 1}
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+          className="px-3 py-1 bg-white border border-slate-200 rounded text-xs font-medium text-slate-700 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+        >
+          Înapoi
+        </button>
+        <button
+          disabled={page === totalPages}
+          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          className="px-3 py-1 bg-white border border-slate-200 rounded text-xs font-medium text-slate-700 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+        >
+          Înainte
+        </button>
+      </div>
+    </div>
+  )}
 
  {/* Vizualizare și Ofertare */}
  <div className="lg:col-span-2">

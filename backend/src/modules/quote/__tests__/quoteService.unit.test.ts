@@ -349,7 +349,7 @@ describe('Quote Service Unit Tests', () => {
       prismaMock.contractorQuote.findMany.mockResolvedValue([{ id: 1 }] as any);
 
       const result = await quoteService.getQuotesForContractor(100);
-      expect(result.length).toBe(1);
+      expect(result.data.length).toBe(1);
       expect(prismaMock.contractorQuote.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { contractorId: 50 } })
       );

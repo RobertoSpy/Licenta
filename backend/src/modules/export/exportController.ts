@@ -4,7 +4,7 @@ import { exportService } from './exportService';
 export const exportController = {
   async generatePlanPdf(req: Request, res: Response): Promise<void> {
     const projectId = parseInt(req.params['projectId'] as string);
-    const { planPngBase64 } = req.body as { planPngBase64?: string };
+    const { planPngBase64, activeFloor } = req.body as { planPngBase64?: string; activeFloor?: string };
 
     if (isNaN(projectId)) {
       res.status(400).json({ error: 'projectId invalid' });
@@ -14,7 +14,8 @@ export const exportController = {
     try {
       const result = await exportService.generatePlanPdf(
         projectId,
-        planPngBase64 ?? null
+        planPngBase64 ?? null,
+        activeFloor ?? 'parter'
       );
 
       if (!result) {

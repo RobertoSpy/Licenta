@@ -45,8 +45,8 @@ export const quoteApi = {
   },
 
   // --- CONSTRUCTORI ---
-  getContractorQuotes: async (): Promise<Quote[]> => {
-    const { data } = await apiPrivate.get('/quotes/contractor');
+  getContractorQuotes: async (page: number = 1, limit: number = 20): Promise<any> => {
+    const { data } = await apiPrivate.get('/quotes/contractor', { params: { page, limit } });
     return data;
   },
 

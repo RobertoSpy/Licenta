@@ -1,9 +1,36 @@
 import { Material } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
-
 export const materialRepository = {
-  async findAll(): Promise<Material[]> {
-    return prisma.material.findMany();
+  async findAll(page: number = 1, limit: number = 20, category?: string, subcategory?: string, search?: string) {
+    const where: any = {};
+    if (category) where.category = category;
+    if (subcategory) where.subcategory = subcategory;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { internalCode: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const total = await prisma.material.count({ where });
+    const skip = (page - 1) * limit;
+
+    const data = await prisma.material.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { name: 'asc' }
+    });
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   },
 
   async findByInternalCodeWithAlternatives(internalCode: string) {

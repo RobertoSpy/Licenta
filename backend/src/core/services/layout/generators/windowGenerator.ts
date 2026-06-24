@@ -46,7 +46,7 @@ export function generateWindows(
 
         const touchesWall = Math.abs(line.y1 - roomBBox.y) < thresholdM || Math.abs(line.y1 - (roomBBox.y + roomBBox.h)) < thresholdM;
         if (touchesWall && roomBBox.x + roomBBox.w > line.x1 + thresholdM && roomBBox.x < line.x2 - thresholdM) {
-          if (preferredOrientations.length === 0 || preferredOrientations.some(o => wallOrientation.includes(o))) {
+          if (preferredOrientations.length === 0 || preferredOrientations.some(o => wallOrientation.includes(o) || o.includes(wallOrientation))) {
             const maxWinWidthM = roomBBox.w - 0.4;
             const finalWinWidthM = Math.min(Math.max(ARCHITECTURAL_STANDARDS.WINDOW.STANDARD_WIDTH, requiredWinWidthM), Math.max(0.6, maxWinWidthM));
             const winW = Math.round(finalWinWidthM * PIXELS_PER_METER);
@@ -69,7 +69,7 @@ export function generateWindows(
 
         const touchesWall = Math.abs(line.x1 - roomBBox.x) < thresholdM || Math.abs(line.x1 - (roomBBox.x + roomBBox.w)) < thresholdM;
         if (touchesWall && roomBBox.y + roomBBox.h > line.y1 + thresholdM && roomBBox.y < line.y2 - thresholdM) {
-          if (preferredOrientations.length === 0 || preferredOrientations.some(o => wallOrientation.includes(o) || (wallOrientation === 'V' && o === 'W'))) {
+          if (preferredOrientations.length === 0 || preferredOrientations.some(o => wallOrientation.includes(o) || o.includes(wallOrientation) || (wallOrientation === 'V' && o === 'W'))) {
             const maxWinWidthM = roomBBox.h - 0.4;
             const finalWinWidthM = Math.min(Math.max(ARCHITECTURAL_STANDARDS.WINDOW.STANDARD_WIDTH, requiredWinWidthM), Math.max(0.6, maxWinWidthM));
             const winH = Math.round(finalWinWidthM * PIXELS_PER_METER);

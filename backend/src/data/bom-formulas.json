@@ -48,8 +48,7 @@
     "note": "Volum săpătură mecanizată. Calculat ca suprafața amprentei la sol (mp/etaj) × adâncimea fundației × 1.2 (marjă pentru spațiu de lucru perimetral și taluzare conform NP 112-2014). Dacă proiectul are subsol, volumul crește masiv.",
     "materialQuery": {
       "type": "FREE_PREFERENCE",
-      "category": "Fundație",
-      "subcategory": "Terasamente"
+      "internalCode": "SAPATURA_MECANIZATA"
     }
   },
   "foundation_concrete": {
@@ -67,13 +66,14 @@
   "foundation_rebar": {
     "phase": "Fundație",
     "unit": "kg",
-   "formula": "perimeter_m * foundation_width_m * foundation_depth_m * base_rebar_kg_per_mc * seismic_multiplier",
+    "formula": "perimeter_m * foundation_width_m * foundation_depth_m * base_rebar_kg_per_mc * seismic_multiplier * 1.15",
     "wastePercent": 8,
     "aiSuggestible": true,
-    "note": "Cantitate armătură fundație (bare longitudinale + etrieri). base_rebar_kg_per_mc=15kg/mc conform NE012-1:2022 dozaj minim. seismic_multiplier crește cantitatea în zone DCM/DCH (P100-1/2013 Cap.8).",
+    "note": "Cantitate armătură fundație (longitudinal + etrieri). base_rebar_kg_per_mc=65kg/mc conform Eurocod 2. Multiplicator 1.15 pentru mustăți/ancoraje. seismic_multiplier crește cantitatea în zone DCM/DCH (P100-1/2013 Cap.8).",
     "materialQuery": {
-      "type": "STRICT_NORMATIVE",
-      "engineKey": "rebarCode"
+      "type": "NORMATIVE_BUDGET",
+      "category": "Fundație",
+      "subcategory": "Oțel Beton Fundație"
     }
   },
   "foundation_formwork": {
@@ -86,7 +86,7 @@
     "materialQuery": {
       "type": "FREE_PREFERENCE",
       "category": "Fundație",
-      "subcategory": "Cofraj"
+      "subcategory": "Cofraj Fundație"
     }
   },
   "wall_exterior": {
@@ -96,17 +96,42 @@
     "wastePercent": 5,
     "aiSuggestible": true,
     "note": "Zidărie exterioară. Materialul implicit este BCA 25cm; se upgradează automat la cărămidă pentru zone seismice severe sau sol slab. Se scade suprafața golurilor. Conform CR6-2013 Art.5.2.",
-    "defaultMaterialCode": "STANDARD_BCA_25",
+    "defaultRoleCode": "Zidărie BCA",
     "upgrades": [
-      { "if": { "ag_gte": 0.30 },                          "use": "CARAMIDA_POROTHERM_38", "reason": "ag≥0.30g → DCH → cărămidă groasă P100-1/2013" },
-      { "if": { "ag_gte": 0.25 },                          "use": "CARAMIDA_POROTHERM_30", "reason": "ag≥0.25g → DCH limită → cărămidă CR6-2013" },
-      { "if": { "soil_type_weak": true, "ag_lt": 0.25 },  "use": "CARAMIDA_POROTHERM_30", "reason": "sol slab + seism mediu → cărămidă NP112-2014" },
-      { "if": { "frost_depth_cm_gt": 90 },                 "use": "BCA_YTONG_30",          "reason": "climă rece → BCA 30cm Mc-001-2022 §7.3" }
+      {
+        "if": {
+          "ag_gte": 0.3
+        },
+        "useRoleCode": "EXTERIOR_WALL_BRICK_38CM",
+        "reason": "ag≥0.30g → DCH → cărămidă groasă P100-1/2013"
+      },
+      {
+        "if": {
+          "ag_gte": 0.25
+        },
+        "useRoleCode": "EXTERIOR_WALL_BRICK_30CM",
+        "reason": "ag≥0.25g → DCH limită → cărămidă CR6-2013"
+      },
+      {
+        "if": {
+          "soil_type_weak": true,
+          "ag_lt": 0.25
+        },
+        "useRoleCode": "EXTERIOR_WALL_BRICK_30CM",
+        "reason": "sol slab + seism mediu → cărămidă NP112-2014"
+      },
+      {
+        "if": {
+          "frost_depth_cm_gt": 90
+        },
+        "useRoleCode": "EXTERIOR_WALL_30CM",
+        "reason": "climă rece → BCA 30cm Mc-001-2022 §7.3"
+      }
     ],
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Structură",
-      "subcategory": "Pereți exteriori"
+      "subcategory": "Zidărie BCA"
     }
   },
   "wall_interior": {
@@ -116,7 +141,7 @@
     "wastePercent": 5,
     "aiSuggestible": true,
     "note": "Zidărie interioară BCA 12.5cm (default). Lungimea pereților interiori extrasă din planul 2D. Conform CR6-2013 Art.5.3.",
-    "defaultMaterialCode": "STANDARD_BCA_12",
+    "defaultRoleCode": "STANDARD_BCA_12",
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Structură",
@@ -126,10 +151,10 @@
   "structure_pillars_concrete": {
     "phase": "Structură",
     "unit": "mc",
-    "formula": "count_corners_and_intersections * floor_height_m * floors_count * 0.0625",
+    "formula": "((perimeter_m + interior_walls_m) / 4 + count_corners_and_intersections) * floor_height_m * floors_count * 0.0625",
     "wastePercent": 5,
     "aiSuggestible": true,
-    "note": "Beton pentru stâlpișori de zidărie confinată (ZC) 25×25cm (0.0625mp secțiune). Amplasați la colțuri + intersecții + goluri conform CR6-2013 Art.7.4.2. Clasa betonului aplicată automat din contextMultiplierEngine.",
+    "note": "Beton stâlpișori de zidărie confinată (ZC) 25×25cm. Amplasați la colțuri, intersecții și intermediari la max 4m conform CR6-2013 Art.7.4.2.",
     "materialQuery": {
       "type": "STRICT_NORMATIVE",
       "engineKey": "concreteCode"
@@ -138,10 +163,10 @@
   "structure_pillars_rebar": {
     "phase": "Structură",
     "unit": "kg",
-    "formula": "count_corners_and_intersections * floor_height_m * floors_count * 4 * 1.208 * seismic_multiplier",
+    "formula": "((perimeter_m + interior_walls_m) / 4 + count_corners_and_intersections) * floor_height_m * floors_count * (4 * 1.208 + 2.63) * 1.15 * seismic_multiplier",
     "wastePercent": 10,
     "aiSuggestible": true,
-    "note": "Armătură stâlpișori: 4 bare Ø14mm (1.208 kg/ml conform STAS 438-1). seismic_multiplier crește cantitatea în zone cu ag mare (P100-1/2013 Cap.8 + CR6-2013 Art.7.4.4 cerințe DCH).",
+    "note": "Armătură stâlpișori. Include stâlpi intermediari (CR6-2013). Longitudinal: 4 bare Ø14mm (1.208 kg/ml). Etrieri: Ø8/15cm (2.63 kg/ml). Factor 1.15 pt mustăți/înnădiri (50d). seismic_multiplier conf. P100-1/2013.",
     "materialQuery": {
       "type": "STRICT_NORMATIVE",
       "engineKey": "rebarCode"
@@ -162,34 +187,34 @@
   "structure_tie_beams_rebar": {
     "phase": "Structură",
     "unit": "kg",
-    "formula": "(perimeter_m + interior_walls_m) * 4 * 0.888 * seismic_multiplier",
+    "formula": "(perimeter_m + interior_walls_m) * (4 * 0.888 + 2.63) * 1.15 * seismic_multiplier",
     "wastePercent": 8,
     "aiSuggestible": false,
-    "note": "Armătură centuri: 4 bare Ø12mm (0.888 kg/ml). seismic_multiplier conform P100-1/2013 Cap.8 + CR6-2013 Art.7.5.3.",
+    "note": "Armătură centuri: 4 bare Ø12mm (0.888 kg/ml) + etrieri Ø8/15cm (2.63 kg/ml). Factor 1.15 pt suprapuneri. seismic_multiplier conform P100-1/2013 Cap.8 + CR6-2013 Art.7.5.3.",
     "materialQuery": {
-      "type": "STRICT_NORMATIVE",
-      "engineKey": "rebarCode"
+      "type": "FREE_PREFERENCE",
+      "internalCode": "STANDARD_FIER_12"
     }
   },
-  "slab_concrete": {
+ "slab_concrete": {
     "phase": "Planșeu",
     "unit": "mc",
-   "formula": "total_floor_area_sqm * 12 * (floors_count - 1) * seismic_multiplier",
+    "formula": "(total_floor_area_sqm / floors_count) * 0.15 * (floors_count - 1)",
     "wastePercent": 8,
     "aiSuggestible": true,
-    "note": "Planșeu beton armat 15cm grosime (h=150mm — valoare curentă conf. NE012-1:2022 pentru deschideri ≤5m). Formula se aplică doar pentru etajele superioare (floors_count-1).",
+    "note": "Volum beton planșeu armat bazat pe o grosime standard structurală de 15cm conform NE012-1:2022. Suprafața este calculată per nivel utilizând amprenta la sol a clădirii.",
     "materialQuery": {
       "type": "STRICT_NORMATIVE",
       "engineKey": "concreteCode"
     }
   },
-  "slab_rebar": {
+"slab_rebar": {
     "phase": "Planșeu",
     "unit": "kg",
-    "formula": "total_floor_area_sqm * base_rebar_kg_per_mc * 0.8 * (floors_count - 1) * seismic_multiplier",
+    "formula": "(total_floor_area_sqm / floors_count) * 0.15 * base_rebar_kg_per_mc * (floors_count - 1) * seismic_multiplier",
     "wastePercent": 8,
     "aiSuggestible": false,
-    "note": "Armătură planșeu bidirecțional: ~12kg/mp (=15kg/mc × 0.15m × 0.8 coef. distribuție). seismic_multiplier aplicat pentru zone DCH conf. P100-1/2013 Cap.8.",
+    "note": "Armătură planșeu raportată la volumul geometric al plăcii de etaj. Coeficientul seismic determinist ajustează densitatea de oțel conform cerințelor de ductilitate înaltă DCH din P100-1/2013.",
     "materialQuery": {
       "type": "STRICT_NORMATIVE",
       "engineKey": "rebarCode"
@@ -205,7 +230,7 @@
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Acoperiș",
-      "subcategory": "Învelitoare"
+      "subcategory": "Învelitori"
     }
   },
   "roof_timber": {
@@ -218,10 +243,9 @@
     "materialQuery": {
       "type": "FREE_PREFERENCE",
       "category": "Acoperiș",
-      "subcategory": "Structură"
+      "subcategory": "Șarpantă Lemn"
     }
   },
-
   "floor_screed": {
     "phase": "Finisaje",
     "unit": "mp",
@@ -258,7 +282,7 @@
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Tâmplărie",
-      "subcategory": "Uși exterior"
+      "subcategory": "Ușă Exterior"
     }
   },
   "door_interior": {
@@ -271,7 +295,7 @@
     "materialQuery": {
       "type": "FREE_PREFERENCE",
       "category": "Finisaje Fine",
-      "subcategory": "Uși interior"
+      "subcategory": "Uși Interior"
     }
   },
   "windows": {
@@ -281,30 +305,51 @@
     "wastePercent": 0,
     "aiSuggestible": true,
     "note": "Ferestre PVC standard cu geam termoizolant 2K (default). Upgrade automat la tripan pentru climă rece/energetic A, aluminiu pentru stil modern. Numărul extras din planul 2D.",
-    "defaultMaterialCode": "STANDARD_FEREASTRA_PVC",
+    "defaultRoleCode": "Fereastră PVC",
     "upgrades": [
-      { "if": { "house_style_in": ["Modern", "Industrial"] }, "use": "FEREASTRA_ALUMINIU",   "reason": "stil Modern/Industrial → aluminiu" },
-      { "if": { "energy_class": "A" },                        "use": "FEREASTRA_PVC_3K",    "reason": "clasă energetică A → tripan" },
-      { "if": { "frost_depth_cm_gt": 90 },                    "use": "FEREASTRA_PVC_3K",    "reason": "climă rece → tripan Mc-001-2022" }
+      {
+        "if": {
+          "house_style_in": [
+            "Modern",
+            "Industrial"
+          ]
+        },
+        "useRoleCode": "FEREASTRA_ALUMINIU",
+        "reason": "stil Modern/Industrial → aluminiu"
+      },
+      {
+        "if": {
+          "energy_class": "A"
+        },
+        "useRoleCode": "FEREASTRA_PVC_3K",
+        "reason": "clasă energetică A → tripan"
+      },
+      {
+        "if": {
+          "frost_depth_cm_gt": 90
+        },
+        "useRoleCode": "FEREASTRA_PVC_3K",
+        "reason": "climă rece → tripan Mc-001-2022"
+      }
     ],
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Tâmplărie",
-      "subcategory": "Ferestre"
+      "subcategory": "Fereastră PVC"
     }
   },
-  "insulation_exterior_walls": {
+"insulation_exterior_walls": {
     "phase": "Termoizolație",
     "unit": "mp",
     "formula": "(perimeter_m * floor_height_m * floors_count) - exterior_openings_sqm",
     "wastePercent": 10,
     "aiSuggestible": true,
-    "note": "Termoizolație pereți exteriori sistem ETICS. Materialul implicit EPS 10cm; AI poate sugera polistiren grafitat sau vată minerală bazaltică în funcție de buget și zonă climatică. Mc-001-2022 §7.2.",
-    "defaultMaterialCode": "polistiren-eps-10cm",
+    "note": "Termoizolație pereți exteriori sistem ETICS. Suprafața brută a fațadei din care se scad golurile de uși și ferestre conform Mc-001-2022 §7.2.",
+    "defaultRoleCode": "Polistiren (EPS/XPS)",
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Termoizolație",
-      "subcategory": "Pereți exteriori"
+      "subcategory": "Polistiren (EPS/XPS)"
     }
   },
   "insulation_roof": {
@@ -314,14 +359,20 @@
     "wastePercent": 5,
     "aiSuggestible": true,
     "note": "Termoizolație pod vată minerală bazaltică 15cm la pardoseala podului (default). Upgrade automat la 20cm pentru zone reci. Mc-001-2022 §7.3 — R≥3.7 m²K/W.",
-    "defaultMaterialCode": "vata-minerala-15cm",
+    "defaultRoleCode": "Vată Minerală",
     "upgrades": [
-      { "if": { "frost_depth_cm_gt": 90 }, "use": "VATA_MINERALA_20", "reason": "climă rece → vată 20cm Mc-001-2022 §7.3" }
+      {
+        "if": {
+          "frost_depth_cm_gt": 90
+        },
+        "useRoleCode": "INSULATION_MW_20CM",
+        "reason": "climă rece → vată 20cm Mc-001-2022 §7.3"
+      }
     ],
     "materialQuery": {
       "type": "NORMATIVE_BUDGET",
       "category": "Termoizolație",
-      "subcategory": "Acoperiș"
+      "subcategory": "Vată Minerală"
     }
   },
   "foundation_sand_bed": {
@@ -333,8 +384,7 @@
     "note": "Pat de balast compactat 20cm grosime sub fundația continuă. NP 112-2014 Art.6.3 — strat drenaj obligatoriu între teren și betonul de egalizare. Lățimea stratului = foundation_width_m, lungimea = perimeter_m fundație.",
     "materialQuery": {
       "type": "FREE_PREFERENCE",
-      "category": "Fundație",
-      "subcategory": "Terasamente"
+      "internalCode": "BALAST_COMPACTAT"
     }
   },
   "foundation_leveling_concrete": {
@@ -345,8 +395,8 @@
     "aiSuggestible": false,
     "note": "Beton de egalizare C8/10 (B100), grosime 10cm sub fundație. NE 012-1:2022 §4.3 — strat de regularizare care creează suprafața plană pentru cofraje și hidroizolație. Formula: perimetru × lățime fundație × 0.10m grosime.",
     "materialQuery": {
-      "type": "STRICT_NORMATIVE",
-      "engineKey": "concreteCode"
+      "type": "FREE_PREFERENCE",
+      "internalCode": "BETON_EGALIZARE_C8_10"
     }
   },
   "foundation_moisture_barrier": {
@@ -358,8 +408,7 @@
     "note": "Folie polietilenă 200 microni — barieră umiditate între beton egalizare și fundație. NP 112-2014 Art.9.1 — protecție hidrofugă obligatorie. Factor 1.15 = 15% suprapunere la margini și îmbinări conform instrucțiunilor tehnice C 112-86.",
     "materialQuery": {
       "type": "FREE_PREFERENCE",
-      "category": "Fundație",
-      "subcategory": "Hidroizolație"
+      "internalCode": "FOLIE_PE_200_MICRONI"
     }
   },
   "foundation_bitumen_primer": {
@@ -371,22 +420,23 @@
     "note": "Primer (amorsă) bituminos aplicat pe toate fețele fundației înainte de membrana bituminoasă. NP 112-2014 Art.9.2 + instrucțiuni tehnice C 112-86. Formula: 2 fețe laterale (perimetru × adâncime × 2) + față inferioară (perimetru × lățime). Consum 0.3 L/mp.",
     "materialQuery": {
       "type": "FREE_PREFERENCE",
-      "category": "Fundație",
-      "subcategory": "Hidroizolație"
+      "internalCode": "PRIMER_BITUMINOS"
     }
   },
-"mortar_brick": {
+  "mortar_brick": {
     "phase": "Structură",
     "unit": "sac",
     "formula": "(perimeter_m * floor_height_m * floors_count - exterior_openings_sqm) * 3.5 + interior_walls_m * floor_height_m * 1.8",
     "wastePercent": 5,
     "aiSuggestible": false,
     "note": "Mortar clasic M10 pentru zidărie din cărămidă. Calcul bazat pe rost de 12mm conform CR 6-2013 Tab.3.1. Se aplică exclusiv dacă materialul structural ales este cărămida.",
-    "condition": { "formulaKey": "wall_exterior", "structuralType": "CARAMIDA" },
+    "condition": {
+      "formulaKey": "wall_exterior",
+      "structuralType": "CARAMIDA"
+    },
     "materialQuery": {
       "type": "FREE_PREFERENCE",
-      "category": "Structură",
-      "subcategory": "Mortar"
+      "internalCode": "MORTAR_ZIDARIE_M10_SAC"
     }
   },
   "adhesive_bca": {
@@ -396,11 +446,13 @@
     "wastePercent": 5,
     "aiSuggestible": false,
     "note": "Adeziv pat subțire (1-3mm) pentru zidărie BCA conform CR 6-2013 §3.2.2(3). Consum redus masiv comparativ cu cărămida (~1.4 kg/mp la exterior). Se aplică exclusiv dacă materialul structural este BCA.",
-    "condition": { "formulaKey": "wall_exterior", "structuralType": "BCA" },
+    "condition": {
+      "formulaKey": "wall_exterior",
+      "structuralType": "BCA"
+    },
     "materialQuery": {
       "type": "FREE_PREFERENCE",
-      "category": "Structură",
-      "subcategory": "Adeziv Zidărie"
+      "internalCode": "ADEZIV_BCA_YTONG_SAC"
     }
   },
   "roof_batten": {
@@ -413,7 +465,7 @@
     "materialQuery": {
       "type": "FREE_PREFERENCE",
       "category": "Acoperiș",
-      "subcategory": "Structură"
+      "subcategory": "Șipci Acoperiș"
     }
   },
   "roof_underlay": {
@@ -426,7 +478,7 @@
     "materialQuery": {
       "type": "FREE_PREFERENCE",
       "category": "Acoperiș",
-      "subcategory": "Hidroizolație"
+      "subcategory": "Hidroizolație Acoperiș"
     }
   },
   "roof_gutter": {
@@ -439,7 +491,7 @@
     "materialQuery": {
       "type": "FREE_PREFERENCE",
       "category": "Acoperiș",
-      "subcategory": "Sistem pluvial"
+      "subcategory": "Sisteme Pluviale - Jgheaburi"
     }
   },
   "roof_downpipe": {
@@ -452,7 +504,7 @@
     "materialQuery": {
       "type": "FREE_PREFERENCE",
       "category": "Acoperiș",
-      "subcategory": "Sistem pluvial"
+      "subcategory": "Sisteme Pluviale - Burlane"
     }
   },
   "etics_mesh": {
@@ -465,7 +517,7 @@
     "materialQuery": {
       "type": "FREE_PREFERENCE",
       "category": "Termoizolație",
-      "subcategory": "ETICS"
+      "subcategory": "ETICS - Armare"
     }
   },
   "etics_finish": {
@@ -478,7 +530,7 @@
     "materialQuery": {
       "type": "FREE_PREFERENCE",
       "category": "Termoizolație",
-      "subcategory": "ETICS"
+      "subcategory": "ETICS - Finisaje Exterioare"
     }
   },
   "glet_interior": {
@@ -503,8 +555,8 @@
     "note": "Vopsea lavabilă interior (2 straturi) + grund. Consum total 0.34 L/mp: grund 0.10 L/mp (spec. Deutek/Kober) + vopsea 2×0.12 L/mp (spec. Kober Spor, SR EN 13300). Suprafața = pereți (ext 1 față + int 2 fețe) + tavan. Aceeași suprafață ca gletul. Include grundul inclus în prețul per litru mediat.",
     "materialQuery": {
       "type": "FREE_PREFERENCE",
-      "category": "Finisaje Brute",
-      "subcategory": "Vopsea"
+      "category": "Finisaje Fine",
+      "subcategory": "Vopsea Lavabilă"
     }
   },
   "electrical_cable_prize": {
@@ -515,9 +567,9 @@
     "aiSuggestible": true,
     "note": "Cablu CYY-F 3×2.5mm² pentru circuite prize. I 7-2011 §5 — circuite prize separate de iluminat, max 16A (2500W)/circuit. Factorul 3.0 acoperă traseele orizontale pe pereți + verticalele la doze + ramificațiile la fiecare priză. Estimare: (perimetru + pereți int) × etaje × 3 = lungime totală trasee principale. AI ajustează în funcție de numărul de camere declarat.",
     "materialQuery": {
-      "type": "FREE_PREFERENCE",
-      "category": "Instalații Electrice",
-      "subcategory": "Cabluri"
+      "type": "NORMATIVE_BUDGET",
+      "category": "Instalații",
+      "subcategory": "Cablu Prize"
     }
   },
   "electrical_cable_light": {
@@ -528,9 +580,9 @@
     "aiSuggestible": true,
     "note": "Cablu CYY-F 3×1.5mm² pentru circuite iluminat. I 7-2011 §5 — circuite lumina separate, max 10A/circuit. Factorul 1.5 (față de prize) reflectă traseele mai scurte și mai puțin ramificate ale iluminatului. Traseele sunt estimate la 50% din lungimea circuitelor de prize (iluminatul urmează același perete dar mai aproape de tavan).",
     "materialQuery": {
-      "type": "FREE_PREFERENCE",
-      "category": "Instalații Electrice",
-      "subcategory": "Cabluri"
+      "type": "NORMATIVE_BUDGET",
+      "category": "Instalații",
+      "subcategory": "Cablu Iluminat"
     }
   },
   "electrical_conduit": {
@@ -541,9 +593,9 @@
     "aiSuggestible": false,
     "note": "Tub protecție PVC Ø20mm sub tencuială pentru toate circuitele electrice (prize + lumina + curenți slabi). I 7-2011 Tab.4.1 — tub de protecție obligatoriu pentru conductoare montate înglobate în tencuială (categoria de instalare B1). Factorul 4.5 = suma traseelor prize (×3) + lumina (×1.5) cu un singur tub per conductor. Ø20mm acceptă max 2 cabluri 3×2.5mm² (factor umplere 40% conform I 7-2011).",
     "materialQuery": {
-      "type": "FREE_PREFERENCE",
-      "category": "Instalații Electrice",
-      "subcategory": "Protecție"
+      "type": "NORMATIVE_BUDGET",
+      "category": "Instalații",
+      "subcategory": "Tuburi și Copex"
     }
   },
   "plumbing_supply": {
@@ -554,9 +606,9 @@
     "aiSuggestible": true,
     "note": "Țevi PPR 20mm PN20 pentru distribuție apă rece + caldă. I 9-2022 §8.3 — conducte de distribuție de la coloanele principale la obiectele sanitare (max 8m fără recirculare). Factorul 1.5 include atât rețeaua apă rece cât și apa caldă (2 conducte paralele, returnul nu e obligatoriu la P+1). Perimetru × 0.5 = traseele pe pereți exteriori parțial, interior_walls_m = traseele complete pe pereții interiori unde sunt grupurile sanitare.",
     "materialQuery": {
-      "type": "FREE_PREFERENCE",
-      "category": "Instalații Sanitare",
-      "subcategory": "Alimentare apă"
+      "type": "NORMATIVE_BUDGET",
+      "category": "Instalații",
+      "subcategory": "Țevi Alimentare Apă"
     }
   },
   "plumbing_drainage_main": {
@@ -567,9 +619,9 @@
     "aiSuggestible": false,
     "note": "Coloană canalizare PVC Ø110mm. I 9-2022 §13.3 + SR EN 12056-2 sistem II — Ø110mm obligatoriu pentru coloane verticale care preiau debitul WC (qs=2.5 l/s conform SR EN 806-3). Formula: 2 coloane verticale × înălțimea totală a clădirii + colectoarele orizontale de bază (25% din perimetru). Panta min 2% pe orizontală (I 9-2022 §13.5).",
     "materialQuery": {
-      "type": "FREE_PREFERENCE",
-      "category": "Instalații Sanitare",
-      "subcategory": "Canalizare"
+      "type": "NORMATIVE_BUDGET",
+      "category": "Instalații",
+      "subcategory": "Canalizare Interioară"
     }
   },
   "plumbing_drainage_secondary": {
@@ -580,9 +632,9 @@
     "aiSuggestible": false,
     "note": "Conducte legătură canalizare PVC Ø50mm (lavoar, duș, chiuvetă). I 9-2022 §13 + SR EN 12056-2 — Ø50mm pentru obiecte sanitare cu qs≤0.5 l/s (lavoar 0.2, duș 0.2, chiuvetă 0.2 — SR EN 806-3 Tab.1). Estimare: 0.5 ml/ml perete interior (grupurile sanitare urmează pereții interiori) + 3 ml per etaj pentru racordările fixe la coloana principală. Panta min 2-3%.",
     "materialQuery": {
-      "type": "FREE_PREFERENCE",
-      "category": "Instalații Sanitare",
-      "subcategory": "Canalizare"
+      "type": "NORMATIVE_BUDGET",
+      "category": "Instalații",
+      "subcategory": "Canalizare Interioară"
     }
   }
 }
